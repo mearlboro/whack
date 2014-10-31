@@ -200,8 +200,14 @@ pExpr = buildExpressionParser waccOperators pExpr'
 pExpr' :: Parser Expr
 pExpr' =  pBoolLiterExpr
       <|> pCharLiterExpr
-      <|> fail "TODO: Implement!" 
-
+      <|> pIdentExpr
+      <|> pUnaryOperExpr
+      <|> pParenthesised 
+      <|> pIntLiter
+      <|> pStrLiter
+      <|> pPairLiter
+      <|> pArrayElemLiter
+      <|> pBinOperLiter
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: TODO COMMENT
@@ -215,27 +221,85 @@ pExpr' =  pBoolLiterExpr
 -- <pair-liter>
 -- <array-elem>
 -- <expr> <binary-oper> <expr>
-pBoolLiterExpr :: Parser Expr
-pBoolLiterExpr = fail "TODO: Implement!" 
-pCharLiterExpr :: Parser Expr
-pCharLiterExpr = fail "TODO: Implement!" 
-pIdentExpr :: Parser Expr
-pIdentExpr = fail "TODO: Implement!"     
-pUnaryOperExpr :: Parser Expr
-pUnaryOperExpr = fail "TODO: Implement!" 
-pParenthesised :: Parser Expr
-pParenthesised = fail "TODO: Implement!" 
-pIntLiterExpr :: Parser Expr
-pIntLiterExpr = fail "TODO: Implement!"  
-pStrLiterExpr :: Parser Expr
-pStrLiterExpr = fail "TODO: Implement!"  
-pPairLiterExpr :: Parser Expr
-pPairLiterExpr = fail "TODO: Implement!" 
-pArrayElemExpr :: Parser Expr
-pArrayElemExpr = fail "TODO: Implement!" 
-pBinaryOperExpr :: Parser Expr
-pBinaryOperExpr = fail "TODO: Implement!" 
 
+pBoolLiterExpr :: Parser Expr
+pBoolLiterExpr 
+  =  do
+     waccReserved "true"
+     return $ BoolLiterExpr True
+ <|> do
+     waccReserved "false"
+     return $ BoolLiterExpr False
+
+
+pCharLiterExpr :: Parser Expr
+pCharLiterExpr = anyChar >>= \ch -> return $ CharLiterExpr ch
+
+
+pIdentExpr :: Parser Expr
+pIdentExpr 
+  = do
+    ident  <- waccIdentifier
+    return $ IdentExpr ident
+
+
+pUnaryOperExpr :: Parser Expr
+pUnaryOperExpr 
+  =  pUnaryOperExp' "!"   NotUnOp
+ <|> pUnaryOperExp' "len" LenUnOp
+ <|> pUnaryOperExp' "ord" OrdUnOp
+ <|> pUnaryOperExp' "chr" ChrUnOp
+ <|> pUnaryOperExp' "-"   NegUnOp
+
+pUnaryOperExp' string op 
+  = do
+    waccReservedOp string
+    expr   <- pExpr
+    return $ UnaryOperExpr op expr
+
+
+pParenthesised :: Parser Expr
+pParenthesised = waccParens pExpr
+
+
+pIntLiterExpr :: Parser Expr
+pIntLiterExpr = pIntLiter >>= \x -> return $ IntLiterExpr x
+ 
+
+pStrLiterExpr :: Parser Expr
+pStrLiterExpr = many anyChar >>= \s -> return $ StrLiterExpr s
+
+
+pPairLiterExpr :: Parser Expr
+pPairLiterExpr = pPairLiter >>= \p -> return $ PairLiterExpr p
+
+
+pArrayElemExpr :: Parser Expr
+pArrayElemExpr = pArrayElem >>= \a -> return $ ArrayElemExpr a
+
+
+pBinaryOperExpr :: Parser Expr
+pBinaryOperExpr 
+  =  pBinaryOperExp' "+"  AddBinOp
+ <|> pBinaryOperExp' "-"  SubBinOp
+ <|> pBinaryOperExp' "*"  MulBinOp
+ <|> pBinaryOperExp' "/"  DivBinOp
+ <|> pBinaryOperExp' "%"  ModBinOp
+ <|> pBinaryOperExp' "&&" AndBinOp
+ <|> pBinaryOperExp' "||" OrrBinOp
+ <|> pBinaryOperExp' "<"  LsBinOp
+ <|> pBinaryOperExp' ">"  GtBinOp
+ <|> pBinaryOperExp' "<=" LEBinOp
+ <|> pBinaryOperExp' ">=" GEBinOp
+ <|> pBinaryOperExp' "==" EqBinOp
+ <|> pBinaryOperExp' "!=" NEBinOp
+
+pBinaryOperExp' string op 
+  = do
+    waccReservedOp string
+    expr   <- pExpr
+    expr'  <- pExpr
+    return $ BinaryOperExpr op expr expr
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: TODO COMMENT
@@ -253,6 +317,16 @@ pIntLiter = fail "TODO: Implement!"
 -- :: TODO COMMENT
 pIntSign :: Parser IntSign
 pIntSign = fail "TODO: Implement!" 
+
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: <array-liter> ::= '[' ( <expr> (',' <expr>)* )? ']'
+pArrayLiter :: Parser ArrayLiter
+pArrayLiter = fail "TODO: Implement!"
+
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: <pair-liter> ::= 'null'
+pPairLiter :: Parser PairLiter
+pPairLiter = fail "TODO: Implement!"
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --

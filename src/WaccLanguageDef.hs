@@ -6,7 +6,6 @@ module WaccLanguageDef
 , waccInteger   
 , waccSemi      
 , waccWhiteSpace
-
 , waccOperators
 ) where
 
@@ -66,19 +65,18 @@ waccOperators
     , [ Prefix ( waccOperators' "chr" $ UnaryOperExpr  ChrUnOp        )           ]
     , [ Prefix ( waccOperators' "-"   $ UnaryOperExpr  NegUnOp        )           ]
     , [ Infix  ( waccOperators' "+"   $ BinaryOperExpr AddBinOp       ) AssocLeft ] 
-    , [ Infix  ( waccOperators' "*"   $ BinaryOperExpr TimesBinOp     ) AssocLeft ] 
+    , [ Infix  ( waccOperators' "-"   $ BinaryOperExpr SubBinOp       ) AssocLeft ]
+    , [ Infix  ( waccOperators' "*"   $ BinaryOperExpr MulBinOp       ) AssocLeft ] 
     , [ Infix  ( waccOperators' "/"   $ BinaryOperExpr DivBinOp       ) AssocLeft ] 
     , [ Infix  ( waccOperators' "%"   $ BinaryOperExpr ModBinOp       ) AssocLeft ] 
-    , [ Infix  ( waccOperators' "-"   $ BinaryOperExpr SubBinOp       ) AssocLeft ]
-    , [ Infix  ( waccOperators' "<"   $ BinaryOperExpr LessBinOp      ) AssocLeft ]
-    , [ Infix  ( waccOperators' "<="  $ BinaryOperExpr LessEqBinOp    ) AssocLeft ] 
-    , [ Infix  ( waccOperators' ">"   $ BinaryOperExpr GreaterBinOp   ) AssocLeft ] 
-    , [ Infix  ( waccOperators' ">="  $ BinaryOperExpr GreaterEqBinOp ) AssocLeft ]
-    , [ Infix  ( waccOperators' "=="  $ BinaryOperExpr EqualsBinOp    ) AssocLeft ]
-    , [ Infix  ( waccOperators' "!="  $ BinaryOperExpr NotEqualsBinOp ) AssocLeft ]
+    , [ Infix  ( waccOperators' "<"   $ BinaryOperExpr LsBinOp        ) AssocLeft ]
+    , [ Infix  ( waccOperators' ">"   $ BinaryOperExpr GtBinOp        ) AssocLeft ] 
+    , [ Infix  ( waccOperators' "<="  $ BinaryOperExpr LEBinOp        ) AssocLeft ] 
+    , [ Infix  ( waccOperators' ">="  $ BinaryOperExpr GEBinOp        ) AssocLeft ]
+    , [ Infix  ( waccOperators' "=="  $ BinaryOperExpr EqBinOp        ) AssocLeft ]
+    , [ Infix  ( waccOperators' "!="  $ BinaryOperExpr NEBinOp        ) AssocLeft ]
     , [ Infix  ( waccOperators' "&&"  $ BinaryOperExpr AndBinOp       ) AssocLeft ]
-    , [ Infix  ( waccOperators' "||"  $ BinaryOperExpr OrBinOp        ) AssocLeft ] ]
+    , [ Infix  ( waccOperators' "||"  $ BinaryOperExpr OrrBinOp        ) AssocLeft ] ]
 
---waccOperators' :: String -> b -> Parser Strin
 waccOperators' op expr = waccReservedOp op >> return ( expr )
   
