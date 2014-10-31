@@ -49,65 +49,127 @@ pParam = do
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <stat> ::= pSkipStat | pFreeStat | ...
+
 pStat :: Parser Stat
-pStat =  pSkipStat
-     <|> pFreeStat
-     <|> fail "TODO: Implement!"
-
-
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: TODO COMMENT 
--- 'skip' 
--- 'free' <expr>
--- 'return' <expr>
--- 'exit' <expr>
--- 'print' <expr>
--- 'println' <expr>
--- 'begin' <stat> 'end'
--- 'read' <assign-lhs>
--- 'while' <expr> 'do' <stat> 'done'
--- <stat> ';' <stat>
--- <assign-lhs> '=' <assign-rhs>
--- 'if' <expr> 'then' <stat> 'else' <stat> 'fi'
--- <type> <ident> '=' <assign-rhs>
+pStat = pSkipStat
+		 <|> pStat' "free" FreeStat 
+         <|> pStat' "return" ReturnStat
+		 <|> pStat' "exit" ExitStat
+		 <|> pStat' "print" PrintStat
+		 <|> pStat' "println" PrintlnStat
+		 <|> pScopedStat
+		 <|> pReadStat
+		 <|> pWhileStat
+		 <|> pSeqStat
+		 <|> pAssignStat
+		 <|> pIfStat
+		 <|> pDeclareStat
+		 			 		
+pStat' :: String -> (Expr -> Stat) -> Parser Stat
+pStat' key stat = do
+  waccReserved key
+  expr <- pExpr
+  return $ stat expr
+								   		
+								   		
 pSkipStat :: Parser Stat
-pSkipStat = fail "TODO: Implement!" 
-pFreeStat :: Parser Stat   
-pFreeStat = fail "TODO: Implement!"
-pReturnStat :: Parser Stat
-pReturnStat = fail "TODO: Implement!"
-pExitStat :: Parser Stat
-pExitStat = fail "TODO: Implement!"
-pPrintStat :: Parser Stat  
-pPrintStat = fail "TODO: Implement!"
-pPrintlnStat :: Parser Stat
-pPrintlnStat = fail "TODO: Implement!"
+pSkipStat = do
+  waccReserved "skip"
+  return $ SkipStat
+
 pScopedStat :: Parser Stat
-pScopedStat = fail "TODO: Implement!" 
+pScopedStat = do
+  waccReserved "begin"
+  stat <- pStat
+  waccReserved "end"
+  return $ ScopedStat stat
+		 	
 pReadStat :: Parser Stat
-pReadStat = fail "TODO: Implement!" 
-pWhileStat :: Parser Stat  
-pWhileStat = fail "TODO: Implement!"
-pSeqStat :: Parser Stat   
-pSeqStat = fail "TODO: Implement!"
+pReadStat = do
+  waccReserved "read"
+  assignLhs <- pAssignLhs
+  return $ ReadStat assignLhs
+		 	
+pWhileStat :: Parser Stat
+pWhileStat = do
+  waccReserved "while"
+  expr <- pExpr
+  waccReserved "do"
+  stat <- pStat
+  waccReserved "done"
+  return $ WhileStat expr stat
+		 	    
+pSeqStat :: Parser Stat
+pSeqStat = do
+  stat1 <- pStat
+  waccSemi
+  stat2 <- pStat
+  return $ SeqStat stat1 stat2
+		 	  
 pAssignStat :: Parser Stat
-pAssignStat = fail "TODO: Implement!"
-pIfStat :: Parser Stat    
-pIfStat = fail "TODO: Implement!"   
+pAssignStat = do
+  assignLhs <- pAssignLhs
+  waccReservedOp "="
+  assignRhs <- pAssignRhs
+  return $ AssignStat assignLhs assignRhs
+
+pIfStat :: Parser Stat
+pIfStat = do
+  waccReserved "if"
+  expr <- pExpr
+  waccReserved "then"
+  stat1 <- pStat
+  waccReserved "else"
+  stat2 <- pStat
+  waccReserved "fi"
+  return $ IfStat expr stat1 stat2
+
 pDeclareStat :: Parser Stat
-pDeclareStat = fail "TODO: Implement!" 
+pDeclareStat = do
+  typez <- pType
+  ident <- waccIdentifier
+  waccReservedOp "="
+  assignRhs <- pAssignRhs
+  return $ DeclareStat typez ident assignRhs
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: TODO COMMENT
+-- :: <assign-lhs> 
 pAssignLhs :: Parser AssignLhs
-pAssignLhs = fail "TODO: Implement!" 
+pAssignLhs =  pSimple waccIdentifier LhsIdent     -- <ident>
+          <|> pSimple pPairElem      LhsPairElem  -- <pair-elem> 
+          <|> pSimple pArrayElem     LhsArrayElem -- <array-elem>
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: TODO COMMENT
+-- :: <assign-rhs>
 pAssignRhs :: Parser AssignRhs
-pAssignRhs = fail "TODO: Implement!" 
+pAssignRhs =  pSimple pExpr       RhsExpr       -- <expr>
+          <|> pSimple pPairElem   RhsPairElem   -- <pair-elem>
+          <|> pSimple pArrayLiter RhsArrayLiter -- <array-liter>
+          <|> pRhsNewPair
+          <|> pRhsCall
+
+-- ::= 'newpair' '(' <expr> ',' <expr> ')'
+pRhsNewPair :: Parser AssignRhs
+pRhsNewPair = do 
+  waccReserved "newpair" 
+  char '('
+  expr  <- pExpr         
+  char ','
+  expr' <- pExpr         
+  char ')'
+  return $ RhsNewPair expr expr'
+
+-- ::= 'call' <ident> '(' <arg-list>? ')'
+pRhsCall :: Parser AssignRhs
+pRhsCall = do 
+  waccReserved "call"
+  ident   <- waccIdentifier 
+  char '('
+  argList <- many pExpr     
+  char ')'
+  return $ RhsCall ident argList
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -302,21 +364,59 @@ pBinaryOperExp' string op
     return $ BinaryOperExpr op expr expr
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: TODO COMMENT
+-- :: <array-elem> ::= <ident> '[' <expr> ']'
 pArrayElem :: Parser ArrayElem
-pArrayElem = fail "TODO: Implement!" 
+pArrayElem = do
+  ident <- waccIdentifier
+  char '['
+  expr <- pExpr
+  char ']'
+  return $ ArrayElem ident expr
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: TODO COMMENT
+-- :: <int-liter> ::= <int-sign>? <digit>+ 
 pIntLiter :: Parser IntLiter
-pIntLiter = fail "TODO: Implement!" 
+pIntLiter = do
+  intSign <- pIntSign
+  digits  <- many1 digit
+  return $ IntLiter intSign $ read digits
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: TODO COMMENT
-pIntSign :: Parser IntSign
-pIntSign = fail "TODO: Implement!" 
+-- :: <int-sign> ::= '+' | '-'
+pIntSign :: Parser ( Maybe IntSign )
+pIntSign =  waccReservedOp "+" `ifSuccess` Just Plus 
+        <|> waccReservedOp "-" `ifSuccess` Just Minus 
+        <|> return Nothing
+
+
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: <array-liter> ::= '[' ( <expr> (',' <expr>)* )? ']'
+pArrayLiter :: Parser ArrayLiter
+pArrayLiter = many pExpr
+
+
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: <pair-liter> ::= 'null'
+pPairLiter :: Parser PairLiter
+pPairLiter = waccReserved "null" `ifSuccess` Null 
+
+
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: Utils ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+
+-- Given a parser and a Type construtor, try to parse a token suing the given
+-- parser and uses the result to contructo a value of the type provided
+pSimple :: Parser a -> ( a -> b ) -> Parser b
+pSimple p t = p >>= \e -> return $ t e
+
+
+-- Perfoms the action provided and returns the value provided if the 
+-- action didnt' fail
+ifSuccess :: Monad m => m a -> b -> m b 
+ifSuccess acc e = do acc ; return e 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <array-liter> ::= '[' ( <expr> (',' <expr>)* )? ']'
@@ -332,6 +432,8 @@ pPairLiter = fail "TODO: Implement!"
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: TEST PARSER ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+
+
 
 regularParse :: Parser a -> String -> Either ParseError a
 regularParse p = parse p ""
