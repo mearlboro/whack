@@ -2,6 +2,7 @@ module WaccParser where
 
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
+import Text.ParserCombinators.Parsec.Token
 import Control.Applicative hiding ( (<|>) , many )
 
 import WaccDataTypes 
@@ -112,37 +113,80 @@ pAssignRhs = fail "TODO: Implement!"
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: TODO COMMENT
 pPairElem :: Parser PairElem
-pPairElem = fail "TODO: Implement!" 
+pPairElem =  
+  do  waccReserved "fst"
+      expr <- pExpr
+      return (Fst expr)
+ <|>  
+  do  waccReserved "snd"
+      expr <- pExpr
+      return (Snd expr)
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: TODO COMMENT
 pType :: Parser Type
-pType = fail "TODO: Implement!" 
+pType =  
+  do  varType <- pBaseType
+      return (TypeBase  varType)
+ <|>  
+  do  varType <- pPairType
+      return (TypePair  varType)
+ <|>  
+  do  varType <- pArrayType
+      return (TypeArray varType) 
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: TODO COMMENT
 pBaseType :: Parser BaseType
-pBaseType = fail "TODO: Implement!" 
+pBaseType = 
+  do  waccReserved "int"
+      return IntBaseType
+  <|> 
+  do  waccReserved "bool"
+      return BoolBaseType
+  <|> 
+  do  waccReserved "char"
+      return CharBaseType
+  <|> 
+  do  waccReserved "string"
+      return StringBaseType
+
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: TODO COMMENT
 pArrayType :: Parser ArrayType
-pArrayType = fail "TODO: Implement!" 
+pArrayType = 
+  do  varType <- pType
+      return (ArrayType varType)
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: TODO COMMENT
 pPairType :: Parser PairType
-pPairType = fail "TODO: Implement!" 
-
+pPairType =  
+  do  waccReserved "pair"
+      waccReserved "("
+      pairElem1 <- pPairElemType
+      waccReserved ","
+      pairElem2 <- pPairElemType
+      waccReserved ")"
+      return (pairElem1, pairElem2)
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: TODO COMMENT
 pPairElemType :: Parser PairElemType
-pPairElemType = fail "TODO: Implement!" 
+pPairElemType = 
+  do  waccReserved "pair"
+      return PairPairElemType
+ <|>  
+  do  varType <- pBaseType
+      return (BasePairElemType varType)
+ <|>  
+  do  varType <- pArrayType
+      return (ArrayPairElemType varType)
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
