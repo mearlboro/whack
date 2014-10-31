@@ -3,6 +3,7 @@ module WaccParser where
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 import Control.Applicative hiding ( (<|>) , many )
+import Control.Monad ( liftM )
 
 import WaccDataTypes 
 import WaccLanguageDef 
@@ -32,9 +33,11 @@ pFunc = do
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <param-list> ::= <type> <ident> '(' <param-list>? ')' 'is' <stat> 'end'
+-- :: <param-list> ::= <param> (';' <param>)*
 pParamList :: Parser ParamList
-pParamList = fail "TODO: Implement!"
+pParamList = do
+  pList <- sepBy pParam waccSemi
+  return $ pList
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -100,17 +103,17 @@ pDeclareStat = fail "TODO: Implement!"
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <assign-lhs> 
 pAssignLhs :: Parser AssignLhs
-pAssignLhs =  pSimple waccIdentifier LhsIdent     -- <ident>
-          <|> pSimple pPairElem      LhsPairElem  -- <pair-elem> 
-          <|> pSimple pArrayElem     LhsArrayElem -- <array-elem>
+pAssignLhs =  liftM LhsIdent     waccIdentifier  -- <ident>
+          <|> liftM LhsPairElem  pPairElem       -- <pair-elem> 
+          <|> liftM LhsArrayElem pArrayElem      -- <array-elem>
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <assign-rhs>
 pAssignRhs :: Parser AssignRhs
-pAssignRhs =  pSimple pExpr       RhsExpr       -- <expr>
-          <|> pSimple pPairElem   RhsPairElem   -- <pair-elem>
-          <|> pSimple pArrayLiter RhsArrayLiter -- <array-liter>
+pAssignRhs =  liftM RhsExpr       pExpr        -- <expr>
+          <|> liftM RhsPairElem   pPairElem    -- <pair-elem>
+          <|> liftM RhsArrayLiter pArrayLiter  -- <array-liter>
           <|> pRhsNewPair
           <|> pRhsCall
 
@@ -129,7 +132,7 @@ pRhsNewPair = do
 pRhsCall :: Parser AssignRhs
 pRhsCall = do 
   waccReserved "call"
-  ident   <- waccIdentifier 
+  ident <- waccIdentifier 
   char '('
   argList <- many pExpr     
   char ')'
@@ -219,7 +222,6 @@ pArrayElemExpr = fail "TODO: Implement!"
 pBinaryOperExpr :: Parser Expr
 pBinaryOperExpr = fail "TODO: Implement!" 
 
-
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <array-elem> ::= <ident> '[' <expr> ']'
 pArrayElem :: Parser ArrayElem
@@ -236,8 +238,8 @@ pArrayElem = do
 pIntLiter :: Parser IntLiter
 pIntLiter = do
   intSign <- pIntSign
-  digits  <- many1 digit
-  return $ IntLiter intSign $ read digits
+  digits  <- waccInteger
+  return $ IntLiter intSign $ digits
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -251,7 +253,11 @@ pIntSign =  waccReservedOp "+" `ifSuccess` Just Plus
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <array-liter> ::= '[' ( <expr> (',' <expr>)* )? ']'
 pArrayLiter :: Parser ArrayLiter
-pArrayLiter = many pExpr
+pArrayLiter = do 
+  char '['
+  exprs <- sepBy pExpr $ char ','
+  char ']'
+  return $ exprs
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -266,8 +272,8 @@ pPairLiter = waccReserved "null" `ifSuccess` Null
 
 -- Given a parser and a Type construtor, try to parse a token suing the given
 -- parser and uses the result to contructo a value of the type provided
-pSimple :: Parser a -> ( a -> b ) -> Parser b
-pSimple p t = p >>= \e -> return $ t e
+--pSimple :: Parser a -> ( a -> b ) -> Parser b
+--pSimple p t = p >>= \e -> return $ t e
 
 
 -- Perfoms the action provided and returns the value provided if the 
