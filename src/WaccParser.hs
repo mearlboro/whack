@@ -137,12 +137,12 @@ pSeqStat = do
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <assign-lhs> :::::::::::::::::::::::::::::::::::::::::::::::::::::::::: -- 
+-- :: <assign-lhs> ::= <ident> | <pair-elem> | <array-elem> ::::::::::::::::: -- 
 pAssignLhs :: Parser AssignLhs
 pAssignLhs 
-    =  liftM LhsIdent     waccIdentifier -- <ident>
-   <|> liftM LhsPairElem  pPairElem      -- <pair-elem> 
-   <|> liftM LhsArrayElem pArrayElem     -- <array-elem>
+    =  liftM LhsIdent     waccIdentifier
+   <|> liftM LhsPairElem  pPairElem     
+   <|> liftM LhsArrayElem pArrayElem    
   
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -179,8 +179,8 @@ pRhsCall = do
 -- :: <pair-elem> ::= 'fst' <expr> | 'snd' <expr' ::::::::::::::::::::::::::: --
 pPairElem :: Parser PairElem
 pPairElem 
-    =  (waccReserved "fst" >> liftM Fst pExpr) -- 'fst' <expr>
-   <|> (waccReserved "snd" >> liftM Snd pExpr) -- 'snd' <expr>
+    =  (waccReserved "fst" >> liftM Fst pExpr)
+   <|> (waccReserved "snd" >> liftM Snd pExpr)
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -247,8 +247,8 @@ pExpr'
    <|> pParenthesised 
    <|> pArrayElemExpr
    <|> pBinaryOperExpr
-  
 
+ 
 pIntLiterExpr :: Parser Expr         -- <int-liter>
 pIntLiterExpr = liftM IntLiterExpr pIntLiter 
  
@@ -318,7 +318,7 @@ pParenthesised = waccParens pExpr
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <array-elem> ::= <ident> '[' <expr> ']'
+-- :: <array-elem> ::= <ident> '[' <expr> ']' ::::::::::::::::::::::::::::::: --
 pArrayElem :: Parser ArrayElem
 pArrayElem = do
     ident <- waccIdentifier
@@ -329,7 +329,7 @@ pArrayElem = do
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <int-liter> ::= <int-sign>? <digit>+ 
+-- :: <int-liter> ::= <int-sign>? <digit>+ :::::::::::::::::::::::::::::::::: --
 pIntLiter :: Parser IntLiter
 pIntLiter = do
     intSign <- pIntSign
@@ -338,7 +338,7 @@ pIntLiter = do
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <int-sign> ::= '+' | '-'
+-- :: <int-sign> ::= '+' | '-' :::::::::::::::::::::::::::::::::::::::::::::: --
 pIntSign :: Parser ( Maybe IntSign )
 pIntSign 
     =  ( waccReservedOp "+" >> return ( Just Plus  ) )
@@ -347,13 +347,13 @@ pIntSign
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <array-liter> ::= '[' ( <expr> (',' <expr>)* )? ']'
+-- :: <array-liter> ::= '[' ( <expr> (',' <expr>)* )? ']' ::::::::::::::::::: --
 pArrayLiter :: Parser ArrayLiter
 pArrayLiter = many pExpr
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <pair-liter> ::= 'null'
+-- :: <pair-liter> ::= 'null' ::::::::::::::::::::::::::::::::::::::::::::::: --
 pPairLiter :: Parser PairLiter
 pPairLiter = waccReserved "null" >> return Null 
 
@@ -366,13 +366,13 @@ pPairLiter = waccReserved "null" >> return Null
 regularParse :: Parser a -> String -> Either ParseError a
 regularParse p = parse p ""
 
---This function will run the parser, but additionally fail if it doesn't
---consume all the input.
+-- |This function will run the parser, but additionally fail if it doesn't
+-- consume all the input.
 parseWithEof :: Parser a -> String -> Either ParseError a
 parseWithEof p = parse ( p <* eof ) ""
 
---This function will apply the parser, then also return any left over
---input which wasn't parsed.
+-- |This function will apply the parser, then also return any left over
+-- input which wasn't parsed.
 parseWithLeftOver :: Parser a -> String -> Either ParseError (a,String)
 parseWithLeftOver p = parse ( (,) <$> p <*> leftOver ) ""
   where leftOver = manyTill anyToken eof
