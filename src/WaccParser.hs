@@ -6,13 +6,13 @@ import Text.ParserCombinators.Parsec.Token
 import Control.Applicative hiding ( (<|>) , many )
 import Control.Monad ( liftM )
 
-import WaccDataTypes 
-import WaccLanguageDef 
+import WaccDataTypes
+import WaccLanguageDef
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <program> ::= 'begin' <func>* <stat> 'end' :::::::::::::::::::::::::::: --
-pProgram :: Parser Program 
-pProgram = do 
+pProgram :: Parser Program
+pProgram = do
     waccReserved "begin"
     funcs <- many pFunc
     stat  <- pStat
@@ -22,9 +22,9 @@ pProgram = do
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <func> ::= <type> <ident> '(' <param-list>? ')' 'is' <stat> 'end' ::::: --
-pFunc :: Parser Func 
-pFunc = do 
-    typez <- pType   
+pFunc :: Parser Func
+pFunc = do
+    typez <- pType
     ident <- waccIdentifier
     pList <- waccParens pParamList
     waccReserved "is"
@@ -34,7 +34,7 @@ pFunc = do
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <param-list> ::= <param> (',' <param>)* ::::::::::::::::::::::::::::::: -- 
+-- :: <param-list> ::= <param> (',' <param>)* ::::::::::::::::::::::::::::::: --
 pParamList :: Parser ParamList
 pParamList = do
     pList <- sepBy pParam $ char ','
@@ -43,7 +43,7 @@ pParamList = do
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <param> ::= <type> <ident> :::::::::::::::::::::::::::::::::::::::::::: --
-pParam :: Parser Param  
+pParam :: Parser Param
 pParam = do
     typez <- pType
     ident <- waccIdentifier
@@ -53,12 +53,12 @@ pParam = do
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <stat> :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 pStat :: Parser Stat
-pStat 
+pStat
     =  pSkipStat
    <|> pDeclareStat
    <|> pAssignStat
    <|> pReadStat
-   <|> pStat' "free"    FreeStat 
+   <|> pStat' "free"    FreeStat
    <|> pStat' "return"  ReturnStat
    <|> pStat' "exit"    ExitStat
    <|> pStat' "print"   PrintStat
@@ -68,11 +68,11 @@ pStat
    <|> pScopedStat
    <|> pSeqStat
 
-		 			 		
-pStat' :: String -> (Expr -> Stat) -> Parser Stat
-pStat' key stat = waccReserved key >> liftM stat pExpr 
 
-								   		
+pStat' :: String -> (Expr -> Stat) -> Parser Stat
+pStat' key stat = waccReserved key >> liftM stat pExpr
+
+
 pSkipStat :: Parser Stat     -- 'skip'
 pSkipStat = waccReserved "skip" >> return SkipStat
 
@@ -84,7 +84,7 @@ pDeclareStat = do
     waccReservedOp "="
     assignRhs <- pAssignRhs
     return $ DeclareStat typez ident assignRhs
-  
+
 
 pAssignStat :: Parser Stat   -- <assign-lhs> = <assign-rhs>
 pAssignStat = do
@@ -108,8 +108,8 @@ pIfStat = do
     stat2 <- pStat
     waccReserved "fi"
     return $ IfStat expr stat1 stat2
-		 	
-		 	
+
+
 pWhileStat :: Parser Stat    -- 'while' <expr> 'do' <stat> 'done'
 pWhileStat = do
     waccReserved "while"
@@ -126,7 +126,7 @@ pScopedStat = do
     stat <- pStat
     waccReserved "end"
     return $ ScopedStat stat
- 
+
 
 pSeqStat :: Parser Stat      -- <stat> ';' <stat>
 pSeqStat = do
@@ -137,48 +137,48 @@ pSeqStat = do
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <assign-lhs> ::= <ident> | <pair-elem> | <array-elem> ::::::::::::::::: -- 
+-- :: <assign-lhs> ::= <ident> | <pair-elem> | <array-elem> ::::::::::::::::: --
 pAssignLhs :: Parser AssignLhs
-pAssignLhs 
+pAssignLhs
     =  liftM LhsIdent     waccIdentifier
-   <|> liftM LhsPairElem  pPairElem     
-   <|> liftM LhsArrayElem pArrayElem    
-  
+   <|> liftM LhsPairElem  pPairElem
+   <|> liftM LhsArrayElem pArrayElem
+
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <assign-rhs> :::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 pAssignRhs :: Parser AssignRhs
-pAssignRhs 
+pAssignRhs
     =  liftM RhsExpr       pExpr         -- <expr>
    <|> liftM RhsPairElem   pPairElem     -- <pair-elem>
    <|> liftM RhsArrayLiter pArrayLiter   -- <array-liter>
    <|> pRhsNewPair
    <|> pRhsCall
-  
+
 
 pRhsNewPair :: Parser AssignRhs          -- 'newpair' '(' <expr> ',' <expr> ')'
-pRhsNewPair = do 
-    waccReserved "newpair" 
+pRhsNewPair = do
+    waccReserved "newpair"
     char '('
-    expr  <- pExpr         
+    expr  <- pExpr
     char ','
-    expr' <- pExpr         
+    expr' <- pExpr
     char ')'
     return $ RhsNewPair expr expr'
 
 
 pRhsCall :: Parser AssignRhs             -- 'call' <ident> '(' <arg-list>? ')'
-pRhsCall = do 
+pRhsCall = do
     waccReserved "call"
-    ident   <- waccIdentifier 
-    argList <- waccParens $ many pExpr     
+    ident   <- waccIdentifier
+    argList <- waccParens $ many pExpr
     return $ RhsCall ident argList
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <pair-elem> ::= 'fst' <expr> | 'snd' <expr' ::::::::::::::::::::::::::: --
 pPairElem :: Parser PairElem
-pPairElem 
+pPairElem
     =  (waccReserved "fst" >> liftM Fst pExpr)
    <|> (waccReserved "snd" >> liftM Snd pExpr)
 
@@ -186,17 +186,17 @@ pPairElem
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <type> ::= <base-type> | <array-type> | <pair-type> ::::::::::::::::::: --
 pType :: Parser Type
-pType 
+pType
     =  liftM TypeBase  pBaseType
    <|> liftM TypeArray pArrayType
-   <|> liftM TypePair  pPairType 
+   <|> liftM TypePair  pPairType
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <base-type> ::= 'int' | 'bool' | 'char' | 'string' :::::::::::::::::::: -- 
+-- :: <base-type> ::= 'int' | 'bool' | 'char' | 'string' :::::::::::::::::::: --
 pBaseType :: Parser BaseType
 pBaseType
-    =  (waccReserved "int"    >> return IntBaseType    ) 
+    =  (waccReserved "int"    >> return IntBaseType    )
    <|> (waccReserved "bool"   >> return BoolBaseType   )
    <|> (waccReserved "char"   >> return CharBaseType   )
    <|> (waccReserved "string" >> return StringBaseType )
@@ -224,7 +224,7 @@ pPairType = do
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <pair-elem-type> ::= <base-type> | <array-type> | 'pair' :::::::::::::: --
 pPairElemType :: Parser PairElemType
-pPairElemType 
+pPairElemType
     =  liftM BasePairElemType  pBaseType
    <|> liftM ArrayPairElemType pArrayType
    <|> ( waccReserved "null" >> return PairPairElemType )
@@ -233,10 +233,10 @@ pPairElemType
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <expr> :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 pExpr :: Parser Expr
-pExpr = buildExpressionParser waccOperators pExpr' 
- 
+pExpr = buildExpressionParser waccOperators pExpr'
+
 pExpr' :: Parser Expr
-pExpr' 
+pExpr'
     =  pIntLiterExpr
    <|> pBoolLiterExpr
    <|> pCharLiterExpr
@@ -244,17 +244,17 @@ pExpr'
    <|> pPairLiterExpr
    <|> pIdentExpr
    <|> pUnaryOperExpr
-   <|> pParenthesised 
+   <|> pParenthesised
    <|> pArrayElemExpr
    <|> pBinaryOperExpr
 
- 
+
 pIntLiterExpr :: Parser Expr         -- <int-liter>
-pIntLiterExpr = liftM IntLiterExpr pIntLiter 
- 
+pIntLiterExpr = liftM IntLiterExpr pIntLiter
+
 
 pBoolLiterExpr :: Parser Expr        -- <bool-liter>
-pBoolLiterExpr 
+pBoolLiterExpr
     =  ( waccReserved "true"  >> return ( BoolLiterExpr True  ) )
    <|> ( waccReserved "false" >> return ( BoolLiterExpr False ) )
 
@@ -280,18 +280,18 @@ pArrayElemExpr = liftM ArrayElemExpr pArrayElem
 
 
 pUnaryOperExpr :: Parser Expr        -- <unary-oper> <expr>
-pUnaryOperExpr 
+pUnaryOperExpr
     =  pUnaryOperExp' "!"   NotUnOp
    <|> pUnaryOperExp' "len" LenUnOp
    <|> pUnaryOperExp' "ord" OrdUnOp
    <|> pUnaryOperExp' "chr" ChrUnOp
    <|> pUnaryOperExp' "-"   NegUnOp
 
-pUnaryOperExp' string op = 
+pUnaryOperExp' string op =
     waccReservedOp string >> liftM (UnaryOperExpr op) pExpr
 
 pBinaryOperExpr :: Parser Expr       -- <expr> <binary-oper> <expr>
-pBinaryOperExpr 
+pBinaryOperExpr
     =  pBinaryOperExp' "+"  AddBinOp
    <|> pBinaryOperExp' "-"  SubBinOp
    <|> pBinaryOperExp' "*"  MulBinOp
@@ -340,7 +340,7 @@ pIntLiter = do
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <int-sign> ::= '+' | '-' :::::::::::::::::::::::::::::::::::::::::::::: --
 pIntSign :: Parser ( Maybe IntSign )
-pIntSign 
+pIntSign
     =  ( waccReservedOp "+" >> return ( Just Plus  ) )
    <|> ( waccReservedOp "-" >> return ( Just Minus ) )
    <|> return Nothing
@@ -355,7 +355,7 @@ pArrayLiter = many pExpr
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <pair-liter> ::= 'null' ::::::::::::::::::::::::::::::::::::::::::::::: --
 pPairLiter :: Parser PairLiter
-pPairLiter = waccReserved "null" >> return Null 
+pPairLiter = waccReserved "null" >> return Null
 
 
 
