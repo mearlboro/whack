@@ -34,7 +34,7 @@ pFunc = do
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <param-list> ::= <param> (',' <param>)* 
+-- :: <param-list> ::= <param> (',' <param>)* ::::::::::::::::::::::::::::::: -- 
 pParamList :: Parser ParamList
 pParamList = do
     pList <- sepBy pParam $ char ','
@@ -74,7 +74,7 @@ pStat' key stat = waccReserved key >> liftM stat pExpr
 
 								   		
 pSkipStat :: Parser Stat     -- 'skip'
-pSkipStat = waccReserved "skip" >> return $ SkipStat
+pSkipStat = waccReserved "skip" >> return SkipStat
 
 
 pDeclareStat :: Parser Stat  -- <type> <ident> '=' <assign-rhs>
@@ -227,7 +227,7 @@ pPairElemType :: Parser PairElemType
 pPairElemType 
     =  liftM BasePairElemType  pBaseType
    <|> liftM ArrayPairElemType pArrayType
-   <|> ( waccReserved "null" >> return $ PairPairElemType )
+   <|> ( waccReserved "null" >> return PairPairElemType )
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -250,35 +250,33 @@ pExpr'
   
 
 pIntLiterExpr :: Parser Expr         -- <int-liter>
-pIntLiterExpr = pIntLiter >>= \x -> return $ IntLiterExpr x
+pIntLiterExpr = liftM IntLiterExpr pIntLiter 
  
 
 pBoolLiterExpr :: Parser Expr        -- <bool-liter>
 pBoolLiterExpr 
-    =  ( waccReserved "true"  >> return $ BoolLiterExpr True  )
-   <|> ( waccReserved "false" >> return $ BoolLiterExpr False )
+    =  ( waccReserved "true"  >> return ( BoolLiterExpr True  ) )
+   <|> ( waccReserved "false" >> return ( BoolLiterExpr False ) )
 
 
 pCharLiterExpr :: Parser Expr        -- <char-liter>
-pCharLiterExpr = anyChar     >>= \c -> return $ CharLiterExpr c
+pCharLiterExpr = liftM CharLiterExpr anyChar
 
 
 pStrLiterExpr :: Parser Expr         -- <str-liter>
-pStrLiterExpr = many anyChar >>= \s -> return $ StrLiterExpr  s
+pStrLiterExpr = liftM StrLiterExpr $ many anyChar
 
 
 pPairLiterExpr :: Parser Expr        -- <pair-liter>
-pPairLiterExpr = pPairLiter  >>= \p -> return $ PairLiterExpr p
+pPairLiterExpr = liftM PairLiterExpr pPairLiter
 
 
 pIdentExpr :: Parser Expr            -- <ident>
-pIdentExpr = do
-    ident  <- waccIdentifier
-    return $ IdentExpr ident
+pIdentExpr = liftM IdentExpr waccIdentifier
 
 
 pArrayElemExpr :: Parser Expr        -- <array-elem>
-pArrayElemExpr = pArrayElem  >>= \a -> return $ ArrayElemExpr a
+pArrayElemExpr = liftM ArrayElemExpr pArrayElem
 
 
 pUnaryOperExpr :: Parser Expr        -- <unary-oper> <expr>
@@ -289,11 +287,8 @@ pUnaryOperExpr
    <|> pUnaryOperExp' "chr" ChrUnOp
    <|> pUnaryOperExp' "-"   NegUnOp
 
-pUnaryOperExp' string op = do
-    waccReservedOp string
-    expr   <- pExpr
-    return $ UnaryOperExpr op expr
-
+pUnaryOperExp' string op = 
+    waccReservedOp string >> liftM (UnaryOperExpr op) pExpr
 
 pBinaryOperExpr :: Parser Expr       -- <expr> <binary-oper> <expr>
 pBinaryOperExpr 
@@ -338,16 +333,16 @@ pArrayElem = do
 pIntLiter :: Parser IntLiter
 pIntLiter = do
     intSign <- pIntSign
-    digits  <- many1 digit
-    return $ IntLiter intSign $ read digits
+    digits  <- waccInteger
+    return $ IntLiter intSign digits
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <int-sign> ::= '+' | '-'
 pIntSign :: Parser ( Maybe IntSign )
 pIntSign 
-    =  ( waccReservedOp "+" >> return $ Just Plus  )
-   <|> ( waccReservedOp "-" >> return $ Just Minus )
+    =  ( waccReservedOp "+" >> return ( Just Plus  ) )
+   <|> ( waccReservedOp "-" >> return ( Just Minus ) )
    <|> return Nothing
 
 
@@ -361,16 +356,6 @@ pArrayLiter = many pExpr
 -- :: <pair-liter> ::= 'null'
 pPairLiter :: Parser PairLiter
 pPairLiter = waccReserved "null" >> return Null 
-
-
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: Utils ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
-
--- Perfoms the action provided and returns the value provided if the 
--- action didnt' fail
-ifSuccess :: Monad m => m a -> b -> m b 
-ifSuccess acc e = do acc ; return e 
 
 
 
