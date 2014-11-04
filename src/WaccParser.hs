@@ -5,6 +5,7 @@ import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Token
 import Control.Applicative hiding ( (<|>) , many )
 import Control.Monad ( liftM , liftM2 )
+import Text.Parsec.Language
 
 import WaccDataTypes
 import WaccLanguageDef
@@ -130,7 +131,7 @@ pAssignRhs
 
     where 
 
-        pRhsNewPair = do                    -- 'newpair' '(' <expr> ',' <expr> ')'
+        pRhsNewPair = do                  -- 'newpair' '(' <expr> ',' <expr> ')'
           waccReserved "newpair" 
           char '('
           expr1 <- pExpr         
@@ -139,7 +140,7 @@ pAssignRhs
           char ')'
           return $ RhsNewPair expr1 expr2
     
-        pRhsCall = do                       -- 'call' <ident> '(' <arg-list>? ')' TODO liftM2
+        pRhsCall = do                     -- 'call' <ident> '(' <arg-list>? ')' TODO liftM2
           waccReserved "call" 
           ident <- waccIdentifier
           aList <- waccParens $ many pExpr
@@ -208,59 +209,75 @@ pPairElemType
 -- :: <expr> :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 pExpr :: Parser Expr
 pExpr = buildExpressionParser waccOperators pExpr' 
-  
-  where  
+
+        where
+
+            pExpr' :: Parser Expr
+            pExpr'
+                =  pIntLiterExpr
+               <|> pBoolLiterExpr
+               <|> pCharLiterExpr
+               <|> pStrLiterExpr
+               <|> pPairLiterExpr
+               <|> pIdentExpr
+               <|> pUnaryOperExpr
+               <|> pParenthesised
+               <|> pArrayElemExpr
+               <|> pBinaryOperExpr
     
-    pExpr' 
-      =  pParensExpr      -- '(' <expr> ')'
-     <|> pIntLiterExpr    -- <int-liter>
-     <|> pCharLiterExpr   -- <char-liter>
-     <|> pStrLiterExpr    -- <str-liter>
-     <|> pPairLiterExpr   -- <pair-liter>
-     <|> pIdentExpr       -- <ident>
-     <|> pArrayElemExpr   -- <array-elem>
-     <|> pBoolLiterExpr   -- <bool-liter>
-     <|> pUnaryOperExpr   -- <unary-oper> <expr>
-     <|> pBinaryOperExpr  -- <expr> <binary-oper> <expr>
-   
-    pParensExpr    = waccParens pExpr
 
-    pIntLiterExpr  = liftM IntLiterExpr   pIntLiter      
-    pCharLiterExpr = liftM CharLiterExpr  anyChar        
-    pStrLiterExpr  = liftM StrLiterExpr $ many anyChar   
-    pPairLiterExpr = liftM PairLiterExpr  pPairLiter           
-    pIdentExpr     = liftM IdentExpr      waccIdentifier 
-    pArrayElemExpr = liftM ArrayElemExpr  pArrayElem     
+-- pIntLiterExpr , pBoolLiterExpr , pCharLiterExpr, pStrLiterExpr ,
+-- pPairLiterExpr, pIdentExpr     , pUnaryOperExpr, pParenthesised,
+-- pArrayElemExpr, pBinaryOperExpr  :: Parser Expr
 
-    pBoolLiterExpr                                       
-      =  "true"  `pWaccWord` BoolLiterExpr True     
-     <|> "false" `pWaccWord` BoolLiterExpr False 
+pBoolLiterExpr                                       
+    =  "true"  `pWaccWord` BoolLiterExpr True     
+   <|> "false" `pWaccWord` BoolLiterExpr False 
 
-    pUnaryOperExpr 
-      =  pUnOp "!"   NotUnOp
-     <|> pUnOp "len" LenUnOp
-     <|> pUnOp "ord" OrdUnOp
-     <|> pUnOp "chr" ChrUnOp
-     <|> pUnOp "-"   NegUnOp
-     
-    pUnOp str op = waccReservedOp str >> liftM ( UnaryOperExpr op ) pExpr   
+pIntLiterExpr  = liftM IntLiterExpr  pIntLiter
 
-    pBinaryOperExpr 
-      =  pBinOp "+"  AddBinOp
-     <|> pBinOp "-"  SubBinOp
-     <|> pBinOp "*"  MulBinOp
-     <|> pBinOp "/"  DivBinOp
-     <|> pBinOp "%"  ModBinOp
-     <|> pBinOp "&&" AndBinOp
-     <|> pBinOp "||" OrrBinOp
-     <|> pBinOp "<"  LsBinOp
-     <|> pBinOp ">"  GtBinOp
-     <|> pBinOp "<=" LEBinOp
-     <|> pBinOp ">=" GEBinOp
-     <|> pBinOp "==" EqBinOp
-     <|> pBinOp "!=" NEBinOp
-     
-    pBinOp str op = waccReserved str >> liftM2 ( BinaryOperExpr op ) pExpr pExpr
+pCharLiterExpr = liftM CharLiterExpr pCharLiter
+
+pStrLiterExpr  = liftM StrLiterExpr  pStringLiter 
+pPairLiterExpr = liftM PairLiterExpr pPairLiter
+
+pIdentExpr     = liftM IdentExpr     waccIdentifier
+
+pArrayElemExpr = liftM ArrayElemExpr pArrayElem
+
+pUnaryOperExpr
+    =  pUnaryOperExp' "!"   NotUnOp
+   <|> pUnaryOperExp' "len" LenUnOp
+   <|> pUnaryOperExp' "ord" OrdUnOp
+   <|> pUnaryOperExp' "chr" ChrUnOp
+   <|> pUnaryOperExp' "-"   NegUnOp
+
+    where
+
+        pUnaryOperExp' string op =
+            waccReservedOp string >> liftM (UnaryOperExpr op) pExpr
+
+pBinaryOperExpr
+    =  pBinaryOperExp' "+"  AddBinOp
+   <|> pBinaryOperExp' "-"  SubBinOp
+   <|> pBinaryOperExp' "*"  MulBinOp
+   <|> pBinaryOperExp' "/"  DivBinOp
+   <|> pBinaryOperExp' "%"  ModBinOp
+   <|> pBinaryOperExp' "&&" AndBinOp
+   <|> pBinaryOperExp' "||" OrrBinOp
+   <|> pBinaryOperExp' "<"  LsBinOp
+   <|> pBinaryOperExp' ">"  GtBinOp
+   <|> pBinaryOperExp' "<=" LEBinOp
+   <|> pBinaryOperExp' ">=" GEBinOp
+   <|> pBinaryOperExp' "==" EqBinOp
+   <|> pBinaryOperExp' "!=" NEBinOp
+
+    where
+
+        pBinaryOperExp' str op =
+            waccReserved str >> liftM2 ( BinaryOperExpr op ) pExpr pExpr 
+
+pParenthesised = waccParens pExpr  
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -297,13 +314,29 @@ pPairLiter = pWaccWord "null" Null
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- | <comment> ::= '#' (any-character-except-EOL)* (EOL) :::::::::::::::::::: --
+-- :: <char-liter> ::= ''' <char> ''' ::::::::::::::::::::::::::::::::::::::: --
+pCharLiter :: Parser CharLiter
+pCharLiter = charLiteral . makeTokenParser $ haskellDef
+
+
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: <str-liter> ::= ''' <char>* ''' ::::::::::::::::::::::::::::::::::::::: --
+pStringLiter :: Parser StrLiter
+pStringLiter = stringLiteral . makeTokenParser $ haskellDef
+
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: <str-liter> ::= ''' <char>* ''' ::::::::::::::::::::::::::::::::::::::: --
+-- pStrLiter :: Parser StrLiter
+-- pStrLiter = return $ stringLiteral
+
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: <comment> ::= '#' (any-character-except-EOL)* (EOL) ::::::::::::::::::: --
 pComment :: Parser Comment 
 pComment = do
-  char '#'
-  comment <- many $ noneOf "\n"
-  char '\n'
-  return comment {-*-}
+    char '#'
+    comment <- many $ noneOf "\n"
+    char '\n'
+    return comment {-*-}
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -335,10 +368,12 @@ pWaccLift word f p = waccReserved word >> liftM f p
 
 pBrackets :: Parser a -> Parser a
 pBrackets p = do
-  char '['
-  e <- p
-  char ']'
-  return e
+    char '['
+    e <- p
+    char ']'
+    return e
+
+
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: TEST PARSER ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -347,10 +382,12 @@ pBrackets p = do
 regularParse :: Parser a -> String -> Either ParseError a
 regularParse p = parse p ""
 
+
 -- |This function will run the parser, but additionally fail if it doesn't
 -- consume all the input.
 parseWithEof :: Parser a -> String -> Either ParseError a
 parseWithEof p = parse ( p <* eof ) ""
+
 
 -- |This function will apply the parser, then also return any left over
 -- input which wasn't parsed.
