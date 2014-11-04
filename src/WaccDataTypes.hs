@@ -166,19 +166,19 @@ data UnaryOper                                  -- <unary-oper> ::=
   deriving ( Show , Eq )  
   
 data BinaryOper                                 -- <binary-oper> ::=
-  = OrBinOp                                     -- '||'
+  = AddBinOp                                    -- '+'
+  | SubBinOp                                    -- '-'
+  | MulBinOp                                    -- '*'
   | DivBinOp                                    -- '/'
   | ModBinOp                                    -- '%'
-  | AddBinOp                                    -- '+'
-  | SubBinOp                                    -- '-'
   | AndBinOp                                    -- '&&'
-  | LessBinOp                                   -- '<'
-  | TimesBinOp                                  -- '*'
-  | LessEqBinOp                                 -- '<='
-  | EqualsBinOp                                 -- '=='
-  | GreaterBinOp                                -- '>'
-  | NotEqualsBinOp                              -- '!='
-  | GreaterEqBinOp                              -- '>='
+  | OrrBinOp                                    -- '||'
+  | LsBinOp                                     -- '<'
+  | GtBinOp                                     -- '>'
+  | LEBinOp                                     -- '<='
+  | GEBinOp                                     -- '>='
+  | EqBinOp                                     -- '=='
+  | NEBinOp                                     -- '!='
   deriving ( Show , Eq )      
   
 type Ident = [ Char ]                           -- <ident> ::= (' '|'a'-'z'|'A'-'Z')(' '|'a'-'z'|'A'-'Z'|'0'-'9')*  
@@ -225,4 +225,3 @@ data PairLiter                                  -- <pair-liter> ::=
   deriving ( Show , Eq )  
   
 type Comment = [ Char ]                         -- <comment> ::= '#' (any-character-except-EOL)* (EOL)
-
