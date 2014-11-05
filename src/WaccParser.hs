@@ -1,14 +1,14 @@
 module WaccParser where
 
+import WaccDataTypes
+import WaccLanguageDef
+
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Token
+import Text.Parsec.Language ( haskellDef )
 import Control.Applicative hiding ( (<|>) , many )
 import Control.Monad ( liftM , liftM2 )
-import Text.Parsec.Language
-
-import WaccDataTypes
-import WaccLanguageDef
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <program> ::= 'begin' <func>* <stat> 'end' :::::::::::::::::::::::::::: --
@@ -226,19 +226,18 @@ pExpr = buildExpressionParser waccOperators pExpr'
                <|> pBinaryOperExpr
     
 
--- pIntLiterExpr , pBoolLiterExpr , pCharLiterExpr, pStrLiterExpr ,
--- pPairLiterExpr, pIdentExpr     , pUnaryOperExpr, pParenthesised,
--- pArrayElemExpr, pBinaryOperExpr  :: Parser Expr
+-- pIntLiterExpr, pBoolLiterExpr, pCharLiterExpr, pStrLiterExpr,  pPairLiterExpr, 
+-- pIdentExpr,    pUnaryOperExpr, pParenthesised, pArrayElemExpr, pBinaryOperExpr
+-- :: Parser Expr
 
-pBoolLiterExpr                                       
-    =  "true"  `pWaccWord` BoolLiterExpr True     
-   <|> "false" `pWaccWord` BoolLiterExpr False 
+pBoolLiterExpr = liftM BoolLiterExpr pBoolLiter                                       
 
 pIntLiterExpr  = liftM IntLiterExpr  pIntLiter
 
 pCharLiterExpr = liftM CharLiterExpr pCharLiter
 
-pStrLiterExpr  = liftM StrLiterExpr  pStringLiter 
+pStrLiterExpr  = liftM StrLiterExpr  pStringLiter
+ 
 pPairLiterExpr = liftM PairLiterExpr pPairLiter
 
 pIdentExpr     = liftM IdentExpr     waccIdentifier
@@ -296,21 +295,16 @@ pIntLiter = liftM2 IntLiter pIntSign waccInteger {-*-}
 -- :: <int-sign> ::= '+' | '-' :::::::::::::::::::::::::::::::::::::::::::::: --
 pIntSign :: Parser ( Maybe IntSign )
 pIntSign
-    =  "+" `pWaccOp` Just Plus  
-   <|> "-" `pWaccOp` Just Minus 
+    =  "+" `pWaccOp` Just Plus
+   <|> "-" `pWaccOp` Just Minus
    <|> return Nothing
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <array-liter> ::= '[' ( <expr> (',' <expr>)* )? ']' ::::::::::::::::::: --
-pArrayLiter :: Parser ArrayLiter
-pArrayLiter = pBrackets $ sepBy pExpr $ char ','
-
-
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <pair-liter> ::= 'null' ::::::::::::::::::::::::::::::::::::::::::::::: --
-pPairLiter :: Parser PairLiter
-pPairLiter = pWaccWord "null" Null 
+-- :: <bool-liter> ::= 'true' | 'false' ::::::::::::::::::::::::::::::::::::: --
+pBoolLiter 
+    =  ( waccReserved "true"  >> return True  )  
+   <|> ( waccReserved "false" >> return False ) 
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -324,10 +318,18 @@ pCharLiter = charLiteral . makeTokenParser $ haskellDef
 pStringLiter :: Parser StrLiter
 pStringLiter = stringLiteral . makeTokenParser $ haskellDef
 
+
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <str-liter> ::= ''' <char>* ''' ::::::::::::::::::::::::::::::::::::::: --
--- pStrLiter :: Parser StrLiter
--- pStrLiter = return $ stringLiteral
+-- :: <array-liter> ::= '[' ( <expr> (',' <expr>)* )? ']' ::::::::::::::::::: --
+pArrayLiter :: Parser ArrayLiter
+pArrayLiter = pBrackets $ sepBy pExpr $ char ','
+
+
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: <pair-liter> ::= 'null' ::::::::::::::::::::::::::::::::::::::::::::::: --
+pPairLiter :: Parser PairLiter
+pPairLiter = pWaccWord "null" Null 
+
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <comment> ::= '#' (any-character-except-EOL)* (EOL) ::::::::::::::::::: --

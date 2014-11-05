@@ -30,9 +30,9 @@ reservedWords
 
 reservedOps :: [ String ]
 reservedOps
-  = [ "+",  "-", "*",  "/",  "=",  "=="
-    , "!=", "<", ">", "<=", ">=", "&&"
-    , "||", "%", "len", "ord", "chr", "!"] 
+  = [ "+" , "-",   "*",   "/",   "=", "=="
+    , "!=", "<",   ">",  "<=",  ">=", "&&"
+    , "||", "%", "len", "ord", "chr",  "!" ] 
 
 -- TODO write type signature
 languageDef 
@@ -41,7 +41,8 @@ languageDef
   , Token.identStart      = letter   <|> char '_'
   , Token.identLetter     = alphaNum <|> char '_'
   , Token.reservedNames   = reservedWords
-  , Token.reservedOpNames = reservedOps }
+  , Token.reservedOpNames = reservedOps
+  , Token.caseSensitive   = True }
 
 -- TODO write type signature
 lexer = Token.makeTokenParser languageDef 
@@ -51,7 +52,7 @@ lexer = Token.makeTokenParser languageDef
 waccIdentifier = Token.identifier lexer -- parses an identifier 
 waccReserved   = Token.reserved   lexer -- parses a reserved name
 waccReservedOp = Token.reservedOp lexer -- parses an operator
-waccParens     = Token.parens     lexer -- parses surrounding parenthesis: parens p takes care of the parenthesis and uses p to parse what's inside them
+waccParens     = Token.parens     lexer -- parses parentheses around p: parens p
 waccInteger    = Token.integer    lexer -- parses an integer
 waccSemi       = Token.semi       lexer -- parses a semicolon
 waccWhiteSpace = Token.whiteSpace lexer -- parses whitespace
@@ -78,5 +79,7 @@ waccOperators
     , [ Infix  ( waccOperators' "&&"  $ BinaryOperExpr AndBinOp       ) AssocLeft ]
     , [ Infix  ( waccOperators' "||"  $ BinaryOperExpr OrrBinOp       ) AssocLeft ] ]
 
-waccOperators' op expr = waccReservedOp op >> return ( expr )
+    where 
+      
+        waccOperators' op expr = waccReservedOp op >> return ( expr )
   

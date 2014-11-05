@@ -5,27 +5,17 @@ import WaccParser
 import Text.ParserCombinators.Parsec
 
 
-tPairLiter 
-  = [ ( "null"  , True  )
-    , ( ""      , False )
-    , ( " null" , False )
-    , ( " Null" , False )
-    , ( " null" , False )
-    , ( "Null " , False ) ]
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: Testing the WACC literals ::::::::::::::::::::::::::::::::::::::::::::: -- 
 
-tArrayLiter 
-  = [ ( ""    , False )
-    , ( "["   , False )
-    , ( "]"   , False )
-    , ( "[]"  , True  )
-    , ( "[,]" , False ) ]
+tBoolLiter
+ = [ ( "true"                   , True  )
+   , ( "True"                   , False )
+   , ( "false"                  , True  )
+   , ( "False "                 , False )
+   , ( "0"                      , False )
+   , ( "ttttrrrruuuuuueeeeelol" , False ) ]
 
-tIntSign 
-  = [ ( "+" , True ) 
-    , ( "-" , True ) 
-    , ( "a" , True ) 
-    , ( "a" , True ) 
-    , ( ""  , True ) ]
 
 tIntLiter
   = [ ( "12345"   , True  ) 
@@ -37,14 +27,67 @@ tIntLiter
     , ( "000000"  , True  )
     , ( "-000111" , True  )
     , ( "+111100" , True  )
-    , ( "+1x"     , True  )
+    , ( "+1x"     , False )
     , ( ""        , False )
     , ( "+"       , False )
     , ( "-"       , False )
     , ( "a"       , False )
     , ( "+a"      , False )
     , ( "-a"      , False )
+    , ( "123"     , True  )
+    , ( "-45"     , True  )
+    , ( "a"       , False )
+    , ( ""        , False )
+    , ( "exit 9"  , False )
     , ( "hello"   , False ) ]
+
+tIntSign 
+  = [ ( "+" , True  ) 
+    , ( "-" , True  ) 
+    , ( "a" , False ) 
+    , ( "a" , False ) 
+    , ( ""  , False ) ]
+
+
+tCharLiter
+ = [ ( "a"      , False )
+   , ( "\'a\'"  , True  )
+   , ( "\'aa\'" , False )
+   , ( "\'\'\'" , False )
+   , ( "\'0\'"  , True  )
+   , ( "\'.\'"  , True  )
+   , ( "\'-1\'" , False ) 
+   , ( "\'"     , False )
+   , ( "\'\'"   , False )
+   , ( "\"a\""  , False ) ]
+
+
+tStringLiter
+ = [ ( "\"\"\""       , False )
+   , ( "\"\"\"\""     , False ) 
+   , ( "abc"          , False ) 
+   , ( "\"\""         , True  )
+   , ( "\"abc\""      , True  ) 
+   , ( "\"a\\\"b\""   , True  ) 
+   , ( "\"a\" \"a \"" , False ) ]
+
+
+tArrayLiter 
+  = [ ( ""    , False )
+    , ( "["   , False )
+    , ( "]"   , False )
+    , ( "[]"  , True  )
+    , ( "[,]" , False ) ]
+
+
+tPairLiter 
+  = [ ( "null"  , True  )
+    , ( ""      , False )
+    , ( " null" , False )
+    , ( " Null" , False )
+    , ( " null" , False )
+    , ( "Null " , False ) ]
+
 
 tComment 
   = [ ( ""                     , False ) 
@@ -63,8 +106,9 @@ tComment
     , ( "# Hello World\n"      , True  )
     , ( "########\n"           , True  )
     , ( "# \n"                 , True  )
-    , ( "# ##\na"              , True  )
+    , ( "# ##\na"              , False )
     , ( "# :@òasd%313412&&&\n" , True  ) ]
+
 
 
 -- To create a test for a parsing function `pFuncName`
@@ -74,16 +118,19 @@ tComment
 -- 3) add the line above to `runAll`
 
 runAll = do
-  runTests "pPairLiter"  pPairLiter  tPairLiter
-  runTests "pArrayLiter" pArrayLiter tArrayLiter
-  runTests "pIntSign"    pIntSign    tIntSign
-  runTests "pIntLiter"   pIntLiter   tIntLiter
-  runTests "pComment"    pComment    tComment
-
+  runTests "pPairLiter"   pPairLiter   tPairLiter
+  runTests "pArrayLiter"  pArrayLiter  tArrayLiter
+  runTests "pIntSign"     pIntSign     tIntSign
+  runTests "pIntLiter"    pIntLiter    tIntLiter
+  runTests "pComment"     pComment     tComment
+  runTests "pIntLiter"    pIntLiter    tIntLiter
+  runTests "pBoolLiter"   pBoolLiter   tBoolLiter
+  runTests "pCharLiter"   pCharLiter   tCharLiter
+  runTests "pStringLiter" pStringLiter tStringLiter
 
 runTests fname parser tests = mapM_ ( runTest fname parser ) tests
 
-runTest fname parser ( input , pass ) = case regularParse parser input of 
+runTest fname parser ( input , pass ) = case parseWithEof parser input of 
   Left  e -> log $ if not pass then "OK it failed!"
                    else "='( Failed but should've passed... ("  ++ show e ++ ")"
   Right r -> log $ if pass then "OK it succeeded! (" ++ show r ++ ")" 
