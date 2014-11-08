@@ -1,32 +1,36 @@
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: 2. WACC Language Definition ::::::::::::::::::::::::::::::::::::::::::: --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+
 module WaccLanguageDef 
 ( waccIdentifier
 , waccReserved  
 , waccReservedOp
-, waccParens    
+, waccParens
+, waccBrackets
+, waccBraces
 , waccInteger   
-, waccSemi      
+, waccSemicolon
+, waccComma
 , waccWhiteSpace
 , waccOperators
 ) where
 
 import WaccDataTypes 
 
+import Text.Parsec.Prim ( parserZero )
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Language ( emptyDef )
 import qualified Text.ParserCombinators.Parsec.Token as Token
 
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: WACC Language Definition :::::::::::::::::::::::::::::::::::::::::::::: --
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
-
 reservedWords :: [ String ]
 reservedWords 
-  = [ "begin", "end", "is", "skip", "read", "free", "return", "exit", "print"
-    , "println", "if", "then", "else", "fi", "while", "do", "done", "call"
-    , "newpair", "fst", "snd", "int", "bool", "char", "string", "pair", "len"
-    , "ord", "chr", "null", "true", "false" ]
+  = [  "begin",     "end",   "is", "skip", "read", "free", "return",  "exit"
+    ,  "print", "println",   "if", "then", "else",   "fi",  "while",    "do"
+    ,   "done", "newpair", "call",  "fst",  "snd",  "int",   "bool",  "char"
+    , "string",    "pair",  "len",  "ord",  "chr", "null",   "true", "false" ]
 
 reservedOps :: [ String ]
 reservedOps
@@ -38,8 +42,11 @@ reservedOps
 languageDef 
   = emptyDef 
   { Token.commentLine     = "#"
+  , Token.nestedComments  = False
   , Token.identStart      = letter   <|> char '_'
   , Token.identLetter     = alphaNum <|> char '_'
+  , Token.opStart         = parserZero
+  , Token.opLetter        = parserZero
   , Token.reservedNames   = reservedWords
   , Token.reservedOpNames = reservedOps
   , Token.caseSensitive   = True }
@@ -49,13 +56,16 @@ lexer = Token.makeTokenParser languageDef
 
 
 -- TODO write type signatures
-waccIdentifier = Token.identifier lexer -- parses an identifier 
-waccReserved   = Token.reserved   lexer -- parses a reserved name
-waccReservedOp = Token.reservedOp lexer -- parses an operator
-waccParens     = Token.parens     lexer -- parses parentheses around p: parens p
-waccInteger    = Token.integer    lexer -- parses an integer
-waccSemi       = Token.semi       lexer -- parses a semicolon
-waccWhiteSpace = Token.whiteSpace lexer -- parses whitespace
+waccIdentifier = Token.identifier    lexer -- parses an identifier 
+waccReserved   = Token.reserved      lexer -- parses a reserved name
+waccReservedOp = Token.reservedOp    lexer -- parses an operator
+waccParens     = Token.parens        lexer -- parses parentheses around p : ( p )
+waccBrackets   = Token.brackets      lexer -- parses brackets around p    : [ p ]
+waccBraces     = Token.braces        lexer -- parses braces around p      : { p }
+waccInteger    = Token.integer       lexer -- parses an integer
+waccSemicolon  = Token.semi          lexer -- parses a semicolon
+waccComma      = Token.comma         lexer -- parses a comma
+waccWhiteSpace = Token.whiteSpace    lexer -- parses whitespace
     
      
 -- TODO write type signature

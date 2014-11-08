@@ -1,3 +1,7 @@
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: 3.1. WACC Parsers ::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+
 module WaccParser where
 
 import WaccDataTypes
@@ -9,6 +13,16 @@ import Text.ParserCombinators.Parsec.Token
 import Text.Parsec.Language ( haskellDef )
 import Control.Applicative hiding ( (<|>) , many )
 import Control.Monad ( liftM , liftM2 )
+
+
+-- |3.1.1 program .......................................................  26 --    
+-- |3.1.2 Statements ....................................................  66 -- 
+-- |3.1.3 Types ......................................................... 183 -- 
+-- |3.1.4 Expressions ................................................... 232 -- 
+-- |3.1.5 Identifiers, literals ......................................... 314 -- 
+ 
+
+-- |3.1.1 Program 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <program> ::= 'begin' <func>* <stat> 'end' :::::::::::::::::::::::::::: --
@@ -37,7 +51,8 @@ pFunc = do
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <param-list> ::= <param> (',' <param>)* ::::::::::::::::::::::::::::::: --
 pParamList :: Parser ParamList
-pParamList = sepBy pParam $ char ','
+pParamList = do
+    sepBy pParam $ waccComma
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -45,6 +60,8 @@ pParamList = sepBy pParam $ char ','
 pParam :: Parser Param
 pParam = liftM2 Param pType waccIdentifier
 
+
+-- 3.2. Statement
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <stat> :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -66,20 +83,20 @@ pStat
 
     where
 
-        pDeclareStat = do -- <type> <ident> '=' <assign-rhs>
+        pDeclareStat = do    -- <type> <ident> '=' <assign-rhs>
           sType <- pType
           ident <- waccIdentifier
           waccReservedOp "="
           rhs   <- pAssignRhs
           return $ DeclareStat sType ident rhs
           
-        pAssignStat = do -- <assign-lhs> = <assign-rhs>
+        pAssignStat = do     -- <assign-lhs> = <assign-rhs>
           lhs <- pAssignLhs
           waccReservedOp "="
           rhs <- pAssignRhs
           return $ AssignStat lhs rhs
              
-        pIfStat = do -- 'if' <expr> 'then' <stat> 'else' <stat> 'fi'
+        pIfStat = do         -- 'if' <expr> 'then' <stat> 'else' <stat> 'fi'
           waccReserved "if"
           expr  <- pExpr
           waccReserved "then"
@@ -89,7 +106,7 @@ pStat
           waccReserved "fi"
           return $ IfStat expr stat1 stat2
                
-        pWhileStat = do -- 'while' <expr> 'do' <stat> 'done'
+        pWhileStat = do      -- 'while' <expr> 'do' <stat> 'done'
           waccReserved "while"
           expr <- pExpr
           waccReserved "do"
@@ -97,15 +114,15 @@ pStat
           waccReserved "done"
           return $ WhileStat expr stat
     
-        pScopedStat = do -- 'begin' <stat> 'end
+        pScopedStat = do     -- 'begin' <stat> 'end
           waccReserved "begin"
           stat <- pStat
           waccReserved "end"
           return $ ScopedStat stat
            
-        pSeqStat = do -- <stat> ';' <stat>
+        pSeqStat = do        -- <stat> ';' <stat>
           stat1 <- pStat
-          waccSemi
+          waccSemicolon
           stat2 <- pStat
           return $ SeqStat stat1 stat2
 
@@ -133,18 +150,24 @@ pAssignRhs
 
         pRhsNewPair = do                  -- 'newpair' '(' <expr> ',' <expr> ')'
           waccReserved "newpair" 
-          char '('
-          expr1 <- pExpr         
-          char ','
-          expr2 <- pExpr         
-          char ')'
-          return $ RhsNewPair expr1 expr2
+          waccParens $ do
+              expr1 <- pExpr         
+              waccComma
+              expr2 <- pExpr         
+              return $ RhsNewPair expr1 expr2
     
         pRhsCall = do                     -- 'call' <ident> '(' <arg-list>? ')' TODO liftM2
           waccReserved "call" 
-          ident <- waccIdentifier
-          aList <- waccParens $ many pExpr
-          return $ RhsCall ident aList 
+          fident <- waccIdentifier
+          args   <- waccParens $ pArgList
+          return $ RhsCall fident args 
+
+
+
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: <arg-list> ::= <expr> (',' <expr>)* ::::::::::::::::::::::::::::::::::: --
+pArgList :: Parser ArgList
+pArgList = sepBy pExpr $ waccComma
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -155,55 +178,63 @@ pPairElem
    <|> pWaccLift "snd" Snd pExpr 
 
 
+-- 3.3. Types
+
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <type> ::= <base-type> | <array-type> | <pair-type> ::::::::::::::::::: --
 pType :: Parser Type
 pType
-    =  liftM TypeBase  pBaseType
-   <|> liftM TypeArray pArrayType
-   <|> liftM TypePair  pPairType
-
+    =  try ( liftM TypeBase  pBaseType  )
+   <|> try ( liftM TypeArray pArrayType )
+   <|> try ( liftM TypePair  pPairType  )
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <base-type> ::= 'int' | 'bool' | 'char' | 'string' :::::::::::::::::::: --
 pBaseType :: Parser BaseType
 pBaseType
-    =  pWaccWord "int"    IntBaseType    
-   <|> pWaccWord "bool"   BoolBaseType   
-   <|> pWaccWord "char"   CharBaseType   
-   <|> pWaccWord "string" StringBaseType 
+    =  try ( pWaccWord "int"    IntBaseType    )    
+   <|> try ( pWaccWord "bool"   BoolBaseType   )
+   <|> try ( pWaccWord "char"   CharBaseType   )
+   <|> try ( pWaccWord "string" StringBaseType )
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <array-type> ::= <type> '[' ']' ::::::::::::::::::::::::::::::::::::::: --
 pArrayType :: Parser ArrayType
-pArrayType = do
-  typez <- pType 
-  string "[]"
-  return $ ArrayType typez
-
+pArrayType = do 
+    subtype <- try pType
+    try ( string "[]" )
+    return $ ArrayType subtype
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: 'pair' '(' <pair-elem-type> ',' <pair-elem-type> ')' :::::::::::::::::: --
+
+-- |For easier management of the nested pair case, we chose a Maybe approach on
+-- the pair type, thus considering the nested pair just another graphical form of
+-- the same type.
 pPairType :: Parser PairType
 pPairType = do
     waccReserved "pair"
-    char '('
+    waccParens $ do
     pairElem1 <- pPairElemType
-    waccReserved ","
+    waccComma
     pairElem2 <- pPairElemType
-    char ')'   
-    return (pairElem1, pairElem2)
+    return $ Just (pairElem1, pairElem2) 
+
+      where
+
+        pPairElemType :: Parser Type
+        pPairElemType
+            =  try ( liftM TypeBase  pBaseType         )
+           <|> try ( liftM TypeArray pArrayType        )
+           <|> try ( liftM TypePair  pPairPairElemType )
+
+        pPairPairElemType :: Parser PairType
+        pPairPairElemType = 
+            waccReserved "pair" >>  return Nothing
 
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <pair-elem-type> ::= <base-type> | <array-type> | 'pair' :::::::::::::: --
-pPairElemType :: Parser PairElemType
-pPairElemType
-    =  liftM BasePairElemType  pBaseType
-   <|> liftM ArrayPairElemType pArrayType
-   <|> pWaccWord "null" PairPairElemType 
-
+-- 3.4. Expressions
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <expr> :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -236,7 +267,7 @@ pIntLiterExpr  = liftM IntLiterExpr  pIntLiter
 
 pCharLiterExpr = liftM CharLiterExpr pCharLiter
 
-pStrLiterExpr  = liftM StrLiterExpr  pStringLiter
+pStrLiterExpr  = liftM StrLiterExpr  pStrLiter
  
 pPairLiterExpr = liftM PairLiterExpr pPairLiter
 
@@ -276,28 +307,21 @@ pBinaryOperExpr
         pBinaryOperExp' str op =
             waccReserved str >> liftM2 ( BinaryOperExpr op ) pExpr pExpr 
 
-pParenthesised = waccParens pExpr  
+pParenthesised = waccParens pExpr
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <array-elem> ::= <ident> '[' <expr> ']' ::::::::::::::::::::::::::::::: --
 pArrayElem :: Parser ArrayElem
-pArrayElem = liftM2 ArrayElem waccIdentifier $ pBrackets pExpr
+pArrayElem = liftM2 ArrayElem waccIdentifier $ waccBrackets pExpr
 
+
+-- 3.5. Literals
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <int-liter> ::= <int-sign>? <digit>+ :::::::::::::::::::::::::::::::::: --
 pIntLiter :: Parser IntLiter
-pIntLiter = liftM2 IntLiter pIntSign waccInteger {-*-}
-
-
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <int-sign> ::= '+' | '-' :::::::::::::::::::::::::::::::::::::::::::::: --
-pIntSign :: Parser ( Maybe IntSign )
-pIntSign
-    =  "+" `pWaccOp` Just Plus
-   <|> "-" `pWaccOp` Just Minus
-   <|> return Nothing
+pIntLiter = liftM IntLiter waccInteger 
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -315,30 +339,20 @@ pCharLiter = charLiteral . makeTokenParser $ haskellDef
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <str-liter> ::= ''' <char>* ''' ::::::::::::::::::::::::::::::::::::::: --
-pStringLiter :: Parser StrLiter
-pStringLiter = stringLiteral . makeTokenParser $ haskellDef
+pStrLiter :: Parser StrLiter
+pStrLiter = stringLiteral . makeTokenParser $ haskellDef
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <array-liter> ::= '[' ( <expr> (',' <expr>)* )? ']' ::::::::::::::::::: --
 pArrayLiter :: Parser ArrayLiter
-pArrayLiter = pBrackets $ sepBy pExpr $ char ','
+pArrayLiter = waccBrackets $ sepBy pExpr $ waccComma
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <pair-liter> ::= 'null' ::::::::::::::::::::::::::::::::::::::::::::::: --
 pPairLiter :: Parser PairLiter
 pPairLiter = pWaccWord "null" Null 
-
-
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <comment> ::= '#' (any-character-except-EOL)* (EOL) ::::::::::::::::::: --
-pComment :: Parser Comment 
-pComment = do
-    char '#'
-    comment <- many $ noneOf "\n"
-    char '\n'
-    return comment {-*-}
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -368,15 +382,6 @@ pWaccLift :: String -> ( a -> b ) -> Parser a -> Parser b
 pWaccLift word f p = waccReserved word >> liftM f p
 
 
-pBrackets :: Parser a -> Parser a
-pBrackets p = do
-    char '['
-    e <- p
-    char ']'
-    return e
-
-
-
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: TEST PARSER ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -396,3 +401,5 @@ parseWithEof p = parse ( p <* eof ) ""
 parseWithLeftOver :: Parser a -> String -> Either ParseError (a,String)
 parseWithLeftOver p = parse ( (,) <$> p <*> leftOver ) ""
   where leftOver = manyTill anyToken eof
+
+
