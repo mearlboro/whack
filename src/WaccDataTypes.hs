@@ -40,7 +40,7 @@ data AssignLhs                                  -- <assign-lhs> ::=
   | LhsPairElem  PairElem                       -- <pair-elem>
   | LhsArrayElem ArrayElem                      -- <array-elem>
   deriving ( Show , Eq )                            
-
+  
 data AssignRhs                                  -- <assign-rghs> ::=
   = RhsExpr       Expr                          -- <expr>
   | RhsPairElem   PairElem                      -- <pair-elem>
@@ -59,7 +59,7 @@ data PairElem                                   -- <pair-elem> ::=
 data Type                                       -- <type> ::=
   = TypeBase  BaseType                          -- <base-type>
   | TypePair  PairType                          -- <pair-type>
-  | TypeArray ArrayType                         -- <array-type>
+  | TypeArray Type                              -- <array-type>
   deriving ( Show , Eq )                        
   
 data BaseType                                   -- <base-type> ::=
@@ -68,10 +68,6 @@ data BaseType                                   -- <base-type> ::=
   | CharBaseType                                -- 'char'
   | StringBaseType                              -- 'string'
   deriving ( Show , Eq )
-
-data ArrayType                                  -- <array-type> ::=
-  = ArrayType Type                              -- <type> '[' ']'  
-  deriving ( Show , Eq )                 
 
 type PairType                                   -- <pair-type> ::= 'pair' '(' <pair-elem-type> ',' <pair-elem-type> ')'    
   = Maybe ( Type , Type )
@@ -116,12 +112,10 @@ data BinaryOper                                 -- <binary-oper> ::=
 type Ident = [ Char ]                           -- <ident> ::= (' '|'a'-'z'|'A'-'Z')(' '|'a'-'z'|'A'-'Z'|'0'-'9')*  
   
 data ArrayElem                                  -- <array-elem> ::=
-  = ArrayElem Ident Expr                        -- <ident> '[' <expr> ']'
+  = ArrayElem Ident [ Expr ]                    -- <ident> '[' <expr> ']'
   deriving ( Show , Eq )  
   
-data IntLiter                                   -- <int-liter> ::=
-  = IntLiter Integer                            -- <int-sign>? <digit>+ 
-  deriving ( Show , Eq )  
+type IntLiter  = Integer
 
 type BoolLiter = Bool                           -- <bool-liter> ::= 'true' | 'false'   
   

@@ -7,26 +7,47 @@ module WaccParsersTest where
 import WaccParser
 import WaccDataTypes
 
+import Text.Parsec.Token
 import Text.ParserCombinators.Parsec
 
+runAll = do 
+    {-testPairLiter  = -} runTests "pPairLiter"  pPairLiter  tPairLiter
+    {-testArrayLiter = -} runTests "pArrayLiter" pArrayLiter tArrayLiter
+    {-testBoolLiter  = -} runTests "pBoolLiter"  pBoolLiter  tBoolLiter
+    {-testIntLiter   = -} runTests "pIntLiter"   pIntLiter   tIntLiter
+    {-testPairType   = -} runTests "pPairType"   pPairType   tPairType
+    {-testArrayElem  = -} runTests "pArrayElem"  pArrayElem  tArrayElem 
+    {-testType       = -} runTests "pType"       pType       tType 
+    {-testBaseType   = -} runTests "pbaseType"   pBaseType   tBaseType
+    {-testParam      = -} runTests "pParam"      pParam      tParam
+    {-testParamList  = -} runTests "pParamList"  pParamList  tParamList 
+    {-testCharLiter  = -} runTests "pParamList"  pParamList  tParamList 
+    {-testStrLiter   = -} runTests "pStrLiter"   pStrLiter   tStrLiter
+    {-testProgram    = -} runTests "pProgram"    pProgram    tProgram
+    {-testStat       = -} runTests "pStat"       pStat       tStat
+    {-testFunc       = -} runTests "pFunc"       pFunc       tFunc
 
--- |This testing library mostly contains edge-cases for the subcomponents of our
--- parser. The role of this library is to spot bugs at function level, and help
--- with detecting the reasons of failure when testing with complete programs.
+tPairLiter 
+  = [ ( "null"  , True  )
+    , ( ""      , False )
+    , ( " null" , False )
+    , ( " Null" , False )
+    , ( " null" , False )
+    , ( "Null " , False ) ]
 
+tArrayLiter 
+  = [ ( ""    , False )
+    , ( "["   , False )
+    , ( "]"   , False )
+    , ( "[]"  , True  )
+    , ( "[,]" , False ) ]
 
--- 3.2.1 Tests for literals and identifiers 
-
--- |Note: the apparently redundant literal tests are design to check whether the
--- language specifications provided by the Parsec library correspond to the WACC
--- language definition in the given specification.
-
-tBoolLiter
- = [ ( "true"        , True  )
-   , ( "false"       , True  )
-   , ( "False "      , False )
-   , ( "0"           , False )
-   , ( "trueeeeelol" , False ) ]
+tIntSign 
+  = [ ( "+" , True ) 
+    , ( "-" , True ) 
+    , ( "a" , True ) 
+    , ( "a" , True ) 
+    , ( ""  , True ) ]
 
 tIntLiter
   = [ ( "12345"   , True  ) 
@@ -36,68 +57,61 @@ tIntLiter
     , ( "+0"      , True  )
     , ( "-0"      , True  )
     , ( "000000"  , True  )
-    , ( "---0111" , False )
-    , ( "++11100" , False )
-    , ( "+1x"     , False )
+    , ( "-000111" , True  )
+    , ( "+111100" , True  )
+    , ( "+1x"     , True  )
     , ( ""        , False )
     , ( "+"       , False )
     , ( "-"       , False )
     , ( "a"       , False )
     , ( "+a"      , False )
     , ( "-a"      , False )
-    , ( "-12xx45" , False ) ]
+    , ( "hello"   , False ) ]
 
-tCharLiter
- = [ ( ""       , False )
-   , ( " "      , False )
-   , ( "a"      , False )
-   , ( "\'a\'"  , True  )
-   , ( "\' \'"  , True  )
-   , ( "\'aa\'" , False )
-   , ( "\'\'\'" , False )
-   , ( "\'0\'"  , True  )
-   , ( "\'.\'"  , True  )
-   , ( "\'-1\'" , False ) 
-   , ( "\'"     , False )
-   , ( "\'\'"   , False )
-   , ( "\"a\""  , False ) ]
-
-
-tStrLiter
- = [ ( ""             , False )
-   , ( " "            , False )
-   , ( "\" \""        , True  )
-   , ( "\"\"\""       , False )
-   , ( "\"\"\"\""     , False ) 
-   , ( "abc"          , False ) 
-   , ( "\"\""         , True  )
-   , ( "\"abc\""      , True  ) 
-   , ( "\"a\\\"b\""   , True  ) 
-   , ( "\"a\" \"a \"" , False ) ]
+tComment 
+  = [ ( ""                     , False ) 
+    , ( "1"                    , False )
+    , ( "a"                    , False )
+    , ( "\n"                   , False )
+    , ( "\t"                   , False )
+    , ( "\""                   , False )
+    , ( "#"                    , False )
+    , ( "#hello"               , False )
+    , ( "#"                    , False )
+    , ( "#\n"                  , True  )
+    , ( "#1\n"                 , True  )
+    , ( "#a\n"                 , True  )
+    , ( "#\"\'\t\b\f\0Allah\n" , True  )
+    , ( "# Hello World\n"      , True  )
+    , ( "########\n"           , True  )
+    , ( "# \n"                 , True  )
+    , ( "# ##\na"              , True  )
+    , ( "# :@òasd%313412&&&\n" , True  ) ]
 
 
-tArrayLiter 
-  = [ ( "[]"              , True  )
-    , ( "[,]"             , False )
-    , ( "[1]"             , True  )
-    , ( "[1, 2]"          , True  )
-    , ( "[a + 1, 3]"      , True  )
-    , ( "[a, b]"          , True  )
-    , ( "[\"\"]"          , True  )
-    , ( "[\"a\"]"         , True  )
-    , ( "[\'a\',\'b\']"   , True  )
-    , ( "[\"a\", \"\"]"   , True  )
-    , ( "[\"a]"           , False )
-    , ( "[bla]"           , True  ) ]
+-- To create a test for a parsing function `pFuncName`
+-- 1) Create test array `tFuncName` :: ( str::String , pass::Bool )
+--    With input string to parse `str` and whether or not it should `pass`
+-- 2) ghci> runTests "FuncName" pFuncName tFuncName
+-- 3) add the line above to `runAll`
+
+runAll = do
+  runTests "pPairLiter"  pPairLiter  tPairLiter
+  runTests "pArrayLiter" pArrayLiter tArrayLiter
+  runTests "pIntSign"    pIntSign    tIntSign
+  runTests "pIntLiter"   pIntLiter   tIntLiter
+  runTests "pComment"    pComment    tComment
 
 
-tPairLiter 
-  = [ ( "null"  , True  )
-    , ( ""      , False )
-    , ( " null" , False )
-    , ( "null a", False )
-    , ( "nulla" , False )
-    , ( "Null " , False ) ]
+runTests fname parser tests = mapM_ ( runTest fname parser ) tests
+
+runTest fname parser ( input , pass ) = case regularParse parser input of 
+  Left  e -> log $ if not pass then "OK it failed!"
+                   else "='( Failed but should've passed... ("  ++ show e ++ ")"
+  Right r -> log $ if pass then "OK it succeeded! (" ++ show r ++ ")" 
+                   else "='( Success but shoudl've failed... (" ++ show r ++ ")"
+  where 
+    log msg = putStrLn $ fname ++ ":\t\"" ++ input ++ "\"\t ... " ++ msg ++ "\n"
 
 
 -- 3.2.2 Tests for statements
