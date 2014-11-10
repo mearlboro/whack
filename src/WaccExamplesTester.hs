@@ -23,10 +23,6 @@ type Filter = FilePath -> Bool
 isHidden  :: Filter 
 isHidden  =  not . isPrefixOf "."
 
--- | Is the file at file path a Wacc file?
-isWacc  :: Filter
-isWacc  =  isSuffixOf ".wacc"
-
 -- | Returns all non-hidden files in dir and in all its sub dirs if any
 getRecursiveContents :: FilePath -> IO [ File ] 
 getRecursiveContents dir = do    
@@ -43,43 +39,66 @@ getRecursiveContents dir = do
 --------------------------------------------------------------------------------
 
 -- | Parses one wacc file and returns true if it was parsed correctly
-parseOne :: File -> IO Bool
-parseOne ( name , path ) = do 
-
+parseOne :: Bool 
+         -> File    -- * Is it supposed to pass (True) or fail (False) ?
+         -> IO Bool
+parseOne shouldPass ( name , path ) = do 
+  -- Read source file 
   source <- readFile path -- putStrLn $ source
-
+  
+  -- Parse source file
   let result = parseWithEof pProgram source
   
-  let handleFail e = do 
-      putStrLn $ replicate 80 '~' 
-      putStrLn $ "FAILED (" ++ name ++ ")\n" ++ show e
+  -- Error message expected by LabTS
+  let errorMessage = "#syntax_error#\nexit:\n100"
 
+  -- Invalid program yet the parser parsed something... but what? 
+  let handlePhantomParse r = do 
+      putStrLn $ "FAILED (" ++ path ++ ")\n" ++ show r
+      -- "Parser was supposed to fail but it parsed this: " ++ show r 
+  
+  -- Parser failed to parse something it was supposed to be able to parse
+  let handleFail e = do 
+      putStrLn $ replicate 80 '~' ++ "FAILED (" ++ name ++ ")\n" ++ show e
+
+  -- Get the result and act accordingly
   case result of -- putStrLn $ show result
-      Right _ -> return True
-      Left  e -> handleFail e >> return False 
+      Right r -> if   shouldPass 
+                 then return True 
+                 else handlePhantomParse r >> return False
+
+      Left  e -> if   shouldPass 
+                 then handleFail e >> return False 
+                 else putStrLn errorMessage >> return True
+
+--------------------------------------------------------------------------------
+
+parseBunch shouldPass dir = do 
+  -- Is the file at file path a Wacc file?
+  let isWacc = isSuffixOf ".wacc"
+
+  -- All valid or invalid wacc programs
+  programs <- filter ( isWacc . snd ) <$> getRecursiveContents dir 
+
+  -- Parse all and find out how many passed or failed when they should have
+  behavedWell <- length . filter id <$> forM programs ( parseOne shouldPass )
+
+  -- The total number of programs parsed
+  let total = length programs
+
+  -- Print outcome
+  putStrLn $ replicate 80 '*'
+  putStr   $ show behavedWell ++ "/" ++ show total ++ " :: " 
+  putStrLn $ show ( total - behavedWell ) ++ " behaved badly!"  
 
 --------------------------------------------------------------------------------
 
 main = do
-
-  -- WaccCompiler.hs directory ../wacc_examples
+  -- ../WaccCompiler.hs_directory/wacc_examples
   pwd <- flip (++) "/wacc_examples/" <$> getCurrentDirectory 
-
-  -- All valid wacc programs
-  valids <- filter ( isWacc . snd ) <$> getRecursiveContents ( pwd ++ "valid" ) 
-
-  -- All valid wacc programs
-  invalids <- filter ( isWacc . snd ) <$> getRecursiveContents ( pwd ++ "invalid" ) 
-
-  -- Compile all valid programs and find out how many of them passed
-  passed <- length . filter id <$> forM valids parseOne
-
-  -- The total number of programs parsed
-  let total = length valids
-
-  -- Print outcome
-  putStrLn $ replicate 80 '*'
-  putStr   $ show passed ++ "/" ++ show total ++ " :: " 
-  putStrLn $ show ( total - passed ) ++ " failed!"  
+  -- Check valid programs
+  parseBunch True ( pwd ++ "valid" ) 
+  -- Check invalid programs
+  parseBunch False ( pwd ++ "invalid" ) 
 
  
