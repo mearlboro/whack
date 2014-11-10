@@ -33,21 +33,25 @@ pProgram :: Parser Program
 pProgram = do
    waccWhiteSpace
    waccReserved "begin"
-   funcs <- many pFunc
+   waccWhiteSpace
+   funcs <- try $ many ( try pFunc )
+   waccWhiteSpace
    stat  <- pStat
    waccReserved "end"
-   return $ Program funcs stat
+   return $ Program funcs stat -- funcs stat
 
 -- :: <func> ::= <type> <ident> '(' <param-list>? ')' 'is' <stat> 'end' ::::: --
 pFunc :: Parser Func
 pFunc = do
-    typez <- pType
+    ftype <- pType
+    waccWhiteSpace
     ident <- waccIdentifier
+    --waccWhiteSpace
     pList <- waccParens pParamList
     waccReserved "is"
     stat  <- pStat
     waccReserved "end"
-    return $ Func typez ident pList stat
+    return $ Func ftype ident pList stat
 
 -- :: <param-list> ::= <param> (',' <param>)* ::::::::::::::::::::::::::::::: --
 pParamList :: Parser ParamList
@@ -225,20 +229,20 @@ pBaseType =  choice [ pWaccWord "int"    IntBaseType
 pExpr :: Parser Expr
 pExpr = buildExpressionParser waccOperators pExpr'
 
-        where
-
-            pExpr' :: Parser Expr
-            pExpr'
-                =  pIntLiterExpr
-               <|> pBoolLiterExpr
-               <|> pCharLiterExpr
-               <|> pStrLiterExpr
-               <|> pPairLiterExpr
-               <|> pIdentExpr
-               <|> pUnaryOperExpr
-               <|> pParenthesised
-               <|> pArrayElemExpr
-               <|> pBinaryOperExpr
+  where
+    pExpr' :: Parser Expr
+    pExpr' 
+      = choice 
+      [ pParenthesised
+      , try $ liftM ArrayElemExpr pArrayElem      
+      , liftM BoolLiterExpr pBoolLiter
+      , liftM IntLiterExpr  pIntLiter
+      , liftM CharLiterExpr pCharLiter
+      , liftM StrLiterExpr  pStrLiter
+      , liftM PairLiterExpr pPairLiter
+      , liftM IdentExpr     waccIdentifier
+      , pUnaryOperExpr
+      , pBinaryOperExpr ] <?> "pExpr"
 
 -- :: <array-elem> ::= <ident> ('[' <expr> ']')+ ::::::::::::::::::::::::::::::: --
 pArrayElem :: Parser ArrayElem
@@ -276,19 +280,6 @@ pPairLiter = pWaccWord "null" Null
 -- pIdentExpr,    pUnaryOperExpr, pParenthesised, pArrayElemExpr, pBinaryOperExpr
 -- :: Parser Expr
 
-pBoolLiterExpr = liftM BoolLiterExpr pBoolLiter
-
-pIntLiterExpr  = liftM IntLiterExpr  pIntLiter
-
-pCharLiterExpr = liftM CharLiterExpr pCharLiter
-
-pStrLiterExpr  = liftM StrLiterExpr  pStrLiter
-
-pPairLiterExpr = liftM PairLiterExpr pPairLiter
-
-pIdentExpr     = liftM IdentExpr     waccIdentifier
-
-pArrayElemExpr = liftM ArrayElemExpr pArrayElem
 
 pUnaryOperExpr
     =  pUnaryOperExp' "!"   NotUnOp
