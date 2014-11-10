@@ -1,72 +1,5 @@
 module WaccDataTypes where
 
-data Token -- Terminal characters
-  = BEGIN    
-  | END       
-  | IS     
-  | SKIP     
-  | READ      
-  | FREE 
-  | RETURN 
-  | EXIT 
-  | PRINT 
-  | PRINTLN
-  | IF       
-  | THEN      
-  | ELSE 
-  | FI
-  | WHILE    
-  | DO        
-  | DONE
-  | CALL
-  | NEWPAIR 
-  | FST 
-  | SND
-  | INT
-  | BOOL 
-  | CHAR 
-  | STRING 
-  | PAIR   
-  | LEN    
-  | ORD 
-  | CHR 
-  | NULL              -- 'null' pair
-  | TRUE  
-  | FALSE
-  | HASHTAG           -- '#'
-  | SEMICOLON         -- ';'
-  | COMMA             -- ','
-  | PARENTHESIS_LEFT  -- '('
-  | PARENTHESIS_RIGHT -- ')'
-  | BRACKET_LEFT      -- '['
-  | BRACKET_RIGHT     -- '['
-  | EXCLAMATION_MARK  -- '!' 
-  | TIMES             -- '*'
-  | UNDERSCORE        -- '_'
-  | PERCENT           -- '%'
-  | PLUS              -- '+'
-  | DASH              -- '-'
-  | EQUALS            -- '='
-  | GREATER           -- '>'
-  | GREATER_EQUAL     -- '>='        
-  | LESS              -- '<'
-  | LESS_EQUAL        -- '<='
-  | DOUBLE_EQUALS     -- '=='
-  | NOT_EQUAL         -- '!='
-  | AND               -- '&&'
-  | OR                -- '||'
-  | NULL_TERMINATOR   -- '0'
-  | BACKSPACE         -- 'b'
-  | TAB               -- 't'
-  | NEW_LINE          -- 'n'
-  | NEW_PAGE          -- 'f'
-  | CARRIAGE_RETURN   -- 'r'
-  | BACKSLASH         -- '\'
-  | SLASH             -- '/'
-  | SINGLE_QUOTE      -- '''
-  | DOUBLE_QUOTES     -- '"'
-  -- | IDENT ValidIdent -- maybe needed later
-  -- | NUMBER Integer
 
 data Program                                    -- <program> ::=
   = Program [ Func ] Stat                       -- 'begin' <func>* <stat> 'end'   
@@ -122,7 +55,7 @@ data PairElem                                   -- <pair-elem> ::=
 data Type                                       -- <type> ::=
   = TypeBase  BaseType                          -- <base-type>
   | TypePair  PairType                          -- <pair-type>
-  | TypeArray ArrayType                         -- <array-type>
+  | TypeArray Type                         -- <array-type>
   deriving ( Show , Eq )                        
   
 data BaseType                                   -- <base-type> ::=
@@ -132,17 +65,20 @@ data BaseType                                   -- <base-type> ::=
   | StringBaseType                              -- 'string'
   deriving ( Show , Eq )
 
-data ArrayType                                  -- <array-type> ::=
-  = ArrayType Type                              -- <type> '[' ']'  
-  deriving ( Show , Eq )                 
+--data ArrayType                                  -- <array-type> ::=
+--  = ArrayType Type                              -- <type> '[' ']'  
+--  deriving ( Show , Eq )                 
 
-type PairType = ( PairElemType , PairElemType ) -- <pair-type> ::= 'pair' '(' <pair-elem-type> ',' <pair-elem-type> ')'   
+--type ArrayType = ( ArrayType Type
 
-data PairElemType                               -- <pair-elem-type> ::=
-  = PairPairElemType                            -- 'pair'
-  | BasePairElemType  BaseType                  -- <base-type>
-  | ArrayPairElemType ArrayType                 -- <array-type>
-  deriving ( Show , Eq )   
+type PairType                                   -- <pair-type> ::= 'pair' '(' <pair-elem-type> ',' <pair-elem-type> ')'    
+  = Maybe ( Type , Type )
+
+--data PairElemType                               -- <pair-elem-type> ::=
+--  = PairPairElemType                            -- 'pair'
+--  | BasePairElemType  BaseType                  -- <base-type>
+--  | ArrayPairElemType ArrayType                 -- <array-type>
+--  deriving ( Show , Eq )   
   
 data Expr                                       -- <expr> ::=
   = BoolLiterExpr     Bool                      -- <bool-liter>
@@ -184,20 +120,22 @@ data BinaryOper                                 -- <binary-oper> ::=
 type Ident = [ Char ]                           -- <ident> ::= (' '|'a'-'z'|'A'-'Z')(' '|'a'-'z'|'A'-'Z'|'0'-'9')*  
   
 data ArrayElem                                  -- <array-elem> ::=
-  = ArrayElem Ident Expr                        -- <ident> '[' <expr> ']'
+  = ArrayElem Ident [ Expr ]                    -- <ident> '[' <expr> ']'
   deriving ( Show , Eq )  
   
-data IntLiter                                   -- <int-liter> ::=
-  = IntLiter ( Maybe IntSign ) Integer {-*-}    -- <int-sign>? <digit>+ 
-  deriving ( Show , Eq )  
+--data IntLiter                                   -- <int-liter> ::=
+--  = IntLiter ( Maybe IntSign ) Integer {-*-}    -- <int-sign>? <digit>+ 
+--  deriving ( Show , Eq )  
   
-{- removed Digit, use Integer -}                -- <digit> ::= ('0'-'9')  
+--{- removed Digit, use Integer -}                -- <digit> ::= ('0'-'9')  
   
-data IntSign                                    -- <int-sign> ::=
-  = Plus                                        -- '+'
-  | Minus                                       -- '-'    
-  deriving ( Show , Eq )  
+--data IntSign                                    -- <int-sign> ::=
+--  = Plus                                        -- '+'
+--  | Minus                                       -- '-'    
+--  deriving ( Show , Eq )  
   
+type IntLiter  = Integer
+
 type BoolLiter = Bool                           -- <bool-liter> ::= 'true' | 'false'   
   
 type CharLiter = Character                      -- <char-liter> ::= ''' <character> '''                  
@@ -224,4 +162,4 @@ data PairLiter                                  -- <pair-liter> ::=
   = Null                                        -- 'null'
   deriving ( Show , Eq )  
   
-type Comment = [ Char ]                         -- <comment> ::= '#' (any-character-except-EOL)* (EOL)
+type Comment = [ Character ]                         -- <comment> ::= '#' (any-character-except-EOL)* (EOL)
