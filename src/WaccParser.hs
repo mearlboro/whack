@@ -51,7 +51,21 @@ pFunc = do
     waccReserved "is"
     stat  <- pStat
     waccReserved "end"
-    return $ Func ftype ident pList stat
+
+    if   not $ hasReachableReturnStat stat 
+    then fail "No Reachable Return Statement In This Function" 
+    else return $ Func ftype ident pList stat
+
+
+hasReachableReturnStat :: Stat -> Bool 
+hasReachableReturnStat s = case s of                
+  ReturnStat  _      -> True  
+  ExitStat    _      -> True   
+  ScopedStat  s      -> hasReachableReturnStat s        
+  WhileStat   _ s    -> hasReachableReturnStat s
+  SeqStat     _ s    -> hasReachableReturnStat s
+  IfStat      e s s' -> and $ map hasReachableReturnStat ( s:s':[] )
+  _                  -> False 
 
 -- :: <param-list> ::= <param> (',' <param>)* ::::::::::::::::::::::::::::::: --
 pParamList :: Parser ParamList
@@ -258,9 +272,11 @@ pArrayElem = do
 -- :: <int-liter> ::= <int-sign>? <digit>+ :::::::::::::::::::::::::::::::::: --
 pIntLiter :: Parser IntLiter
 pIntLiter = do
+  -- −2^31 to 2^31 − 1 inclusive.
   int <- waccInteger
-  if int < -2^31 || int > 2^31-1 then fail "please work" else return int
-  --return int 
+  if   int >= (-2^31) && int <= (2^31-1)
+  then return int
+  else fail "Integer Out Of Bounds" 
 
 -- :: <bool-liter> ::= 'true' | 'false' ::::::::::::::::::::::::::::::::::::: --
 pBoolLiter :: Parser BoolLiter
@@ -268,7 +284,12 @@ pBoolLiter =  pWaccWord "true" True <|> pWaccWord "false" False
 
 -- :: <char-liter> ::= ''' <char> ''' ::::::::::::::::::::::::::::::::::::::: --
 pCharLiter :: Parser CharLiter
-pCharLiter = waccCharLiter
+pCharLiter = waccCharLiter 
+--do 
+--  c <- waccCharLiter
+--  if   c `elem` "\"\'\\"
+--  then fail "Unescaped Character"
+--  else return c
 
 -- :: <str-liter> ::= ''' <char>* ''' ::::::::::::::::::::::::::::::::::::::: --
 pStrLiter :: Parser StrLiter

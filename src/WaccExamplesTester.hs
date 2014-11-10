@@ -50,7 +50,7 @@ parseOne shouldPass ( name , path ) = do
   let result = parseWithEof pProgram source
   
   -- Error message expected by LabTS
-  let errorMessage = "#syntax_error#\nexit:\n100"
+  let errorMessage = "" -- "#syntax_error#\nexit:\n100\n"
 
   -- Invalid program yet the parser parsed something... but what? 
   let handlePhantomParse r = do 
@@ -59,7 +59,7 @@ parseOne shouldPass ( name , path ) = do
   
   -- Parser failed to parse something it was supposed to be able to parse
   let handleFail e = do 
-      putStrLn $ replicate 80 '~' ++ "FAILED (" ++ name ++ ")\n" ++ show e
+      putStrLn $ replicate 80 '~' ++ "\nFAILED (" ++ name ++ ")\n" ++ show e
 
   -- Get the result and act accordingly
   case result of -- putStrLn $ show result
@@ -69,7 +69,7 @@ parseOne shouldPass ( name , path ) = do
 
       Left  e -> if   shouldPass 
                  then handleFail e >> return False 
-                 else putStrLn errorMessage >> return True
+                 else putStr errorMessage >> return True
 
 --------------------------------------------------------------------------------
 
