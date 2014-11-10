@@ -80,8 +80,8 @@ languageDef
   , Token.nestedComments  = False
   , Token.identStart      = letter   <|> char '_'
   , Token.identLetter     = alphaNum <|> char '_'
-  , Token.opStart         = oneOf "+-*/=!<>&|%loc!"
-  , Token.opLetter        = parserZero
+  --, Token.opStart         = oneOf "+-*/=!<>&|%loc!" WHHHAT REMOVING THIS MAKES  9 TESTS PASS
+  --, Token.opLetter        = parserZero
   , Token.reservedNames   = reservedWords
   , Token.reservedOpNames = reservedOps
   , Token.caseSensitive   = True }
