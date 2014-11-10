@@ -48,8 +48,11 @@ tIntLiter
     , ( "-12xx45" , False ) ]
 
 tCharLiter
- = [ ( "a"      , False )
+ = [ ( ""       , False )
+   , ( " "      , False )
+   , ( "a"      , False )
    , ( "\'a\'"  , True  )
+   , ( "\' \'"  , True  )
    , ( "\'aa\'" , False )
    , ( "\'\'\'" , False )
    , ( "\'0\'"  , True  )
@@ -61,7 +64,10 @@ tCharLiter
 
 
 tStrLiter
- = [ ( "\"\"\""       , False )
+ = [ ( ""             , False )
+   , ( " "            , False )
+   , ( "\" \""        , True  )
+   , ( "\"\"\""       , False )
    , ( "\"\"\"\""     , False ) 
    , ( "abc"          , False ) 
    , ( "\"\""         , True  )
@@ -155,7 +161,7 @@ runGroupAll = do
     runGroupTests "pStrLiter"    pStrLiter    tStrLiter
     runGroupTests "pPairLiter"   pPairLiter   tPairLiter
     runGroupTests "pArrayLiter"  pArrayLiter  tArrayLiter
---    runGroupTests "pStat"        pStat        tStat
+    runGroupTests "pStat"        pStat        tStat
     runGroupTests "pPairType"    pPairType    tPairType
 
 runGroupTests fname parser tests 

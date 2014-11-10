@@ -10,8 +10,12 @@ module WaccLanguageDef
 , waccBrackets
 , waccBraces
 , waccInteger   
-, waccSemicolon
+, waccSemi
+, waccSemiSep
+, waccSemiSep1
 , waccComma
+, waccCommaSep
+, waccCommaSep1
 , waccWhiteSpace
 , waccOperators
 ) where
@@ -63,8 +67,12 @@ waccParens     = Token.parens        lexer -- parses parentheses around p : ( p 
 waccBrackets   = Token.brackets      lexer -- parses brackets around p    : [ p ]
 waccBraces     = Token.braces        lexer -- parses braces around p      : { p }
 waccInteger    = Token.integer       lexer -- parses an integer
-waccSemicolon  = Token.semi          lexer -- parses a semicolon
+waccSemi       = Token.semi          lexer -- parses a semicolon
+waccSemiSep    = Token.semiSep       lexer -- parses 0 or more tokens separated by ;
+waccSemiSep1   = Token.semiSep1      lexer -- parses 1 or more tokens separated by ;
 waccComma      = Token.comma         lexer -- parses a comma
+waccCommaSep   = Token.commaSep      lexer -- parses 0 or more tokens separated by ,
+waccCommaSep1  = Token.commaSep1     lexer -- parses 1 or more tokens separated by ,
 waccWhiteSpace = Token.whiteSpace    lexer -- parses whitespace
     
      

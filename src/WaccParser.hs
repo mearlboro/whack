@@ -7,12 +7,14 @@ module WaccParser where
 import WaccDataTypes
 import WaccLanguageDef
 
+import Text.Parsec.Prim ( parserZero )
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Token
 import Text.Parsec.Language ( haskellDef )
 import Control.Applicative hiding ( (<|>) , many )
 import Control.Monad ( liftM , liftM2 )
+import Control.Monad.Fix
 
 
 -- |3.1.1 program .......................................................  26 --    
@@ -39,20 +41,19 @@ pProgram = do
 -- :: <func> ::= <type> <ident> '(' <param-list>? ')' 'is' <stat> 'end' ::::: --
 pFunc :: Parser Func
 pFunc = do
-    typez <- pType
-    ident <- waccIdentifier
+    fType <- pType
+    fName <- waccIdentifier
     pList <- waccParens pParamList
     waccReserved "is"
     stat  <- pStat
     waccReserved "end"
-    return $ Func typez ident pList stat
+    return $ Func fType fName pList stat
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <param-list> ::= <param> (',' <param>)* ::::::::::::::::::::::::::::::: --
 pParamList :: Parser ParamList
-pParamList = do
-    sepBy pParam $ waccComma
+pParamList = waccCommaSep1 pParam
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -81,50 +82,49 @@ pStat
    <|> pScopedStat
    <|> pSeqStat
 
-    where
 
-        pDeclareStat = do    -- <type> <ident> '=' <assign-rhs>
-          sType <- pType
-          ident <- waccIdentifier
-          waccReservedOp "="
-          rhs   <- pAssignRhs
-          return $ DeclareStat sType ident rhs
-          
-        pAssignStat = do     -- <assign-lhs> = <assign-rhs>
-          lhs <- pAssignLhs
-          waccReservedOp "="
-          rhs <- pAssignRhs
-          return $ AssignStat lhs rhs
-             
-        pIfStat = do         -- 'if' <expr> 'then' <stat> 'else' <stat> 'fi'
-          waccReserved "if"
-          expr  <- pExpr
-          waccReserved "then"
-          stat1 <- pStat
-          waccReserved "else"
-          stat2 <- pStat
-          waccReserved "fi"
-          return $ IfStat expr stat1 stat2
-               
-        pWhileStat = do      -- 'while' <expr> 'do' <stat> 'done'
-          waccReserved "while"
-          expr <- pExpr
-          waccReserved "do"
-          stat <- pStat
-          waccReserved "done"
-          return $ WhileStat expr stat
+pDeclareStat = do    -- <type> <ident> '=' <assign-rhs>
+    sType <- pType
+    ident <- waccIdentifier
+    waccReservedOp "="
+    rhs   <- pAssignRhs
+    return $ DeclareStat sType ident rhs
     
-        pScopedStat = do     -- 'begin' <stat> 'end
-          waccReserved "begin"
-          stat <- pStat
-          waccReserved "end"
-          return $ ScopedStat stat
-           
-        pSeqStat = do        -- <stat> ';' <stat>
-          stat1 <- pStat
-          waccSemicolon
-          stat2 <- pStat
-          return $ SeqStat stat1 stat2
+pAssignStat = do     -- <assign-lhs> = <assign-rhs>
+    lhs <- pAssignLhs
+    waccReservedOp "="
+    rhs <- pAssignRhs
+    return $ AssignStat lhs rhs
+       
+pIfStat = do         -- 'if' <expr> 'then' <stat> 'else' <stat> 'fi'
+    waccReserved "if"
+    expr  <- pExpr
+    waccReserved "then"
+    stat1 <- pStat
+    waccReserved "else"
+    stat2 <- pStat
+    waccReserved "fi"
+    return $ IfStat expr stat1 stat2
+         
+pWhileStat = do      -- 'while' <expr> 'do' <stat> 'done'
+    waccReserved "while"
+    expr <- pExpr
+    waccReserved "do"
+    stat <- pStat
+    waccReserved "done"
+    return $ WhileStat expr stat
+
+pScopedStat = do     -- 'begin' <stat> 'end
+    waccReserved "begin"
+    stat <- pStat
+    waccReserved "end"
+    return $ ScopedStat stat
+     
+pSeqStat =  do       -- <stat> ';' <stat>
+    stat1 <- pStat
+    waccSemi 
+    stat2 <- pStat
+    return $ SeqStat stat1 stat2
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -183,10 +183,10 @@ pPairElem
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <type> ::= <base-type> | <array-type> | <pair-type> ::::::::::::::::::: --
 pType :: Parser Type
-pType
-    =  try ( liftM TypeBase  pBaseType  )
-   <|> try ( liftM TypeArray pArrayType )
-   <|> try ( liftM TypePair  pPairType  )
+pType = do
+    subtype <-  liftM TypeBase pBaseType 
+            <|> liftM TypePair pPairType
+    fix (\f -> (string "[]" >> fmap (TypeArray . ArrayType) f) <|> return subtype) 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <base-type> ::= 'int' | 'bool' | 'char' | 'string' :::::::::::::::::::: --
@@ -199,18 +199,10 @@ pBaseType
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <array-type> ::= <type> '[' ']' ::::::::::::::::::::::::::::::::::::::: --
-pArrayType :: Parser ArrayType
-pArrayType = do 
-    subtype <- try pType
-    try ( string "[]" )
-    return $ ArrayType subtype
-
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: 'pair' '(' <pair-elem-type> ',' <pair-elem-type> ')' :::::::::::::::::: --
 
 -- |For easier management of the nested pair case, we chose a Maybe approach on
--- the pair type, thus considering the nested pair just another graphical form of
+-- the pair type,y thus considering the nested pair just another graphical form of
 -- the same type.
 pPairType :: Parser PairType
 pPairType = do
@@ -225,14 +217,8 @@ pPairType = do
 
         pPairElemType :: Parser Type
         pPairElemType
-            =  try ( liftM TypeBase  pBaseType         )
-           <|> try ( liftM TypeArray pArrayType        )
-           <|> try ( liftM TypePair  pPairPairElemType )
-
-        pPairPairElemType :: Parser PairType
-        pPairPairElemType = 
-            waccReserved "pair" >>  return Nothing
-
+            =  try ( pWaccWord "pair" $ TypePair Nothing )
+           <|> pType
 
 -- 3.4. Expressions
 
