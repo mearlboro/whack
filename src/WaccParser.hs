@@ -257,7 +257,10 @@ pArrayElem = do
 
 -- :: <int-liter> ::= <int-sign>? <digit>+ :::::::::::::::::::::::::::::::::: --
 pIntLiter :: Parser IntLiter
-pIntLiter = waccInteger
+pIntLiter = do
+  int <- waccInteger
+  if int < -2^31 || int > 2^31-1 then fail "please work" else return int
+  --return int 
 
 -- :: <bool-liter> ::= 'true' | 'false' ::::::::::::::::::::::::::::::::::::: --
 pBoolLiter :: Parser BoolLiter
