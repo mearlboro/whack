@@ -131,9 +131,9 @@ pStat = pStat' >>= \stat ->
 -- :: <assign-lhs> ::= <ident> | <pair-elem> | <array-elem> ::::::::::::::::: --
 pAssignLhs :: Parser AssignLhs
 pAssignLhs
-    =  choice [ liftM LhsIdent     waccIdentifier
-              , liftM LhsPairElem  pPairElem
-              , liftM LhsArrayElem pArrayElem ]
+    =  choice [ try $ liftM LhsArrayElem pArrayElem
+              , try $ liftM LhsIdent     waccIdentifier
+              , try $ liftM LhsPairElem  pPairElem ]
 
 -- :: <assign-rhs> :::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 pAssignRhs :: Parser AssignRhs
@@ -233,16 +233,16 @@ pExpr = buildExpressionParser waccOperators pExpr'
     pExpr' :: Parser Expr
     pExpr' 
       = choice 
-      [ pParenthesised
+      [ try $ waccParens pExpr
       , try $ liftM ArrayElemExpr pArrayElem      
-      , liftM BoolLiterExpr pBoolLiter
-      , liftM IntLiterExpr  pIntLiter
-      , liftM CharLiterExpr pCharLiter
-      , liftM StrLiterExpr  pStrLiter
-      , liftM PairLiterExpr pPairLiter
-      , liftM IdentExpr     waccIdentifier
-      , pUnaryOperExpr
-      , pBinaryOperExpr ] <?> "pExpr"
+      , try $ liftM BoolLiterExpr pBoolLiter
+      , try $ liftM IntLiterExpr  pIntLiter
+      , try $ liftM CharLiterExpr pCharLiter
+      , try $ liftM StrLiterExpr  pStrLiter
+      , try $ liftM PairLiterExpr pPairLiter
+      , try $ liftM IdentExpr     waccIdentifier
+      , try pBinaryOperExpr
+      , try pUnaryOperExpr ] <?> "pExpr"
 
 -- :: <array-elem> ::= <ident> ('[' <expr> ']')+ ::::::::::::::::::::::::::::::: --
 pArrayElem :: Parser ArrayElem
@@ -282,11 +282,12 @@ pPairLiter = pWaccWord "null" Null
 
 
 pUnaryOperExpr
-    =  pUnaryOperExp' "!"   NotUnOp
-   <|> pUnaryOperExp' "len" LenUnOp
-   <|> pUnaryOperExp' "ord" OrdUnOp
-   <|> pUnaryOperExp' "chr" ChrUnOp
-   <|> pUnaryOperExp' "-"   NegUnOp
+    = choice
+    [ try $ pUnaryOperExp' "!"   NotUnOp
+    , try $ pUnaryOperExp' "len" LenUnOp
+    , try $ pUnaryOperExp' "ord" OrdUnOp
+    , try $ pUnaryOperExp' "chr" ChrUnOp
+    , try $ pUnaryOperExp' "-"   NegUnOp ]
 
     where
 
@@ -294,24 +295,24 @@ pUnaryOperExpr
             waccReservedOp string >> liftM (UnaryOperExpr op) pExpr
 
 pBinaryOperExpr
-    =  pBinaryOperExp' "+"  AddBinOp
-   <|> pBinaryOperExp' "-"  SubBinOp
-   <|> pBinaryOperExp' "*"  MulBinOp
-   <|> pBinaryOperExp' "/"  DivBinOp
-   <|> pBinaryOperExp' "%"  ModBinOp
-   <|> pBinaryOperExp' "&&" AndBinOp
-   <|> pBinaryOperExp' "||" OrrBinOp
-   <|> pBinaryOperExp' "<"  LsBinOp
-   <|> pBinaryOperExp' ">"  GtBinOp
-   <|> pBinaryOperExp' "<=" LEBinOp
-   <|> pBinaryOperExp' ">=" GEBinOp
-   <|> pBinaryOperExp' "==" EqBinOp
-   <|> pBinaryOperExp' "!=" NEBinOp
+    = choice 
+    [ try $ pBinaryOperExp' "+"  AddBinOp
+    , try $ pBinaryOperExp' "-"  SubBinOp
+    , try $ pBinaryOperExp' "*"  MulBinOp
+    , try $ pBinaryOperExp' "/"  DivBinOp
+    , try $ pBinaryOperExp' "%"  ModBinOp
+    , try $ pBinaryOperExp' "&&" AndBinOp
+    , try $ pBinaryOperExp' "||" OrrBinOp
+    , try $ pBinaryOperExp' "<=" LEBinOp
+    , try $ pBinaryOperExp' "<"  LsBinOp
+    , try $ pBinaryOperExp' ">"  GtBinOp
+    , try $ pBinaryOperExp' ">=" GEBinOp
+    , try $ pBinaryOperExp' "==" EqBinOp
+    , try $ pBinaryOperExp' "!=" NEBinOp ]
     where
         pBinaryOperExp' str op =
-            waccReserved str >> liftM2 ( BinaryOperExpr op ) pExpr pExpr
+            waccReservedOp str >> liftM2 ( BinaryOperExpr op ) pExpr pExpr
 
-pParenthesised = waccParens pExpr
 
 
 
