@@ -59,7 +59,11 @@ pParamList = waccCommaSep pParam
 
 -- :: <param> ::= <type> <ident> :::::::::::::::::::::::::::::::::::::::::::: --
 pParam :: Parser Param
-pParam = liftM2 Param pType waccIdentifier
+pParam = do
+  parType <- pType
+  waccWhiteSpace
+  ident <- waccIdentifier
+  return $ Param parType ident
 
 -- :: <stat> :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 pStat :: Parser Stat
@@ -139,11 +143,11 @@ pAssignLhs
 pAssignRhs :: Parser AssignRhs
 pAssignRhs
     =  choice 
-    [ liftM RhsExpr       pExpr          -- <expr>
-    , liftM RhsPairElem   pPairElem      -- <pair-elem>
-    , liftM RhsArrayLiter pArrayLiter    -- <array-liter>
-    , pRhsNewPair
-    , pRhsCall ]
+    [ try $ liftM RhsArrayLiter pArrayLiter    -- <array-liter>
+    , try $ liftM RhsPairElem   pPairElem      -- <pair-elem>
+    , try $ liftM RhsExpr       pExpr          -- <expr>
+    , try pRhsNewPair
+    , try pRhsCall ]
 
     where
 
