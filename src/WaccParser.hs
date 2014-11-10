@@ -28,259 +28,286 @@ import Control.Monad.IO.Class     ( liftIO )
 
 -- |3.1.1 Program 
 
+
 -- :: <program> ::= 'begin' <func>* <stat> 'end' :::::::::::::::::::::::::::: --
 pProgram :: Parser Program
 pProgram = do
-   waccWhiteSpace
-   waccReserved "begin"
-   waccWhiteSpace
-   funcs <- try $ many ( try pFunc )
-   waccWhiteSpace
-   stat  <- pStat
-   waccReserved "end"
-   return $ Program funcs stat -- funcs stat
+    waccWhiteSpace
+    waccReserved "begin"
+    funcs <- many $ try pFunc 
+    waccWhiteSpace
+    body  <- pStat
+    waccReserved "end"
+    return $ Program funcs body 
+
 
 -- :: <func> ::= <type> <ident> '(' <param-list>? ')' 'is' <stat> 'end' ::::: --
 pFunc :: Parser Func
 pFunc = do
-    ftype <- pType
+    ftype  <- pType
     waccWhiteSpace
-    ident <- waccIdentifier
-    --waccWhiteSpace
-    pList <- waccParens pParamList
+    name   <- waccIdentifier
+    params <- waccParens pParamList
     waccReserved "is"
-    stat  <- pStat
+    body   <- pStat
     waccReserved "end"
 
-    if   not $ hasReachableReturnStat stat 
-    then fail "No Reachable Return Statement In This Function" 
-    else return $ Func ftype ident pList stat
+    -- Control flow in functions must eventually reach a return or exit stat
+    let returnsOrExits x = case x of                
+            ReturnStat  _      -> True  
+            ExitStat    _      -> True   
+            ScopedStat  s      -> returnsOrExits s        
+            WhileStat   _ s    -> returnsOrExits s
+            SeqStat     _ s    -> returnsOrExits s
+            IfStat      e s s' -> and $ map returnsOrExits $ s:s':[]
+            _                  -> False 
 
+    if   returnsOrExits body 
+    then return $ Func ftype name params body
+    else fail "No Reachable Return/Exit Statement" 
 
-hasReachableReturnStat :: Stat -> Bool 
-hasReachableReturnStat s = case s of                
-  ReturnStat  _      -> True  
-  ExitStat    _      -> True   
-  ScopedStat  s      -> hasReachableReturnStat s        
-  WhileStat   _ s    -> hasReachableReturnStat s
-  SeqStat     _ s    -> hasReachableReturnStat s
-  IfStat      e s s' -> and $ map hasReachableReturnStat ( s:s':[] )
-  _                  -> False 
 
 -- :: <param-list> ::= <param> (',' <param>)* ::::::::::::::::::::::::::::::: --
 pParamList :: Parser ParamList
 pParamList = waccCommaSep pParam
 
+
 -- :: <param> ::= <type> <ident> :::::::::::::::::::::::::::::::::::::::::::: --
 pParam :: Parser Param
 pParam = do
-  parType <- pType
-  waccWhiteSpace
-  ident <- waccIdentifier
-  return $ Param parType ident
+    ptype <- pType
+    waccWhiteSpace
+    pname <- waccIdentifier
+    return $ Param ptype pname
+
 
 -- :: <stat> :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 pStat :: Parser Stat
 pStat = pStat' >>= \stat -> 
-  -- option x p tries to apply parser p. If p fails without consuming input, 
-  -- it returns the value x, otherwise the value returned by p.
-  option stat $ waccSemicolon >> liftM ( SeqStat stat ) pStat 
+    -- First parse a statement `stat` with `pStat'`.
+    -- Then `option` will try to parse a `waccSemicolon` and if it 
+    -- finds one then it will go on and parse a second statement with `pStat`
+    -- and place it inside a `SeqStat` together with `stat`.
+    -- If it can't parse a `waccSemicolon` it will fail and return `stat`.
+    option stat $ waccSemicolon >> liftM ( SeqStat stat ) pStat 
 
     where
 
-      pStat' 
-        = choice 
-        [ pWaccWord "skip"    SkipStat
-        , pWaccLift "free"    FreeStat    pExpr
-        , pWaccLift "return"  ReturnStat  pExpr
-        , pWaccLift "exit"    ExitStat    pExpr
-        , pWaccLift "print"   PrintStat   pExpr
-        , pWaccLift "println" PrintlnStat pExpr
-        , pWaccLift "read"    ReadStat    pAssignLhs
-        , pDeclareStat
-        , pAssignStat
-        , pIfStat
-        , pWhileStat
-        , pScopedStat ]
-
-      pDeclareStat = do    -- <type> <ident> '=' <assign-rhs>
-        sType <- pType
-        waccWhiteSpace
-        ident <- waccIdentifier 
-        waccWhiteSpace
-        waccReservedOp "="
-        waccWhiteSpace
-        rhs   <- pAssignRhs
-        return $ DeclareStat sType ident rhs
-
-      pAssignStat = do     -- <assign-lhs> = <assign-rhs>
-        lhs <- pAssignLhs
-        waccWhiteSpace
-        waccReservedOp "="
-        waccWhiteSpace
-        rhs <- pAssignRhs
-        return $ AssignStat lhs rhs
-
-      pIfStat = do         -- 'if' <expr> 'then' <stat> 'else' <stat> 'fi'
-        waccReserved "if"
-        expr  <- pExpr
-        waccReserved "then"
-        stat1 <- pStat
-        waccReserved "else"
-        stat2 <- pStat
-        waccReserved "fi"
-        return $ IfStat expr stat1 stat2
-
-      pWhileStat = do      -- 'while' <expr> 'do' <stat> 'done'
-        waccReserved "while"
-        expr <- pExpr
-        waccReserved "do"
-        stat <- pStat
-        waccReserved "done"
-        return $ WhileStat expr stat
-
-      pScopedStat = do     -- 'begin' <stat> 'end'
-        waccReserved "begin"
-        stat <- pStat
-        waccReserved "end"
-        return $ ScopedStat stat
+        pStat' = choice 
+            [ pWaccWord "skip"    SkipStat
+            , pWaccLift "free"    FreeStat    pExpr
+            , pWaccLift "return"  ReturnStat  pExpr
+            , pWaccLift "exit"    ExitStat    pExpr
+            , pWaccLift "print"   PrintStat   pExpr
+            , pWaccLift "println" PrintlnStat pExpr
+            , pWaccLift "read"    ReadStat    pAssignLhs
+            , pDeclareStat
+            , pAssignStat
+            , pIfStat
+            , pWhileStat
+            , pScopedStat ]
+    
+        pDeclareStat = do -- <type> <ident> '=' <assign-rhs>
+            stype <- pType
+            waccWhiteSpace
+            ident <- waccIdentifier 
+            waccWhiteSpace
+            waccReservedOp "="
+            waccWhiteSpace
+            rhs   <- pAssignRhs
+            return $ DeclareStat stype ident rhs
+    
+        pAssignStat = do -- <assign-lhs> = <assign-rhs>
+            lhs <- pAssignLhs
+            waccWhiteSpace
+            waccReservedOp "="
+            waccWhiteSpace
+            rhs <- pAssignRhs
+            return $ AssignStat lhs rhs
+    
+        pIfStat = do -- 'if' <expr> 'then' <stat> 'else' <stat> 'fi'
+            waccReserved "if"
+            expr  <- pExpr
+            waccReserved "then"
+            stat  <- pStat
+            waccReserved "else"
+            stat' <- pStat
+            waccReserved "fi"
+            return $ IfStat expr stat stat'
+    
+        pWhileStat = do -- 'while' <expr> 'do' <stat> 'done'
+            waccReserved "while"
+            expr <- pExpr
+            waccReserved "do"
+            stat <- pStat
+            waccReserved "done"
+            return $ WhileStat expr stat
+    
+        pScopedStat = do -- 'begin' <stat> 'end'
+            waccReserved "begin"
+            stat <- pStat
+            waccReserved "end"
+            return $ ScopedStat stat
 
 
 -- :: <assign-lhs> ::= <ident> | <pair-elem> | <array-elem> ::::::::::::::::: --
 pAssignLhs :: Parser AssignLhs
-pAssignLhs
-    =  choice [ try $ liftM LhsArrayElem pArrayElem
-              , try $ liftM LhsIdent     waccIdentifier
-              , try $ liftM LhsPairElem  pPairElem ]
+pAssignLhs = choice 
+    [ try $ liftM LhsArrayElem pArrayElem
+    ,       liftM LhsIdent     waccIdentifier
+    ,       liftM LhsPairElem  pPairElem ]
 
 -- :: <assign-rhs> :::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 pAssignRhs :: Parser AssignRhs
-pAssignRhs
-    =  choice 
-    [ try $ liftM RhsArrayLiter pArrayLiter    -- <array-liter>
-    , try $ liftM RhsPairElem   pPairElem      -- <pair-elem>
-    , try $ liftM RhsExpr       pExpr          -- <expr>
-    , try pRhsNewPair
-    , try pRhsCall ]
+pAssignRhs = choice 
+    [ liftM RhsArrayLiter pArrayLiter 
+    , liftM RhsPairElem   pPairElem   
+    , liftM RhsExpr       pExpr       
+    , pRhsNewPair
+    , pRhsCall ]
 
     where
 
-        pRhsNewPair = do                  -- 'newpair' '(' <expr> ',' <expr> ')'
-          waccReserved "newpair"
-          waccParens $ do
-              expr1 <- pExpr
-              waccComma
-              expr2 <- pExpr
-              return $ RhsNewPair expr1 expr2
-
-        pRhsCall = do                     -- 'call' <ident> '(' <arg-list>? ')' TODO liftM2
+        pRhsNewPair = do 
+            waccReserved "newpair"
+            waccParens $ do
+                expr  <- pExpr
+                waccComma
+                expr' <- pExpr
+                return $ RhsNewPair expr expr'
+        
+        pRhsCall = do 
           waccReserved "call"
-          fident <- waccIdentifier
-          args   <- waccParens $ pArgList
-          return $ RhsCall fident args
+          fname <- waccIdentifier
+          args  <- waccParens pArgList
+          return $ RhsCall fname args
+
 
 -- :: <arg-list> ::= <expr> (',' <expr>)* ::::::::::::::::::::::::::::::::::: --
 pArgList :: Parser ArgList
 pArgList = waccCommaSep pExpr
 
+
 -- :: <pair-elem> ::= 'fst' <expr> | 'snd' <expr' ::::::::::::::::::::::::::: --
 pPairElem :: Parser PairElem
-pPairElem
-    =  pWaccLift "fst" Fst pExpr
-   <|> pWaccLift "snd" Snd pExpr
+pPairElem = pWaccLift "fst" Fst pExpr <|> pWaccLift "snd" Snd pExpr
+
 
 -- :: <type> ::= <base-type> | <array-type> | <pair-type> ::::::::::::::::::: --
 pType :: Parser Type
 pType = do 
-  base <- liftM TypePair pPairType 
-      <|> liftM TypeBase pBaseType 
-  dims <- length <$> many ( string "[]" ) 
-  return $ if   dims == 0 
-           then base 
-           else iterate TypeArray base !! dims
+    base <- liftM TypePair pPairType <|> liftM TypeBase pBaseType 
+    dims <- length <$> many ( string "[]" ) 
+
+    if   dims == 0 
+    then return   base 
+    else return $ iterate TypeArray base !! dims
+
 
 --   = Maybe ( Type , Type )
 pPairType :: Parser PairType
 pPairType = do
     waccReserved "pair"
     waccParens $ do
-    pairElem1 <- pPairElemType
-    waccComma
-    pairElem2 <- pPairElemType
-    return $ Just (pairElem1, pairElem2) 
+        pelem  <- pPairElemType
+        waccComma
+        pelem' <- pPairElemType
+        return $ Just ( pelem , pelem' ) 
 
-      where
+    where
 
         pPairElemType  :: Parser Type
-        pPairElemType  = try $ pWaccWord "pair" ( TypePair Nothing )
-                     <|> pType
-
-        --pPairPairElemType :: Parser PairType
-        --pPairPairElemType = 
-        --    waccReserved "pair" >>  return Nothing
-
-
--- :: <pair-type> ::= 'pair' '(' <pair-elem-type> ',' <pair-elem-type> ')' :: --   
---pPairType :: Parser PairType  -- Mayeb ( tyoe , type )
---pPairType = do
---    waccReserved "pair"
---    waccParens $ do
---        pairElem  <- pPairElemType 
---        waccComma
---        pairElem' <- pPairElemType
---        return Just $ ( pairElem , pairElem' ) 
---    where
---        pPairElemType :: Parser ( Maybe Type )
---        pPairElemType = try $ pWaccWord "pair" Nothing 
---                     <|> liftM Just pType
+        pPairElemType  =  pWaccWord "pair" ( TypePair Nothing ) <|> pType
 
 
 
 -- :: <base-type> ::= 'int' | 'bool' | 'char' | 'string' :::::::::::::::::::: --
 pBaseType :: Parser BaseType
-pBaseType =  choice [ pWaccWord "int"    IntBaseType    
-                    , pWaccWord "bool"   BoolBaseType   
-                    , pWaccWord "char"   CharBaseType   
-                    , pWaccWord "string" StringBaseType ]
+pBaseType = choice 
+    [ pWaccWord "int"    IntBaseType    
+    , pWaccWord "bool"   BoolBaseType   
+    , pWaccWord "char"   CharBaseType   
+    , pWaccWord "string" StringBaseType ]
 
 -- :: <expr> :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 pExpr :: Parser Expr
 pExpr = buildExpressionParser waccOperators pExpr'
 
-  where
-    pExpr' :: Parser Expr
-    pExpr' 
-      = choice 
-      [ try $ waccParens pExpr
-      , try $ liftM ArrayElemExpr pArrayElem      
-      , try $ liftM BoolLiterExpr pBoolLiter
-      , try $ liftM IntLiterExpr  pIntLiter
-      , try $ liftM CharLiterExpr pCharLiter
-      , try $ liftM StrLiterExpr  pStrLiter
-      , try $ liftM PairLiterExpr pPairLiter
-      , try $ liftM IdentExpr     waccIdentifier
-      , try pBinaryOperExpr
-      , try pUnaryOperExpr ] <?> "pExpr"
+    where
+
+        pExpr' = choice 
+            [ waccParens pExpr
+            , try $ liftM ArrayElemExpr pArrayElem      
+            ,       liftM BoolLiterExpr pBoolLiter
+            ,       liftM IntLiterExpr  pIntLiter
+            ,       liftM CharLiterExpr pCharLiter
+            ,       liftM StrLiterExpr  pStrLiter
+            ,       liftM PairLiterExpr pPairLiter
+            ,       liftM IdentExpr     waccIdentifier
+            , pBinaryOperExpr
+            , pUnaryOperExpr 
+            ] <?> "pExpr"
+
+
+        pUnaryOperExpr = choice
+            [ pUnOp "!"   NotUnOp
+            , pUnOp "len" LenUnOp
+            , pUnOp "ord" OrdUnOp
+            , pUnOp "chr" ChrUnOp
+            , pUnOp "-"   NegUnOp ]
+        
+            where
+        
+                pUnOp string op = do 
+                    waccReservedOp string
+                    liftM ( UnaryOperExpr op ) pExpr
+        
+        pBinaryOperExpr = choice 
+            [ pBinOp "+"  AddBinOp
+            , pBinOp "-"  SubBinOp
+            , pBinOp "*"  MulBinOp
+            , pBinOp "/"  DivBinOp
+            , pBinOp "%"  ModBinOp
+            , pBinOp "&&" AndBinOp
+            , pBinOp "||" OrrBinOp
+            , pBinOp "<=" LEBinOp
+            , pBinOp "<"  LsBinOp
+            , pBinOp ">"  GtBinOp
+            , pBinOp ">=" GEBinOp
+            , pBinOp "==" EqBinOp
+            , pBinOp "!=" NEBinOp ]
+            
+            where
+                
+                pBinOp str op = do 
+                    waccReservedOp str 
+                    liftM2 ( BinaryOperExpr op ) pExpr pExpr
+
+
+
 
 -- :: <array-elem> ::= <ident> ('[' <expr> ']')+ ::::::::::::::::::::::::::::::: --
 pArrayElem :: Parser ArrayElem
 pArrayElem = do 
-  ident      <- waccIdentifier
-  dimensions <- many1 ( waccBrackets pExpr )
-  return $ ArrayElem ident dimensions
+  ident <- waccIdentifier
+  dims  <- many1 $ waccBrackets pExpr 
+  return $ ArrayElem ident dims
+
 
 -- :: <int-liter> ::= <int-sign>? <digit>+ :::::::::::::::::::::::::::::::::: --
 pIntLiter :: Parser IntLiter
 pIntLiter = do
   -- −2^31 to 2^31 − 1 inclusive.
   int <- waccInteger
-  if   int >= (-2^31) && int <= (2^31-1)
+  if   int >= -2^31 && int <= 2^31-1
   then return int
   else fail "Integer Out Of Bounds" 
+
 
 -- :: <bool-liter> ::= 'true' | 'false' ::::::::::::::::::::::::::::::::::::: --
 pBoolLiter :: Parser BoolLiter
 pBoolLiter =  pWaccWord "true" True <|> pWaccWord "false" False 
+
 
 -- :: <char-liter> ::= ''' <char> ''' ::::::::::::::::::::::::::::::::::::::: --
 pCharLiter :: Parser CharLiter
@@ -304,51 +331,8 @@ pPairLiter :: Parser PairLiter
 pPairLiter = pWaccWord "null" Null
 
 
--- pIntLiterExpr, pBoolLiterExpr, pCharLiterExpr, pStrLiterExpr,  pPairLiterExpr, 
--- pIdentExpr,    pUnaryOperExpr, pParenthesised, pArrayElemExpr, pBinaryOperExpr
--- :: Parser Expr
 
 
-pUnaryOperExpr
-    = choice
-    [ try $ pUnaryOperExp' "!"   NotUnOp
-    , try $ pUnaryOperExp' "len" LenUnOp
-    , try $ pUnaryOperExp' "ord" OrdUnOp
-    , try $ pUnaryOperExp' "chr" ChrUnOp
-    , try $ pUnaryOperExp' "-"   NegUnOp ]
-
-    where
-
-        pUnaryOperExp' string op =
-            waccReservedOp string >> liftM (UnaryOperExpr op) pExpr
-
-pBinaryOperExpr
-    = choice 
-    [ try $ pBinaryOperExp' "+"  AddBinOp
-    , try $ pBinaryOperExp' "-"  SubBinOp
-    , try $ pBinaryOperExp' "*"  MulBinOp
-    , try $ pBinaryOperExp' "/"  DivBinOp
-    , try $ pBinaryOperExp' "%"  ModBinOp
-    , try $ pBinaryOperExp' "&&" AndBinOp
-    , try $ pBinaryOperExp' "||" OrrBinOp
-    , try $ pBinaryOperExp' "<=" LEBinOp
-    , try $ pBinaryOperExp' "<"  LsBinOp
-    , try $ pBinaryOperExp' ">"  GtBinOp
-    , try $ pBinaryOperExp' ">=" GEBinOp
-    , try $ pBinaryOperExp' "==" EqBinOp
-    , try $ pBinaryOperExp' "!=" NEBinOp ]
-    where
-        pBinaryOperExp' str op =
-            waccReservedOp str >> liftM2 ( BinaryOperExpr op ) pExpr pExpr
-
-
-
-
-pComment :: Parser Comment 
-pComment = do 
-    char '#'
-    skipMany ( noneOf "\r\n" )
-    return ""
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: Utils ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --

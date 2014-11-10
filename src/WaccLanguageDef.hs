@@ -1,31 +1,4 @@
 
-
-
---languageDef 
---  = emptyDef 
---  { Token.commentStart    = ""  
---  , Token.commentEnd      = ""
---  , Token.commentLine     = "#"
---  , Token.nestedComments  = False
---  , Token.identStart      = letter   <|> char '_'
---  , Token.identLetter     = alphaNum <|> char '_'
---  , Token.opStart         = oneOf "+-*/=!<>&|%loc!"
---  , Token.opLetter        = oneOf "" -- TODO 
---  , Token.reservedNames   = reservedWords
---  , Token.reservedOpNames = reservedOps
---  , Token.caseSensitive   = True
---  }
-
-
----- TODO write type signature
---lexer = Token.makeTokenParser languageDef 
-
-
----- TODO write type signatures
-
-
-     
-
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: 2. WACC Language Definition ::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -80,8 +53,6 @@ languageDef
   , Token.nestedComments  = False
   , Token.identStart      = letter   <|> char '_'
   , Token.identLetter     = alphaNum <|> char '_'
-  --, Token.opStart         = oneOf "+-*/=!<>&|%loc!" WHHHAT REMOVING THIS MAKES  9 TESTS PASS
-  --, Token.opLetter        = parserZero
   , Token.reservedNames   = reservedWords
   , Token.reservedOpNames = reservedOps
   , Token.caseSensitive   = True }
@@ -112,24 +83,24 @@ waccLexeme     = Token.lexeme        lexer
 
 -- TODO write type signature
 waccOperators
-  = [ [ Prefix ( waccOperators' "!"   $ UnaryOperExpr  NotUnOp        )           ]
-    , [ Prefix ( waccOperators' "len" $ UnaryOperExpr  LenUnOp        )           ]
-    , [ Prefix ( waccOperators' "ord" $ UnaryOperExpr  OrdUnOp        )           ]
-    , [ Prefix ( waccOperators' "chr" $ UnaryOperExpr  ChrUnOp        )           ]
-    , [ Prefix ( waccOperators' "-"   $ UnaryOperExpr  NegUnOp        )           ]
-    , [ Infix  ( waccOperators' "+"   $ BinaryOperExpr AddBinOp       ) AssocLeft ]
-    , [ Infix  ( waccOperators' "-"   $ BinaryOperExpr SubBinOp       ) AssocLeft ]
-    , [ Infix  ( waccOperators' "*"   $ BinaryOperExpr MulBinOp       ) AssocLeft ]
-    , [ Infix  ( waccOperators' "/"   $ BinaryOperExpr DivBinOp       ) AssocLeft ]
-    , [ Infix  ( waccOperators' "%"   $ BinaryOperExpr ModBinOp       ) AssocLeft ]
-    , [ Infix  ( waccOperators' "<"   $ BinaryOperExpr LsBinOp        ) AssocLeft ]
-    , [ Infix  ( waccOperators' ">"   $ BinaryOperExpr GtBinOp        ) AssocLeft ]
-    , [ Infix  ( waccOperators' "<="  $ BinaryOperExpr LEBinOp        ) AssocLeft ]
-    , [ Infix  ( waccOperators' ">="  $ BinaryOperExpr GEBinOp        ) AssocLeft ]
-    , [ Infix  ( waccOperators' "=="  $ BinaryOperExpr EqBinOp        ) AssocLeft ]
-    , [ Infix  ( waccOperators' "!="  $ BinaryOperExpr NEBinOp        ) AssocLeft ]
-    , [ Infix  ( waccOperators' "&&"  $ BinaryOperExpr AndBinOp       ) AssocLeft ]
-    , [ Infix  ( waccOperators' "||"  $ BinaryOperExpr OrrBinOp       ) AssocLeft ] ]
+  = [ [ Prefix ( waccOperators' "!"   $ UnaryOperExpr  NotUnOp  )           ]
+    , [ Prefix ( waccOperators' "len" $ UnaryOperExpr  LenUnOp  )           ]
+    , [ Prefix ( waccOperators' "ord" $ UnaryOperExpr  OrdUnOp  )           ]
+    , [ Prefix ( waccOperators' "chr" $ UnaryOperExpr  ChrUnOp  )           ]
+    , [ Prefix ( waccOperators' "-"   $ UnaryOperExpr  NegUnOp  )           ]
+    , [ Infix  ( waccOperators' "+"   $ BinaryOperExpr AddBinOp ) AssocLeft ]
+    , [ Infix  ( waccOperators' "-"   $ BinaryOperExpr SubBinOp ) AssocLeft ]
+    , [ Infix  ( waccOperators' "*"   $ BinaryOperExpr MulBinOp ) AssocLeft ]
+    , [ Infix  ( waccOperators' "/"   $ BinaryOperExpr DivBinOp ) AssocLeft ]
+    , [ Infix  ( waccOperators' "%"   $ BinaryOperExpr ModBinOp ) AssocLeft ]
+    , [ Infix  ( waccOperators' "<"   $ BinaryOperExpr LsBinOp  ) AssocLeft ]
+    , [ Infix  ( waccOperators' ">"   $ BinaryOperExpr GtBinOp  ) AssocLeft ]
+    , [ Infix  ( waccOperators' "<="  $ BinaryOperExpr LEBinOp  ) AssocLeft ]
+    , [ Infix  ( waccOperators' ">="  $ BinaryOperExpr GEBinOp  ) AssocLeft ]
+    , [ Infix  ( waccOperators' "=="  $ BinaryOperExpr EqBinOp  ) AssocLeft ]
+    , [ Infix  ( waccOperators' "!="  $ BinaryOperExpr NEBinOp  ) AssocLeft ]
+    , [ Infix  ( waccOperators' "&&"  $ BinaryOperExpr AndBinOp ) AssocLeft ]
+    , [ Infix  ( waccOperators' "||"  $ BinaryOperExpr OrrBinOp ) AssocLeft ] ]
 
     where
 
