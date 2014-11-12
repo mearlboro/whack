@@ -333,12 +333,20 @@ pBoolLiter
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <char-liter> ::= ''' <char> ''' ::::::::::::::::::::::::::::::::::::::: --
 pCharLiter :: Parser CharLiter
-pCharLiter = waccCharLiter 
---do 
---  c <- waccCharLiter
---  if   c `elem` "\"\'\\"
---  then fail "Unescaped Character"
---  else return c
+pCharLiter = do
+
+  c <- lookAhead waccCharLiter
+
+  if      c `elem` "\\\"\'" -- If char was one of "\' 
+  then do char  '\''        -- Then make sure it was escaped correctly
+          char  '\\'
+          oneOf "\\\"\'"
+          char  '\''
+          waccWhiteSpace
+          return c
+  else do waccCharLiter >>= return 
+
+
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <str-liter> ::= ''' <char>* ''' ::::::::::::::::::::::::::::::::::::::: --

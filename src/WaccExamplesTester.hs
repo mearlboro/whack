@@ -59,7 +59,7 @@ parseOne shouldPass ( name , path ) = do
   
   -- Parser failed to parse something it was supposed to be able to parse
   let handleFail e = do 
-      putStrLn $ replicate 80 '~' ++ "\nFAILED (" ++ name ++ ")\n" ++ show e
+      putStrLn $ replicate 80 '~' ++ "\nFAILED (" ++ path ++ ")\n" ++ show e
 
   -- Get the result and act accordingly
   case result of -- putStrLn $ show result
