@@ -4,7 +4,6 @@
 
 module WaccDataTypes where
 
-
 data Program                                    -- <program> ::=
   = Program [ Func ] Stat                       -- 'begin' <func>* <stat> 'end'   
   deriving ( Show , Eq )  
