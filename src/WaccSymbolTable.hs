@@ -24,7 +24,12 @@ import WaccDataTypes
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
 -- | General purpose symbol table
-data SymbolTable k a = Empty | ST ( SymbolTable k a ) ( Map k a )
+data SymbolTable k a 
+    = Empty 
+    | ST ( SymbolTable k a ) ( Map k a )
+    deriving ( Show )
+
+instance () Show ( SymbolTable k a )
 
 -- | An identifier table is a symbol table that maps variable names to 
 --   identifier objects. it may be empty or it may have: a dictionary (Map) 
@@ -39,7 +44,8 @@ data Context =
     deriving ( Eq , Show , Enum , Ord )
 
 -- | An identifier has a type and a context
-type Identifier = ( Type , Context ) 
+type Identifier = ( Type , Context )
+
 
 -- | An Identifier name is just a string
 type Name = [ Char ]

@@ -2,7 +2,8 @@ module WaccSemantics where
 
 import Data.Maybe ( isNothing , fromMaybe , fromJust )
 import Data.Map ( empty )
-import Control.Applicative hiding ( (<$>) , empty )
+import Control.Applicative hiding (  empty )
+import Data.Char ( isSpace )
 
 import WaccParser
 import WaccExamplesTester
@@ -14,27 +15,33 @@ import WaccSymbolTable
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
 -- | PROGRAM represents the Program AST augmented with the global scope
-data PROGRAM = PROGRAM [ FUNC ] STAT Scope 
+data PROGRAM = 
+    PROGRAM [ FUNC ] STAT Scope 
+    deriving ( Show )
+
 
 -- | FUNC also contains the AST for Function and introduces its own scope
-data FUNC = FUNC Type Ident ParamList STAT Scope 
+data FUNC = 
+    FUNC Type Ident ParamList STAT Scope 
+    deriving ( Show )
 
 -- | Some statement (while, if, scoped) introduce a new scope.
 -- | All statements have a reference to the current scope they are in
 data STAT 
   = SKIPstat      
-  | FREEstat      Expr        Scope                                               
-  | RETURNstat    Expr        Scope                                              
-  | EXITstat      Expr        Scope                                               
-  | PRINTstat     Expr        Scope                                               
-  | PRINTLNstat   Expr        Scope                        
-  | SCOPEDstat    STAT                               
-  | READstat      AssignLhs   Scope                         
-  | WHILEstat     Expr        STAT        Scope                            
-  | SEQstat       STAT        STAT                                    
-  | ASSIGNstat    AssignLhs   AssignRhs   Scope                    
-  | IFstat        Expr        STAT        STAT        Scope     
-  | DECLAREstat   Type        Ident       AssignRhs   Scope 
+  | FREEstat    Expr      Scope                                               
+  | RETURNstat  Expr      Scope                                              
+  | EXITstat    Expr      Scope                                               
+  | PRINTstat   Expr      Scope                                               
+  | PRINTLNstat Expr      Scope                        
+  | SCOPEDstat  STAT                             
+  | READstat    AssignLhs Scope                         
+  | WHILEstat   Expr      STAT      Scope                            
+  | SEQstat     STAT      STAT                                  
+  | ASSIGNstat  AssignLhs AssignRhs Scope                    
+  | IFstat      Expr      STAT      STAT      Scope     
+  | DECLAREstat Type      Ident     AssignRhs Scope 
+  deriving ( Show )
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: Building the PROGRAM :::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -182,5 +189,20 @@ printError err  =  putStrLn $ case err of
     Nothing  -> "No Semantic Errors"
     Just msg -> "SemanticError: " ++ msg 
 
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: Testing ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
 
+begin = do 
+    putStrLn $ "Enter the name of a .wacc program to read, parse and test."
+    putStrLn $ "The file should be located in wacc_examples/semanticErr"
+    path <- trim <$> getLine 
+    program <- parseOne' $ "wacc_examples/semanticErr/" ++ path
+    let pROGRAM = buildPROGRAM program 
+    putStrLn $ "semantically-augmented PROGRAM:\n" ++ show pROGRAM 
+
+
+trim :: String -> String
+trim = f . f
+   where f = reverse . dropWhile isSpace

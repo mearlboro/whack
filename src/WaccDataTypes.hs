@@ -55,6 +55,17 @@ data PairElem                                   -- <pair-elem> ::=
   | Snd Expr                                    -- 'snd' <expr>
   deriving ( Show , Eq )          
   
+--data Type
+--  = IntType
+--  | BoolType 
+--  | StrType 
+--  | CharType 
+--  | PairType ( Maybe ( Type , Type ) )
+--  | ArrayType Type 
+--  | NullType
+--  | EmptyType  
+--  deriving ( Show , Eq , Ord )  
+
 data Type                                       -- <type> ::=
   = TypeBase  BaseType                          -- <base-type>
   | TypePair  PairType                          -- <pair-type>
@@ -70,6 +81,7 @@ data BaseType                                   -- <base-type> ::=
 
 type PairType                                   -- <pair-type> ::= 'pair' '(' <pair-elem-type> ',' <pair-elem-type> ')'    
   = Maybe ( Type , Type )
+
 
 data Expr                                       -- <expr> ::=
   = BoolLiterExpr     Bool                      -- <bool-liter>
