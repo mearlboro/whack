@@ -172,7 +172,8 @@ checkStat stat  =  case stat of
     READstat      (LhsPairElem (Snd expr)) scope -> checkExpr expr scope
     READstat      (LhsArrayElem arrayElem) scope -> checkExpr (ArrayElemExpr arrayElem) scope
 
-    WHILEstat     expr  body  scope              -> error "TODO"          
+    WHILEstat     expr  body  scope              -> if (checkExpr expr scope == Nothing && getTypeExpr expr scope == BoolType) then checkStat body
+                                                    else Just "Conditional expression error"         
     SEQstat       stat  stat'                    -> error "TODO"          
     ASSIGNstat    lhs   rhs   scope              -> error "TODO"          
     IFstat        expr  sthen selse scope        -> error "TODO"   
@@ -208,8 +209,8 @@ getTypeExpr expr scope = case expr of
     ParenthesisedExpr expr             -> getTypeExpr expr scope   
     IntLiterExpr      int              -> IntType   
     StrLiterExpr      str              -> StringType   
-    PairLiterExpr     pair             -> PairType     
-    ArrayElemExpr     (arrIdent exprs) -> ArrayType (findIdent arrIdent scope)
+    PairLiterExpr     pair             -> NullType 
+ -- ArrayElemExpr     ArrayType (arrIdent exprs) -> ArrayType (findIdent arrIdent scope) TODO
     
     BinaryOperExpr AddBinOp _ _        -> IntType
     BinaryOperExpr SubBinOp _ _        -> IntType                                  
