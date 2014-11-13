@@ -42,24 +42,15 @@ data STAT
 
 -- 1. The Global Scope in all of its majesty
 -- 2. Build the main statement thus updating the global scope
+-- 3. Add all function identifiers
 buildPROGRAM :: Program -> PROGRAM 
 buildPROGRAM p@( Program funcs main ) = PROGRAM funcs' main' globalScope''
     where
- 
         globalScope              = ST Empty empty
         ( globalScope' , main' ) = buildSTAT main globalScope
-
-        -- TODO implement with a fold or something clever
-        addFuncs []     _funcs scope = ( scope   , _funcs )
-        addFuncs (f:fs) _funcs scope = addFuncs fs (_FUNC:_funcs) scope'
-            where ( scope'  , _FUNC  ) = buildFUNC f scope
-
-        --g = foldr addFunc func globalScope globalScope' funcs 
-        -- Build the program functions, once again updating the global
-        -- scope since the function name identifiers will be added by
-        -- buildFUNC
-        ( globalScope'' , funcs' ) = addFuncs funcs [] globalScope'
-
+        globalScope''            = foldr addFunc globalScope' funcs
+        funcs'                   = map ( flip buildFUNC globalScope'' ) funcs 
+   
 
 -- | Given a function and its parent scope (the global scope), build its 
 --   semantically-augmented version (FUNC) and in the process create 
@@ -68,35 +59,36 @@ buildPROGRAM p@( Program funcs main ) = PROGRAM funcs' main' globalScope''
 --   2. Create function scope, parented by the global scope
 --   3. Build the body STATement, updating the function scope 
 --   4. Add function parameters to the function scope
-buildFUNC :: Func -> Scope -> ( Scope , FUNC )
-buildFUNC func@( Func ftype name plist body ) globalScope = result
+buildFUNC :: Func -> Scope -> FUNC 
+buildFUNC func@( Func ftype name plist body ) globalScope = func'
     where
-        globalScope'             = addFunc func globalScope
-        functionScope            = ST globalScope' empty -- New scope
+        functionScope              = ST globalScope empty -- New scope
         ( functionScope' , body' ) = buildSTAT body functionScope 
-        functionScope''          = foldr addParam functionScope' plist
-        func'                    = FUNC ftype name plist body' functionScope''
-        result = ( globalScope' , func' )
+        functionScope''            = foldr addParam functionScope' plist
+        func'                      = FUNC ftype name plist body' functionScope''
 
 
 -- | Given a statement and the currentScope it is in, produce a STAT 
 --   with its own scope, if needed. The current scope gets populated by 
 --   the identifiers, if any, declared or used in the statement.
-buildSTAT :: Stat -> Scope -> ( Scope , STAT )  
-buildSTAT stat currentScope = case stat of 
-    SkipStat            -> ( currentScope , SKIPstat                         )
-    FreeStat    expr    -> ( currentScope , FREEstat    expr    currentScope ) 
-    ReturnStat  expr    -> ( currentScope , RETURNstat  expr    currentScope ) 
-    ExitStat    expr    -> ( currentScope , EXITstat    expr    currentScope ) 
-    PrintStat   expr    -> ( currentScope , PRINTstat   expr    currentScope ) 
-    PrintlnStat expr    -> ( currentScope , PRINTLNstat expr    currentScope ) 
-    ReadStat    lhs     -> ( currentScope , READstat    lhs     currentScope )
-    AssignStat  lhs rhs -> ( currentScope , ASSIGNstat  lhs rhs currentScope ) 
-    DeclareStat _ _ _   ->   buildDECLAREstat stat currentScope 
-    SeqStat     _ _     ->   buildSEQstat     stat currentScope 
-    ScopedStat  _       ->   buildSCOPEDstat  stat currentScope 
-    WhileStat   _ _     ->   buildWHILEstat   stat currentScope 
-    IfStat      _ _ _   ->   buildIFstat      stat currentScope 
+buildSTAT                            :: Stat -> Scope -> ( Scope , STAT )  
+buildSTAT   ( SkipStat            )  =  flip (,)          SKIPstat 
+buildSTAT   ( FreeStat    expr    )  =  buildSimpleStat ( FREEstat    expr    )
+buildSTAT   ( ReturnStat  expr    )  =  buildSimpleStat ( RETURNstat  expr    )
+buildSTAT   ( ExitStat    expr    )  =  buildSimpleStat ( EXITstat    expr    )
+buildSTAT   ( PrintStat   expr    )  =  buildSimpleStat ( PRINTstat   expr    )
+buildSTAT   ( PrintlnStat expr    )  =  buildSimpleStat ( PRINTLNstat expr    )
+buildSTAT   ( ReadStat    lhs     )  =  buildSimpleStat ( READstat    lhs     )
+buildSTAT   ( AssignStat  lhs rhs )  =  buildSimpleStat ( ASSIGNstat  lhs rhs )
+buildSTAT s@( DeclareStat _ _ _   )  =  buildDECLAREstat  s                 
+buildSTAT s@( SeqStat     _ _     )  =  buildSEQstat      s                 
+buildSTAT s@( ScopedStat  _       )  =  buildSCOPEDstat   s                 
+buildSTAT s@( WhileStat   _ _     )  =  buildWHILEstat    s                 
+buildSTAT s@( IfStat      _ _ _   )  =  buildIFstat       s                 
+
+
+buildSimpleStat stat parentScope = ( parentScope , stat parentScope )
+
 
 -- A scoped statement introduces its own local childScope, enclosed
 -- by the parentScope, and leaves the parentscope unchanged.
@@ -121,8 +113,8 @@ buildWHILEstat ( WhileStat expr body ) parentScope =
 buildIFstat ( IfStat expr thenBody elseBody ) parentScope =
     let thenScope = ST parentScope empty 
         elseScope = ST parentScope empty
-        ( thenScope' , thenBody' ) = buildSTAT thenBody thenScope
-        ( elseScope' , elseBody' ) = buildSTAT elseBody elseScope
+        ( thenScope'  , thenBody' ) = buildSTAT thenBody thenScope
+        ( elseScope'  , elseBody' ) = buildSTAT elseBody elseScope
     in  ( parentScope , IFstat expr thenBody' elseBody' parentScope ) 
 
 
