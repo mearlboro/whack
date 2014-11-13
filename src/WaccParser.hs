@@ -15,16 +15,15 @@ import Control.Applicative hiding ( (<|>) , many )
 import Control.Monad              ( liftM , liftM2 )
 import Control.Monad.Fix
 
--- (⋟﹏⋞) = error 
 
--- (✿_✿)  = error 
-
--- |3.1.1 program .......................................................  28 --    
+-- |3.1.1 Program .......................................................  28 --    
 -- |3.1.2 Statements ....................................................  85 -- 
--- |3.1.3 Types ......................................................... 205 -- 
--- |3.1.4 Expressions ................................................... 232 -- 
--- |3.1.5 Identifiers, literals ......................................... 314 -- 
+-- |3.1.3 Types ......................................................... 206 -- 
+-- |3.1.4 Expressions ................................................... 246 -- 
+-- |3.1.5 Identifiers, literals ......................................... 312 -- 
 
+-- | Utils .............................................................. 365 --
+-- | Test parser ........................................................ 392 --
 
 -- |3.1.1 Program 
 
@@ -209,21 +208,13 @@ pPairElem
 -- :: <type> ::= <base-type> | <array-type> | <pair-type> ::::::::::::::::::: --
 -- |For easier management of datatypes, they are represented linearly.
 
--- pType :: Parser Type
--- pType = do 
---     base  <-  pBaseType 
---           <|> pPairType
---     fix ( \f -> (string "[]" >> fmap ArrayType f ) 
---           <|> return base)
---
+pType :: Parser Type
 pType = do 
-    base <- pPairType <|> pBaseType 
-    dims <- length <$> many ( string "[]" ) 
+    base  <-  pBaseType 
+          <|> pPairType
+    fix ( \f -> (string "[]" >> fmap ArrayType f ) 
+          <|> return base)
 
-    if   dims == 0 
-    then return   base 
-    else return $ iterate ArrayType base !! dims
- 
         where
 
             -- <base-type> ::= 'int' | 'bool' | 'char' | 'string'
@@ -417,3 +408,7 @@ parseWithLeftOver :: Parser a -> String -> Either ParseError (a,String)
 parseWithLeftOver p = parse ( (,) <$> p <*> leftOver ) ""
   where leftOver = manyTill anyToken eof
 
+
+
+-- (⋟﹏⋞) = error 
+-- (✿__✿) = error 
