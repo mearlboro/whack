@@ -4,7 +4,6 @@
 
 module WaccDataTypes where
 
-
 data Program                                    -- <program> ::=
   = Program [ Func ] Stat                       -- 'begin' <func>* <stat> 'end'   
   deriving ( Show , Eq )  
@@ -63,8 +62,8 @@ data Type                                       -- <type> ::=
   | StringType                                  -- 'string'
   | PairType ( Maybe ( Type, Type ) )           -- <pair-type> ::= 'pair' '(' <pair-elem-type> ',' <pair-elem-type> ')'    
   | ArrayType Type                              -- <array-type>
-  | NullType
-  | EmptyType
+  | NullType                                    -- 'null'
+  | EmptyType                                   -- <empty-array>
   deriving ( Show , Eq )                        
   
 data Expr                                       -- <expr> ::=
