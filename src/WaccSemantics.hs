@@ -1,9 +1,9 @@
 module WaccSemantics where
 
 import Data.Maybe ( isNothing , fromMaybe , fromJust )
-import Data.Map ( empty )
-import Control.Applicative hiding (  empty )
-import Data.Char ( isSpace )
+import Data.Map   ( empty                            )
+import Control.Applicative hiding ( empty )
+import Data.Char  ( isSpace )
 
 import WaccParser
 import WaccExamplesTester
@@ -197,12 +197,7 @@ printError err  =  putStrLn $ case err of
 begin = do 
     putStrLn $ "Enter the name of a .wacc program to read, parse and test."
     putStrLn $ "The file should be located in wacc_examples/semanticErr"
-    path <- trim <$> getLine 
+    path <- getLine 
     program <- parseOne' $ "wacc_examples/semanticErr/" ++ path
     let pROGRAM = buildPROGRAM program 
     putStrLn $ "semantically-augmented PROGRAM:\n" ++ show pROGRAM 
-
-
-trim :: String -> String
-trim = f . f
-   where f = reverse . dropWhile isSpace

@@ -12,6 +12,7 @@ module WaccSymbolTable
 import Data.Map       ( Map (..) 
                       , insert 
                       , empty 
+                      , insertWith
                       , findWithDefault 
                       , lookup )
 
@@ -28,8 +29,6 @@ data SymbolTable k a
     = Empty 
     | ST ( SymbolTable k a ) ( Map k a )
     deriving ( Show )
-
-instance () Show ( SymbolTable k a )
 
 -- | An identifier table is a symbol table that maps variable names to 
 --   identifier objects. it may be empty or it may have: a dictionary (Map) 
@@ -81,28 +80,32 @@ addFunc ( Func ftype name _ _ )  =  addObject name ftype Function
 
 
 -- | Add a variable to the table ( new variable in scope )
-addVariable            :: Ident -> Type -> Scope -> Scope 
+addVariable            :: Name -> Type -> Scope -> Scope 
 addVariable var vtype  =  addObject var vtype Variable
 
 
 -- | Add an object to the table 
-addObject                       :: String -> Type -> Context -> Scope -> Scope 
+addObject                       :: Name -> Type -> Context -> Scope -> Scope 
 addObject name otype ctx table  =  case table of 
     Empty        -> ST Empty $ insert name ( otype , ctx ) empty
     ST encl dict -> ST encl  $ insert name ( otype , ctx ) dict  
 
+
+-- | Handle case of redeclaration of a variable already declared
+onInsert :: ( Identifier -> Identifier -> Identifier )
+onInsert = undefined
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: Retrieval ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
 -- Look for an identifier in the current scope only
-findIdent          :: String -> Scope -> Maybe Identifier
+findIdent          :: Name -> Scope -> Maybe Identifier
 findIdent name it  =  lookup name `onDict` it
 
 
 -- Look for an identifier in the enclosed scopes as well 
-findIdent' :: String -> Scope -> Maybe Identifier
+findIdent' :: Name -> Scope -> Maybe Identifier
 findIdent' name it 
   -- If the lookup fails in this table, try the enclosed table
   -- If the lookup succeeds wrap its result int a Just.
