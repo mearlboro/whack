@@ -151,23 +151,32 @@ checkFunc ( FUNC ftype name plist body functionScope )  =  error "TODO"
 -- | Check semantics of a statement 
 checkStat       :: STAT -> SemanticErr 
 checkStat stat  =  case stat of 
-    SKIPstat                              -> Nothing
-    
-    FREEstat      (PairLiterExpr pair)  scope  -> checkExpr (PairLiterExpr pair) scope
-    FREEstat      (ArrayElemExpr arr)   scope  -> checkExpr (ArrayElemExpr arr)  scope
-    FREEstat      _ _                          -> Just "Cannot free that type of memory"                
-    
-    RETURNstat    expr  scope             -> checkExpr expr scope       
-    EXITstat      expr  scope             -> error "TODO"                
-    PRINTstat     expr  scope             -> error "TODO"                
-    PRINTLNstat   expr  scope             -> error "TODO"        
-    SCOPEDstat    stat                    -> error "TODO"        
-    READstat      lhs   table             -> error "TODO"         
-    WHILEstat     expr  body  scope       -> error "TODO"          
-    SEQstat       stat  stat'             -> error "TODO"          
-    ASSIGNstat    lhs   rhs   scope       -> error "TODO"          
-    IFstat        expr  sthen selse scope -> error "TODO"   
-    DECLAREstat   stype ident rhs   scope -> error "TODO"
+    SKIPstat                                     -> Nothing
+      
+    FREEstat      (PairLiterExpr pair)  scope    -> checkExpr (PairLiterExpr pair) scope
+    FREEstat      (ArrayElemExpr arr)   scope    -> checkExpr (ArrayElemExpr arr)  scope
+    FREEstat      _ _                            -> Just "Cannot free that type of memory"                
+      
+    RETURNstat    expr  scope                    -> error "TODO"   
+  
+    EXITstat      expr  scope                    -> if (checkExpr expr scope == Nothing && getTypeExpr expr scope == IntType) then Nothing 
+                                                    else Just "Exit Statement expects int type"
+  
+    PRINTstat     expr  scope                    -> checkExpr expr scope                
+    PRINTLNstat   expr  scope                    -> checkExpr expr scope
+       
+    SCOPEDstat    stat                           -> checkStat stat  
+
+    READstat      (LhsIdent  ident)   scope      -> checkExpr (IdentExpr ident) scope
+    READstat      (LhsPairElem (Fst expr)) scope -> checkExpr expr scope  
+    READstat      (LhsPairElem (Snd expr)) scope -> checkExpr expr scope
+    READstat      (LhsArrayElem arrayElem) scope -> checkExpr (ArrayElemExpr arrayElem) scope
+
+    WHILEstat     expr  body  scope              -> error "TODO"          
+    SEQstat       stat  stat'                    -> error "TODO"          
+    ASSIGNstat    lhs   rhs   scope              -> error "TODO"          
+    IFstat        expr  sthen selse scope        -> error "TODO"   
+    DECLAREstat   stype ident rhs   scope        -> error "TODO"
 
 
 -- | Check semantics of an expression
