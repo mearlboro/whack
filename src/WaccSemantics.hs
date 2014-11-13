@@ -13,38 +13,40 @@ import WaccSymbolTable
 -- :: Data Definitions :::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
--- | PROGRAM contains an AST with semantic attributes and the global scope
-data PROGRAM = PROGRAM [ FUNC ] STAT IdentTable 
+-- | PROGRAM represents the Program AST augmented with the global scope
+data PROGRAM = PROGRAM [ FUNC ] STAT Scope 
 
--- | FUNC als contains an AST for a function and introduces its own scope
-data FUNC = FUNC Type Ident ParamList STAT IdentTable 
+-- | FUNC also contains the AST for Function and introduces its own scope
+data FUNC = FUNC Type Ident ParamList STAT Scope 
 
--- | Some statement (while, if, scoped) introduce a new scope
+-- | Some statement (while, if, scoped) introduce a new scope.
+-- | All statements have a reference to the current scope.
 data STAT 
-  = SKIPstat      IdentTable 
-  | FREEstat      Expr        IdentTable                                               
-  | RETURNstat   Expr        IdentTable                                              
-  | EXITstat      Expr        IdentTable                                               
-  | PRINTstat     Expr        IdentTable                                               
-  | PRINTLNstat   Expr        IdentTable                        
-  | SCOPEDstat    STAT        IdentTable                        
-  | READstat      AssignLhs   IdentTable                         
-  | WHILEstat     Expr        STAT        IdentTable                            
-  | SEQstat       STAT        STAT        IdentTable                             
-  | ASSIGNstat    AssignLhs   AssignRhs   IdentTable                    
-  | IFstat        Expr        STAT        STAT        IdentTable       
-  | DECLAREstat   Type        Ident       AssignRhs   IdentTable 
+  = SKIPstat      
+  | FREEstat      Expr        Scope                                               
+  | RETURNstat    Expr        Scope                                              
+  | EXITstat      Expr        Scope                                               
+  | PRINTstat     Expr        Scope                                               
+  | PRINTLNstat   Expr        Scope                        
+  | SCOPEDstat    STAT                               
+  | READstat      AssignLhs   Scope                         
+  | WHILEstat     Expr        STAT        Scope                            
+  | SEQstat       STAT        STAT                                    
+  | ASSIGNstat    AssignLhs   AssignRhs   Scope                    
+  | IFstat        Expr        STAT        STAT        Scope     
+  | DECLAREstat   Type        Ident       AssignRhs   Scope 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: Building the PROGRAM :::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
+-- 1. The Global Scope in all of its majesty
+-- 2. Build the main statement thus updating the global scope
 buildPROGRAM :: Program -> PROGRAM 
 buildPROGRAM p@( Program funcs main ) = PROGRAM funcs' main' globalScope''
     where
-        -- The global scope 
-        globalScope = ST Empty empty
-        -- Build the main statement thus updating the global scope
+ 
+        globalScope              = ST Empty empty
         ( globalScope' , main' ) = buildSTAT main globalScope
 
         -- TODO implement with a fold or something clever
@@ -52,6 +54,7 @@ buildPROGRAM p@( Program funcs main ) = PROGRAM funcs' main' globalScope''
         addFuncs (f:fs) _funcs scope = addFuncs fs (_FUNC:_funcs) scope'
             where ( scope'  , _FUNC  ) = buildFUNC f scope
 
+        --g = foldr addFunc func globalScope globalScope' funcs 
         -- Build the program functions, once again updating the global
         -- scope since the function name identifiers will be added by
         -- buildFUNC
@@ -60,135 +63,113 @@ buildPROGRAM p@( Program funcs main ) = PROGRAM funcs' main' globalScope''
 
 -- | Given a function and its parent scope (the global scope), build its 
 --   semantically-augmented version (FUNC) and in the process create 
---   its own childScope
-buildFUNC :: Func -> It -> ( It , FUNC )
+--   its own childScope(s). Also updates the global scope
+--   1. Add funcion name to the global scope
+--   2. Create function scope, parented by the global scope
+--   3. Build the body STATement, updating the function scope 
+--   4. Add function parameters to the function scope
+buildFUNC :: Func -> Scope -> ( Scope , FUNC )
 buildFUNC func@( Func ftype name plist body ) globalScope = result
     where
-        -- Add funcion name to the global scope
-        globalScope' = addFunc func globalScope
-        -- Create function scope, parented to global scope
-        functionScope = ST globalScope' empty -- New scope
-        -- Build the statement, updating the function scope and
-        -- obtaining the new body
+        globalScope'             = addFunc func globalScope
+        functionScope            = ST globalScope' empty -- New scope
         ( functionScope' , body' ) = buildSTAT body functionScope 
-        -- Add function arguments to the function scope
-        functionScope'' = foldr addParam functionScope' plist
-        -- Finally build the function
-        func' = FUNC ftype name plist body' functionScope''
-        -- It doesn't fit on one line
+        functionScope''          = foldr addParam functionScope' plist
+        func'                    = FUNC ftype name plist body' functionScope''
         result = ( globalScope' , func' )
 
 
--- | Given a statement and its parent (enclosing) scope produce a statement 
---   with its own scope, if needed. Also add itentifiers to parent scope here
-buildSTAT :: Stat -> It -> ( It , STAT )  
-buildSTAT stat parentScope = case stat of 
-    -- Parent scope unchanged , Skip statement doesn't have its own scope
-    SkipStat         -> ( parentScope               , SKIPstat         Empty )
-    -- Scan expression for identifiers and update parent scope  
-    -- Free statement doesn't have its own scope. Samve goes for the rest
-    FreeStat    expr -> ( scanExpr expr parentScope , FREEstat    expr Empty ) 
-    ReturnStat  expr -> ( scanExpr expr parentScope , RETURNstat  expr Empty ) 
-    ExitStat    expr -> ( scanExpr expr parentScope , EXITstat    expr Empty ) 
-    PrintStat   expr -> ( scanExpr expr parentScope , PRINTstat   expr Empty ) 
-    PrintlnStat expr -> ( scanExpr expr parentScope , PRINTLNstat expr Empty ) 
+-- | Given a statement and the currentScope it is in, produce a STAT 
+--   with its own scope, if needed. The current scope gets populated by 
+--   the identifiers, if any, declared or used in the statement.
+buildSTAT :: Stat -> Scope -> ( Scope , STAT )  
+buildSTAT stat currentScope = case stat of 
+    SkipStat            -> ( currentScope , SKIPstat                         )
+    FreeStat    expr    -> ( currentScope , FREEstat    expr    currentScope ) 
+    ReturnStat  expr    -> ( currentScope , RETURNstat  expr    currentScope ) 
+    ExitStat    expr    -> ( currentScope , EXITstat    expr    currentScope ) 
+    PrintStat   expr    -> ( currentScope , PRINTstat   expr    currentScope ) 
+    PrintlnStat expr    -> ( currentScope , PRINTLNstat expr    currentScope ) 
+    ReadStat    lhs     -> ( currentScope , READstat    lhs     currentScope )
+    AssignStat  lhs rhs -> ( currentScope , ASSIGNstat  lhs rhs currentScope ) 
+    DeclareStat _ _ _   ->   buildDECLAREstat stat currentScope 
+    SeqStat     _ _     ->   buildSEQstat     stat currentScope 
+    ScopedStat  _       ->   buildSCOPEDstat  stat currentScope 
+    WhileStat   _ _     ->   buildWHILEstat   stat currentScope 
+    IfStat      _ _ _   ->   buildIFstat      stat currentScope 
 
-    ReadStat    lhs             -> error "TODO" 
-    AssignStat  lhs   rhs       -> error "TODO"
-    DeclareStat dtype ident rhs -> error "TODO"
-
-    -- Scoped statements
-    ScopedStat  _     -> buildSCOPEDstat stat parentScope 
-    WhileStat   _ _   -> buildWHILEstat  stat parentScope 
-    SeqStat     _ _   -> buildSEQstat    stat parentScope 
-    IfStat      _ _ _ -> buildIFstat     stat parentScope
-
-
+-- A scoped statement introduces its own local childScope, enclosed
+-- by the parentScope, and leaves the parentscope unchanged.
 buildSCOPEDstat ( ScopedStat body ) parentScope = 
-    -- build a statement that is scoped, providing an empty table whose 
-    -- parent is the eclosing table provided
-    let ( childScope , stat' ) = buildSTAT body ( ST parentScope empty ) -- New scope
-    -- Return the original table which will have not been modified and the
-    -- statment just build, with its new inner scope table'
-    in  ( parentScope , SCOPEDstat stat' childScope )
+    let childScope = ST parentScope empty 
+        ( _childScope' , body' ) = buildSTAT body childScope
+    in  ( parentScope  , SCOPEDstat body' )
+
+
+-- Here we add a new variable to the parentScope and return it updated
+buildDECLAREstat ( DeclareStat dtype ident rhs ) parentScope = 
+    let   parentScope' = addVariable ident dtype parentScope
+    in  ( parentScope', DECLAREstat dtype ident rhs parentScope' )
 
 
 buildWHILEstat ( WhileStat expr body ) parentScope = 
-    -- Populate new scope with expression 
-    let childScope = scanExpr expr ( ST parentScope empty ) 
-    -- Use updated table to build the statement
-        ( childScope' , stat' ) = buildSTAT body childScope
-    -- Return the new semantically-augmented while statement wow 
-    in  ( parentScope , WHILEstat expr stat' childScope' )
+    let loopScope = ST parentScope empty 
+        ( loopScope'  , body' ) = buildSTAT body loopScope 
+    in  ( parentScope , WHILEstat expr body' parentScope )
 
 
-buildIFstat ( IfStat expr stat1 stat2 ) parentScope = 
-    -- Add stuff to parent scope from expression
-    let parentScope' = scanExpr expr parentScope
-    -- Create first child scope with new parentscope
-        ( _childScope1 , stat1' ) = buildSTAT stat1 ( ST parentScope' empty )
-    -- Create second child sope
-        ( _childScope2 , stat2' ) = buildSTAT stat2 ( ST parentScope' empty )
-    -- Return ffs -- If stmt itself dont introduce a new scope, hence Empty
-    in  ( parentScope' , IFstat expr stat1' stat2' Empty ) 
+buildIFstat ( IfStat expr thenBody elseBody ) parentScope =
+    let thenScope = ST parentScope empty 
+        elseScope = ST parentScope empty
+        ( thenScope' , thenBody' ) = buildSTAT thenBody thenScope
+        ( elseScope' , elseBody' ) = buildSTAT elseBody elseScope
+    in  ( parentScope , IFstat expr thenBody' elseBody' parentScope ) 
 
 
-buildSEQstat ( SeqStat stat1 stat2 ) parentScope = 
-    let ( parentScope'  , stat1' ) = buildSTAT stat1 parentScope
-        ( parentScope'' , stat2' ) = buildSTAT stat2 parentScope'
-    in  ( parentScope'' , SEQstat stat1' stat2' Empty )
-
-
--- | Search an expression for identifiers to put in the identifier table
-scanExpr :: Expr -> It -> It 
-scanExpr expr table = case expr of
-    BoolLiterExpr     _         -> table  
-    CharLiterExpr     _         -> table   
-    IdentExpr         ident     -> addVariable ident Nothing table
-    UnaryOperExpr     _     e   -> scanExpr e table 
-    ParenthesisedExpr e         -> scanExpr e table 
-    IntLiterExpr      _         -> table   
-    StrLiterExpr      _         -> table   
-    PairLiterExpr     _         -> table     
-    ArrayElemExpr     a         -> error "TODO"
-    BinaryOperExpr    _    e e' -> scanExpr e' ( scanExpr e table )   
+buildSEQstat ( SeqStat first second ) parentScope = 
+    let ( parentScope'  , first'  ) = buildSTAT first  parentScope
+        ( parentScope'' , second' ) = buildSTAT second parentScope'
+    in  ( parentScope'' , SEQstat first' second' )
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: Semantic Analisys ::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
+-- * To look in the current scope use >findIdent ident scope 
+-- * To look in the parent's scope as well use >findIdent' ident scope
+
 -- | Check semantics of a program
-checkProgram :: PROGRAM -> Bool 
-checkProgram ( PROGRAM funcs body table ) = error "TODO"
+checkProgram                                     :: PROGRAM -> SemanticErr 
+checkProgram ( PROGRAM funcs body globalScope )  =  error "TODO"
 
 
 -- | Check semantics of a function
-checkFunc :: FUNC -> Bool 
-checkFunc ( FUNC ftype name plist body table ) = error "TODO" 
+checkFunc                                               :: FUNC -> SemanticErr 
+checkFunc ( FUNC ftype name plist body functionScope )  =  error "TODO" 
 
 
 -- | Check semantics of a statement 
-checkStat :: STAT -> Bool 
-checkStat stat = case stat of 
-    SKIPstat      table                   -> error "TODO"
-    FREEstat      expr  table             -> error "TODO"                
-    RETURNstat    expr  table             -> error "TODO"                
-    EXITstat      expr  table             -> error "TODO"                
-    PRINTstat     expr  table             -> error "TODO"                
-    PRINTLNstat   expr  table             -> error "TODO"        
-    SCOPEDstat    stat  table             -> error "TODO"        
+checkStat       :: STAT -> SemanticErr 
+checkStat stat  =  case stat of 
+    SKIPstat                              -> error "TODO"
+    FREEstat      expr  scope             -> error "TODO"                
+    RETURNstat    expr  scope             -> error "TODO"                
+    EXITstat      expr  scope             -> error "TODO"                
+    PRINTstat     expr  scope             -> error "TODO"                
+    PRINTLNstat   expr  scope             -> error "TODO"        
+    SCOPEDstat    stat                    -> error "TODO"        
     READstat      lhs   table             -> error "TODO"         
-    WHILEstat     expr  stat1 table       -> error "TODO"          
-    SEQstat       stat1 stat2 table       -> error "TODO"          
-    ASSIGNstat    lhs   rhs   table       -> error "TODO"          
-    IFstat        expr  stat1 stat2 table -> error "TODO"   
-    DECLAREstat   ttype ident rhs   table -> error "TODO"
+    WHILEstat     expr  body  scope       -> error "TODO"          
+    SEQstat       stat  stat'             -> error "TODO"          
+    ASSIGNstat    lhs   rhs   scope       -> error "TODO"          
+    IFstat        expr  sthen selse scope -> error "TODO"   
+    DECLAREstat   stype ident rhs   scope -> error "TODO"
 
 
 -- | Check semantics of an expression
-checkExpr :: Expr -> It -> Bool 
-checkExpr expr table = case expr of 
+checkExpr             :: Expr -> Scope -> SemanticErr 
+checkExpr expr scope  =  case expr of 
     BoolLiterExpr     bool             -> error "TODO"  
     CharLiterExpr     char             -> error "TODO"   
     IdentExpr         ident            -> error "TODO"  
@@ -199,6 +180,15 @@ checkExpr expr table = case expr of
     PairLiterExpr     pair             -> error "TODO"     
     ArrayElemExpr     arr              -> error "TODO"
     BinaryOperExpr    op    expr expr' -> error "TODO"     
+
+
+-- Nothing means no semantic error, Just contains the semantic error message
+type SemanticErr = Maybe String 
+
+printError      :: SemanticErr -> IO ()
+printError err  =  putStrLn $ case err of
+    Nothing  -> "No Semantic Errors"
+    Just msg -> "SemanticError: " ++ msg 
 
 
 

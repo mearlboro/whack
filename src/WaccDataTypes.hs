@@ -59,14 +59,14 @@ data Type                                       -- <type> ::=
   = TypeBase  BaseType                          -- <base-type>
   | TypePair  PairType                          -- <pair-type>
   | TypeArray Type                              -- <array-type>
-  deriving ( Show , Eq )                        
-  
+  deriving ( Show , Eq , Ord )                        
+
 data BaseType                                   -- <base-type> ::=
   = IntBaseType                                 -- 'int' 
   | BoolBaseType                                -- 'bool'
   | CharBaseType                                -- 'char'
   | StringBaseType                              -- 'string'
-  deriving ( Show , Eq )
+  deriving ( Show , Eq , Ord )
 
 type PairType                                   -- <pair-type> ::= 'pair' '(' <pair-elem-type> ',' <pair-elem-type> ')'    
   = Maybe ( Type , Type )

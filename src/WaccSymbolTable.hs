@@ -1,7 +1,7 @@
 module WaccSymbolTable
 ( SymbolTable (..)
-, IdentTable
-, It
+, Scope
+, newScope
 , addParam
 , addFunc
 , addVariable
@@ -9,7 +9,12 @@ module WaccSymbolTable
 , findIdent'
 ) where
 
-import Data.Map ( Map (..) , insert , empty , findWithDefault , lookup )
+import Data.Map       ( Map (..) 
+                      , insert 
+                      , empty 
+                      , findWithDefault 
+                      , lookup )
+
 import Prelude hiding ( lookup , empty )
 
 import WaccDataTypes
@@ -18,87 +23,98 @@ import WaccDataTypes
 -- :: Symbol Table :::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
--- | General puropose symbol table
+-- | General purpose symbol table
 data SymbolTable k a = Empty | ST ( SymbolTable k a ) ( Map k a )
 
--- | Type synonim
-type St k a = SymbolTable k a 
-
--- | An identifier may appear as a variable, function or parameter name 
-data Context = Variable | Function | Parameter 
-
--- | An identifier has a type (Nothing if it is not known yet) and a context
-type Identifier = ( Maybe Type , Context )
-
--- | Identifier name is just a string
-type Name = [ Char ]
-
 -- | An identifier table is a symbol table that maps variable names to 
---   identifier objects. it may be empty or it may have a dictionary mapping 
---   identifiers with their names as well as an enclosing identifier table.
---   The enclosing table represents the parten scope
+--   identifier objects. it may be empty or it may have: a dictionary (Map) 
+--   that maps the names to the objects, as well as an enclosing identifier 
+--   table. Identifier tables represent `scopes` in the program
 type IdentTable = SymbolTable Name Identifier
 
--- | Type synonim 
-type It = IdentTable
+-- | An identifier may appear in a program as a Variable name, Function name 
+--   or Parameter name 
+data Context = 
+    Variable | Function | Parameter 
+    deriving ( Eq , Show , Enum , Ord )
 
--- | Type synonim 
+-- | An identifier has a type and a context
+type Identifier = ( Type , Context ) 
+
+-- | An Identifier name is just a string
+type Name = [ Char ]
+
+-- | An IdentTable is just a scope 
+type Scope = IdentTable
+
+-- | A Dictionary maps names to identifier objects
 type Dictionary = Map Name Identifier
+
+
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: Creation :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+
+-- | Creates a new scope enclosed by the parenting scope
+newScope         :: Scope -> Scope 
+newScope parent  =  ST parent empty 
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: Insertion ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
--- | Add a parameter to the table 
-addParam                       :: Param -> It -> It 
-addParam ( Param ptype name )  =  addObject name ( Just ptype ) Parameter
+-- | Add a parameter to the table ( new variable in scope )
+addParam                       :: Param -> Scope -> Scope 
+addParam ( Param ptype name )  =  addObject name ptype Parameter
 
 
--- | Add a function to the table 
-addFunc                          :: Func -> It -> It 
-addFunc ( Func ftype name _ _ )  =  addObject name ( Just ftype ) Function 
+-- | Add a function to the table ( new funcion in global scope )
+addFunc                          :: Func -> Scope -> Scope 
+addFunc ( Func ftype name _ _ )  =  addObject name ftype Function 
 
 
--- | Add a variable to the table
-addVariable            :: Ident -> Maybe Type -> It -> It 
+-- | Add a variable to the table ( new variable in scope )
+addVariable            :: Ident -> Type -> Scope -> Scope 
 addVariable var vtype  =  addObject var vtype Variable
 
 
 -- | Add an object to the table 
-addObject                       :: String -> Maybe Type -> Context -> It -> It 
+addObject                       :: String -> Type -> Context -> Scope -> Scope 
 addObject name otype ctx table  =  case table of 
-    Empty        -> Empty 
-    ST encl dict -> ST encl $ insert name ( otype , ctx ) dict  
+    Empty        -> ST Empty $ insert name ( otype , ctx ) empty
+    ST encl dict -> ST encl  $ insert name ( otype , ctx ) dict  
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: Retrieval ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
--- | Performs a retrieval operation on the table dictionary
-onDict                   :: ( Dictionary -> Maybe a ) -> It -> Maybe a 
+-- Look for an identifier in the current scope only
+findIdent          :: String -> Scope -> Maybe Identifier
+findIdent name it  =  lookup name `onDict` it
+
+
+-- Look for an identifier in the enclosed scopes as well 
+findIdent' :: String -> Scope -> Maybe Identifier
+findIdent' name it 
+  -- If the lookup fails in this table, try the enclosed table
+  -- If the lookup succeeds wrap its result int a Just.
+  = maybe ( findIdent' name `onEncl` it ) Just ( lookup name `onDict` it )
+
+
+-- | Performs a retrieval operation on the table's dictionary
+onDict                   :: ( Dictionary -> Maybe a ) -> Scope -> Maybe a 
 f `onDict` Empty         =  Nothing
 f `onDict` ST    _ dict  =  f dict 
 
 
 -- | Performs a retrieval operation on the table's enclosed table 
-onEncl                   :: ( It -> Maybe a ) -> It -> Maybe a 
+onEncl                   :: ( Scope -> Maybe a ) -> Scope -> Maybe a 
 f `onEncl` Empty         =  Nothing
 f `onEncl` ST    encl _  =  f encl
 
 
--- Look for an identifier in the current scope only
-findIdent          :: String -> It -> Maybe Identifier
-findIdent name it  =  lookup name `onDict` it
-
-
--- Look for an identifier in the enclosed scopes as well 
-findIdent' :: String -> It -> Maybe Identifier
-findIdent' name it 
-  = maybe ( findIdent' name `onEncl` it ) Just ( lookup name `onDict` it )
-
-    
 {-
 Confusingly the semantic analyser’s dictionary is termed the Symbol Table.
 Note: the symbol table is not indexed on the symbols (tokens) of a program, 
@@ -151,4 +167,14 @@ class SymbolTable:
 --(<%>)               :: ( Dictionary -> Dictionary ) -> It -> It 
 --_ <%> Empty         =  Empty
 --f <%> ST encl dict  =  ST encl ( f dict )
+
+--names = words "foo bar waz a b c hello world"
+
+--contex = cycle [ Variable .. ]
+
+--idents = zip ( repeat $ Just ( TypeBase IntBaseType ) ) contex 
+
+--dict = zipWith3 insert names idents ( repeat empty )
+
+--table = ST Empty dict 
 
