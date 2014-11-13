@@ -151,9 +151,13 @@ checkFunc ( FUNC ftype name plist body functionScope )  =  error "TODO"
 -- | Check semantics of a statement 
 checkStat       :: STAT -> SemanticErr 
 checkStat stat  =  case stat of 
-    SKIPstat                              -> error "TODO"
-    FREEstat      expr  scope             -> error "TODO"                
-    RETURNstat    expr  scope             -> error "TODO"                
+    SKIPstat                              -> Nothing
+    
+    FREEstat      (PairLiterExpr pair)  scope  -> checkExpr (PairLiterExpr pair) scope
+    FREEstat      (ArrayElemExpr arr)   scope  -> checkExpr (ArrayElemExpr arr)  scope
+    FREEstat      _ _                          -> Just "Cannot free that type of memory"                
+    
+    RETURNstat    expr  scope             -> checkExpr expr scope       
     EXITstat      expr  scope             -> error "TODO"                
     PRINTstat     expr  scope             -> error "TODO"                
     PRINTLNstat   expr  scope             -> error "TODO"        
@@ -181,6 +185,30 @@ checkExpr expr scope  =  case expr of
     BinaryOperExpr    op    expr expr' -> error "TODO"     
 
 
+-- |Gets the type of an expression
+getTypeExpr :: Expr -> Scope -> Type
+getTypeExpr expr scope = case expr of
+    BoolLiterExpr     bool             -> BoolType 
+    CharLiterExpr     char             -> CharType   
+    IdentExpr         ident            -> fst (findIdent ident scope)   
+    UnaryOperExpr     NotUnOp    expr  -> BoolType
+    UnaryOperExpr     LenUnOp    expr  -> IntType
+    UnaryOperExpr     OrdUnOp    expr  -> IntType  
+    UnaryOperExpr     ChrUnOp    expr  -> CharType
+    UnaryOperExpr     NegUnOp    expr  -> IntType
+    ParenthesisedExpr expr             -> getTypeExpr expr scope   
+    IntLiterExpr      int              -> IntType   
+    StrLiterExpr      str              -> StringType   
+    PairLiterExpr     pair             -> PairType     
+    ArrayElemExpr     (arrIdent exprs) -> ArrayType (findIdent arrIdent scope)
+    
+    BinaryOperExpr AddBinOp _ _        -> IntType
+    BinaryOperExpr SubBinOp _ _        -> IntType                                  
+    BinaryOperExpr MulBinOp _ _        -> IntType                                   
+    BinaryOperExpr DivBinOp _ _        -> IntType                                    
+    BinaryOperExpr ModBinOp _ _        -> IntType                                    
+    BinaryOperExpr _        _ _        -> BoolType  
+        
 -- Nothing means no semantic error, Just contains the semantic error message
 type SemanticErr = Maybe String 
 
