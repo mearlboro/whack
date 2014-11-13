@@ -6,3 +6,7 @@ all:
 	cabal install --only-dependencies
 	cabal configure
 	cabal build
+
+clean:
+	rm -f *.hi *.o
+	rm -f Wacc/*.hi Wacc/*.o

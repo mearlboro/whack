@@ -7,22 +7,23 @@ module Wacc.WaccParser where
 import Wacc.WaccDataTypes
 import Wacc.WaccLanguageDef
 
-import Text.Parsec.Prim ( parserZero )
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Token
-import Text.Parsec.Language ( haskellDef )
+import Text.Parsec.Language       ( haskellDef )
 import Control.Applicative hiding ( (<|>) , many )
-import Control.Monad ( liftM , liftM2 )
+import Control.Monad              ( liftM , liftM2 )
 import Control.Monad.Fix
 
 
--- |3.1.1 program .......................................................  26 --    
--- |3.1.2 Statements ....................................................  66 -- 
--- |3.1.3 Types ......................................................... 183 -- 
--- |3.1.4 Expressions ................................................... 232 -- 
--- |3.1.5 Identifiers, literals ......................................... 314 -- 
- 
+-- |3.1.1 Program .......................................................  28 --    
+-- |3.1.2 Statements ....................................................  85 -- 
+-- |3.1.3 Types ......................................................... 206 -- 
+-- |3.1.4 Expressions ................................................... 246 -- 
+-- |3.1.5 Identifiers, literals ......................................... 312 -- 
+
+-- | Utils .............................................................. 365 --
+-- | Test parser ........................................................ 392 --
 
 -- |3.1.1 Program 
 
@@ -30,36 +31,55 @@ import Control.Monad.Fix
 -- :: <program> ::= 'begin' <func>* <stat> 'end' :::::::::::::::::::::::::::: --
 pProgram :: Parser Program
 pProgram = do
+    waccWhiteSpace
     waccReserved "begin"
-    funcs <- many pFunc
-    stat  <- pStat
+    funcs <- many $ try pFunc 
+    waccWhiteSpace
+    body  <- pStat
     waccReserved "end"
-    return $ Program funcs stat
+    return $ Program funcs body 
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <func> ::= <type> <ident> '(' <param-list>? ')' 'is' <stat> 'end' ::::: --
 pFunc :: Parser Func
 pFunc = do
-    fType <- pType
-    fName <- waccIdentifier
-    pList <- waccParens pParamList
+    ftype  <- pType
+    waccWhiteSpace
+    name   <- waccIdentifier
+    params <- waccParens pParamList
     waccReserved "is"
-    stat  <- pStat
+    body   <- pStat
     waccReserved "end"
-    return $ Func fType fName pList stat
+
+    -- Control flow in functions must eventually reach a return or exit stat
+    let returnsOrExits x = case x of                
+            ReturnStat  _      -> True  
+            ExitStat    _      -> True   
+            ScopedStat  s      -> returnsOrExits s        
+            WhileStat   _ s    -> returnsOrExits s
+            SeqStat     _ s    -> returnsOrExits s
+            IfStat      e s s' -> and $ map returnsOrExits $ s:s':[]
+            _                  -> False 
+
+    if   returnsOrExits body 
+    then return $ Func ftype name params body
+    else fail "No Reachable Return/Exit Statement" 
 
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <param-list> ::= <param> (',' <param>)* ::::::::::::::::::::::::::::::: --
 pParamList :: Parser ParamList
-pParamList = waccCommaSep1 pParam
+pParamList = waccCommaSep pParam
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <param> ::= <type> <ident> :::::::::::::::::::::::::::::::::::::::::::: --
 pParam :: Parser Param
-pParam = liftM2 Param pType waccIdentifier
+pParam = do
+    ptype <- pType
+    waccWhiteSpace
+    pname <- waccIdentifier
+    return $ Param ptype pname
 
 
 -- 3.2. Statement
@@ -67,108 +87,112 @@ pParam = liftM2 Param pType waccIdentifier
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <stat> :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 pStat :: Parser Stat
-pStat
-    =  pWaccWord "skip"    SkipStat
-   <|> pWaccLift "read"    ReadStat    pAssignLhs 
-   <|> pWaccLift "free"    FreeStat    pExpr      
-   <|> pWaccLift "return"  ReturnStat  pExpr      
-   <|> pWaccLift "exit"    ExitStat    pExpr      
-   <|> pWaccLift "print"   PrintStat   pExpr      
-   <|> pWaccLift "println" PrintlnStat pExpr
-   <|> pDeclareStat
-   <|> pAssignStat
-   <|> pIfStat
-   <|> pWhileStat
-   <|> pScopedStat
-   <|> pSeqStat
+pStat = pStat' >>= \stat -> 
+    -- First parse a statement `stat` with `pStat'`.
+    -- Then `option` will try to parse a `waccSemicolon` and if it 
+    -- finds one then it will go on and parse a second statement with `pStat`
+    -- and place it inside a `SeqStat` together with `stat`.
+    -- If it can't parse a `waccSemicolon` it will fail and return `stat`.
+    option stat $ waccSemicolon >> liftM ( SeqStat stat ) pStat 
 
+    where
 
-pDeclareStat = do    -- <type> <ident> '=' <assign-rhs>
-    sType <- pType
-    ident <- waccIdentifier
-    waccReservedOp "="
-    rhs   <- pAssignRhs
-    return $ DeclareStat sType ident rhs
+        pStat' = choice 
+            [ pWaccWord "skip"    SkipStat
+            , pWaccLift "free"    FreeStat    pExpr
+            , pWaccLift "return"  ReturnStat  pExpr
+            , pWaccLift "exit"    ExitStat    pExpr
+            , pWaccLift "print"   PrintStat   pExpr
+            , pWaccLift "println" PrintlnStat pExpr
+            , pWaccLift "read"    ReadStat    pAssignLhs
+            , pDeclareStat
+            , pAssignStat
+            , pIfStat
+            , pWhileStat
+            , pScopedStat ]
     
-pAssignStat = do     -- <assign-lhs> = <assign-rhs>
-    lhs <- pAssignLhs
-    waccReservedOp "="
-    rhs <- pAssignRhs
-    return $ AssignStat lhs rhs
-       
-pIfStat = do         -- 'if' <expr> 'then' <stat> 'else' <stat> 'fi'
-    waccReserved "if"
-    expr  <- pExpr
-    waccReserved "then"
-    stat1 <- pStat
-    waccReserved "else"
-    stat2 <- pStat
-    waccReserved "fi"
-    return $ IfStat expr stat1 stat2
-         
-pWhileStat = do      -- 'while' <expr> 'do' <stat> 'done'
-    waccReserved "while"
-    expr <- pExpr
-    waccReserved "do"
-    stat <- pStat
-    waccReserved "done"
-    return $ WhileStat expr stat
-
-pScopedStat = do     -- 'begin' <stat> 'end
-    waccReserved "begin"
-    stat <- pStat
-    waccReserved "end"
-    return $ ScopedStat stat
-     
-pSeqStat =  do       -- <stat> ';' <stat>
-    stat1 <- pStat
-    waccSemi 
-    stat2 <- pStat
-    return $ SeqStat stat1 stat2
+        pDeclareStat = do -- <type> <ident> '=' <assign-rhs>
+            stype <- pType
+            waccWhiteSpace
+            ident <- waccIdentifier 
+            waccWhiteSpace
+            waccReservedOp "="
+            waccWhiteSpace
+            rhs   <- pAssignRhs
+            return $ DeclareStat stype ident rhs
+    
+        pAssignStat = do -- <assign-lhs> = <assign-rhs>
+            lhs <- pAssignLhs
+            waccWhiteSpace
+            waccReservedOp "="
+            waccWhiteSpace
+            rhs <- pAssignRhs
+            return $ AssignStat lhs rhs
+    
+        pIfStat = do -- 'if' <expr> 'then' <stat> 'else' <stat> 'fi'
+            waccReserved "if"
+            expr  <- pExpr
+            waccReserved "then"
+            stat  <- pStat
+            waccReserved "else"
+            stat' <- pStat
+            waccReserved "fi"
+            return $ IfStat expr stat stat'
+    
+        pWhileStat = do -- 'while' <expr> 'do' <stat> 'done'
+            waccReserved "while"
+            expr <- pExpr
+            waccReserved "do"
+            stat <- pStat
+            waccReserved "done"
+            return $ WhileStat expr stat
+    
+        pScopedStat = do -- 'begin' <stat> 'end'
+            waccReserved "begin"
+            stat <- pStat
+            waccReserved "end"
+            return $ ScopedStat stat
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <assign-lhs> ::= <ident> | <pair-elem> | <array-elem> ::::::::::::::::: --
 pAssignLhs :: Parser AssignLhs
-pAssignLhs
-    =  liftM LhsIdent     waccIdentifier
-   <|> liftM LhsPairElem  pPairElem
-   <|> liftM LhsArrayElem pArrayElem
+pAssignLhs = choice 
+    [ try $ liftM LhsArrayElem pArrayElem
+    ,       liftM LhsIdent     waccIdentifier
+    ,       liftM LhsPairElem  pPairElem ]
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <assign-rhs> :::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 pAssignRhs :: Parser AssignRhs
-pAssignRhs
-    =  liftM RhsExpr       pExpr          -- <expr>
-   <|> liftM RhsPairElem   pPairElem      -- <pair-elem>
-   <|> liftM RhsArrayLiter pArrayLiter    -- <array-liter>
-   <|> pRhsNewPair
-   <|> pRhsCall
+pAssignRhs = choice 
+    [ liftM RhsArrayLiter pArrayLiter 
+    , liftM RhsPairElem   pPairElem   
+    , liftM RhsExpr       pExpr       
+    , pRhsNewPair
+    , pRhsCall ]
 
-    where 
+    where
 
-        pRhsNewPair = do                  -- 'newpair' '(' <expr> ',' <expr> ')'
-          waccReserved "newpair" 
-          waccParens $ do
-              expr1 <- pExpr         
-              waccComma
-              expr2 <- pExpr         
-              return $ RhsNewPair expr1 expr2
-    
-        pRhsCall = do                     -- 'call' <ident> '(' <arg-list>? ')' TODO liftM2
-          waccReserved "call" 
-          fident <- waccIdentifier
-          args   <- waccParens $ pArgList
-          return $ RhsCall fident args 
+        pRhsNewPair = do 
+            waccReserved "newpair"
+            waccParens $ do
+                expr  <- pExpr
+                waccComma
+                expr' <- pExpr
+                return $ RhsNewPair expr expr'
+        
+        pRhsCall = do 
+          waccReserved "call"
+          fname <- waccIdentifier
+          args  <- waccParens pArgList
+          return $ RhsCall fname args
 
-
-
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 -- :: <arg-list> ::= <expr> (',' <expr>)* ::::::::::::::::::::::::::::::::::: --
 pArgList :: Parser ArgList
-pArgList = sepBy pExpr $ waccComma
-
+pArgList = waccCommaSep pExpr
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <pair-elem> ::= 'fst' <expr> | 'snd' <expr' ::::::::::::::::::::::::::: --
@@ -182,125 +206,106 @@ pPairElem
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <type> ::= <base-type> | <array-type> | <pair-type> ::::::::::::::::::: --
+-- |For easier management of datatypes, they are represented linearly.
+
 pType :: Parser Type
-pType = do
-    subtype <-  liftM TypeBase pBaseType 
-            <|> liftM TypePair pPairType
-    fix (\f -> (string "[]" >> fmap (TypeArray . ArrayType) f) 
-            <|> return subtype) 
+pType = do 
+    base  <-  pBaseType 
+          <|> pPairType
+    fix ( \f -> (string "[]" >> fmap ArrayType f ) 
+          <|> return base)
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <base-type> ::= 'int' | 'bool' | 'char' | 'string' :::::::::::::::::::: --
-pBaseType :: Parser BaseType
-pBaseType
-    =  try ( pWaccWord "int"    IntBaseType    )    
-   <|> try ( pWaccWord "bool"   BoolBaseType   )
-   <|> try ( pWaccWord "char"   CharBaseType   )
-   <|> try ( pWaccWord "string" StringBaseType )
+        where
 
+            -- <base-type> ::= 'int' | 'bool' | 'char' | 'string'
+            pBaseType :: Parser Type
+            pBaseType = choice 
+                [ pWaccWord "int"    IntType    
+                , pWaccWord "bool"   BoolType   
+                , pWaccWord "char"   CharType   
+                , pWaccWord "string" StringType ]
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: 'pair' '(' <pair-elem-type> ',' <pair-elem-type> ')' :::::::::::::::::: --
+            -- 'pair' '(' <type> ',' <type> ')'
+            -- |For easier management of the nested pair case, we chose a Maybe
+            -- approach on the pair type, thus considering the nested pair just
+            -- another graphical form of the same type.
+            pPairType :: Parser Type
+            pPairType = do
+                waccReserved "pair"
+                waccParens $ do
+                    pairElem  <- pPairElemType
+                    waccComma
+                    pairElem' <- pPairElemType
+                    return $ PairType ( Just ( pairElem , pairElem' ) )
 
--- |For easier management of the nested pair case, we chose a Maybe approach on
--- the pair type,y thus considering the nested pair just another graphical form of
--- the same type.
-pPairType :: Parser PairType
-pPairType = do
-    waccReserved "pair"
-    waccParens $ do
-    pairElem1 <- pPairElemType
-    waccComma
-    pairElem2 <- pPairElemType
-    return $ Just (pairElem1, pairElem2) 
+            pPairElemType :: Parser Type
+            pPairElemType = pWaccWord "pair" ( PairType Nothing ) <|> pType
 
-      where
-
-        pPairElemType :: Parser Type
-        pPairElemType
-            =  try ( pWaccWord "pair" $ TypePair Nothing )
-           <|> pType
 
 -- 3.4. Expressions
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <expr> :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 pExpr :: Parser Expr
-pExpr = buildExpressionParser waccOperators pExpr' 
-
-        where
-
-            pExpr' :: Parser Expr
-            pExpr'
-                =  pIntLiterExpr
-               <|> pBoolLiterExpr
-               <|> pCharLiterExpr
-               <|> pStrLiterExpr
-               <|> pPairLiterExpr
-               <|> pIdentExpr
-               <|> pUnaryOperExpr
-               <|> pParenthesised
-               <|> pArrayElemExpr
-               <|> pBinaryOperExpr
-    
-
--- pIntLiterExpr, pBoolLiterExpr, pCharLiterExpr, pStrLiterExpr,  pPairLiterExpr, 
--- pIdentExpr,    pUnaryOperExpr, pParenthesised, pArrayElemExpr, pBinaryOperExpr
--- :: Parser Expr
-
-pBoolLiterExpr = liftM BoolLiterExpr pBoolLiter                                       
-
-pIntLiterExpr  = liftM IntLiterExpr  pIntLiter
-
-pCharLiterExpr = liftM CharLiterExpr pCharLiter
-
-pStrLiterExpr  = liftM StrLiterExpr  pStrLiter
- 
-pPairLiterExpr = liftM PairLiterExpr pPairLiter
-
-pIdentExpr     = liftM IdentExpr     waccIdentifier
-
-pArrayElemExpr = liftM ArrayElemExpr pArrayElem
-
-pUnaryOperExpr
-    =  pUnaryOperExp' "!"   NotUnOp
-   <|> pUnaryOperExp' "len" LenUnOp
-   <|> pUnaryOperExp' "ord" OrdUnOp
-   <|> pUnaryOperExp' "chr" ChrUnOp
-   <|> pUnaryOperExp' "-"   NegUnOp
+pExpr = buildExpressionParser waccOperators pExpr'
 
     where
 
-        pUnaryOperExp' string op =
-            waccReservedOp string >> liftM (UnaryOperExpr op) pExpr
+        pExpr' = choice 
+            [ waccParens pExpr
+            , try $ liftM ArrayElemExpr pArrayElem      
+            ,       liftM BoolLiterExpr pBoolLiter
+            ,       liftM IntLiterExpr  pIntLiter
+            ,       liftM CharLiterExpr pCharLiter
+            ,       liftM StrLiterExpr  pStrLiter
+            ,       liftM PairLiterExpr pPairLiter
+            ,       liftM IdentExpr     waccIdentifier
+            , pBinaryOperExpr
+            , pUnaryOperExpr 
+            ] <?> "pExpr"
 
-pBinaryOperExpr
-    =  pBinaryOperExp' "+"  AddBinOp
-   <|> pBinaryOperExp' "-"  SubBinOp
-   <|> pBinaryOperExp' "*"  MulBinOp
-   <|> pBinaryOperExp' "/"  DivBinOp
-   <|> pBinaryOperExp' "%"  ModBinOp
-   <|> pBinaryOperExp' "&&" AndBinOp
-   <|> pBinaryOperExp' "||" OrrBinOp
-   <|> pBinaryOperExp' "<"  LsBinOp
-   <|> pBinaryOperExp' ">"  GtBinOp
-   <|> pBinaryOperExp' "<=" LEBinOp
-   <|> pBinaryOperExp' ">=" GEBinOp
-   <|> pBinaryOperExp' "==" EqBinOp
-   <|> pBinaryOperExp' "!=" NEBinOp
-
-    where
-
-        pBinaryOperExp' str op =
-            waccReserved str >> liftM2 ( BinaryOperExpr op ) pExpr pExpr 
-
-pParenthesised = waccParens pExpr
+        pUnaryOperExpr = choice
+            [ pUnOp "!"   NotUnOp
+            , pUnOp "len" LenUnOp
+            , pUnOp "ord" OrdUnOp
+            , pUnOp "chr" ChrUnOp
+            , pUnOp "-"   NegUnOp ]
+        
+            where
+        
+                pUnOp string op = do 
+                    waccReservedOp string
+                    liftM ( UnaryOperExpr op ) pExpr
+        
+        pBinaryOperExpr = choice 
+            [ pBinOp "+"  AddBinOp
+            , pBinOp "-"  SubBinOp
+            , pBinOp "*"  MulBinOp
+            , pBinOp "/"  DivBinOp
+            , pBinOp "%"  ModBinOp
+            , pBinOp "&&" AndBinOp
+            , pBinOp "||" OrrBinOp
+            , pBinOp "<=" LEBinOp
+            , pBinOp "<"  LsBinOp
+            , pBinOp ">"  GtBinOp
+            , pBinOp ">=" GEBinOp
+            , pBinOp "==" EqBinOp
+            , pBinOp "!=" NEBinOp ]
+            
+            where
+                
+                pBinOp str op = do 
+                    waccReservedOp str 
+                    liftM2 ( BinaryOperExpr op ) pExpr pExpr
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <array-elem> ::= <ident> '[' <expr> ']' ::::::::::::::::::::::::::::::: --
 pArrayElem :: Parser ArrayElem
-pArrayElem = liftM2 ArrayElem waccIdentifier $ waccBrackets pExpr
+pArrayElem = do 
+  ident <- waccIdentifier
+  dims  <- many1 $ waccBrackets pExpr 
+  return $ ArrayElem ident dims
 
 
 -- 3.5. Literals
@@ -308,38 +313,52 @@ pArrayElem = liftM2 ArrayElem waccIdentifier $ waccBrackets pExpr
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <int-liter> ::= <int-sign>? <digit>+ :::::::::::::::::::::::::::::::::: --
 pIntLiter :: Parser IntLiter
-pIntLiter = liftM IntLiter waccInteger 
+pIntLiter = do
+  -- −2^31 to 2^31 − 1 inclusive.
+  int <- waccInteger
+  if   int >= -2^31 && int <= 2^31-1
+  then return int
+  else fail "Integer Out Of Bounds" 
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <bool-liter> ::= 'true' | 'false' ::::::::::::::::::::::::::::::::::::: --
+pBoolLiter :: Parser BoolLiter
 pBoolLiter 
-    =  ( waccReserved "true"  >> return True  )  
-   <|> ( waccReserved "false" >> return False ) 
-
+	=  pWaccWord "true" True 
+   <|> pWaccWord "false" False 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <char-liter> ::= ''' <char> ''' ::::::::::::::::::::::::::::::::::::::: --
 pCharLiter :: Parser CharLiter
-pCharLiter = charLiteral . makeTokenParser $ haskellDef
+pCharLiter = do
+
+  c <- lookAhead waccCharLiter
+
+  if      c `elem` "\\\"\'" -- If char was one of "\' 
+  then do char  '\''        -- Then make sure it was escaped correctly
+          char  '\\'
+          oneOf "\\\"\'"
+          char  '\''
+          waccWhiteSpace
+          return c
+  else do waccCharLiter >>= return 
+
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <str-liter> ::= ''' <char>* ''' ::::::::::::::::::::::::::::::::::::::: --
 pStrLiter :: Parser StrLiter
-pStrLiter = stringLiteral . makeTokenParser $ haskellDef
+pStrLiter = waccStrLiter
 
-
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <array-liter> ::= '[' ( <expr> (',' <expr>)* )? ']' ::::::::::::::::::: --
 pArrayLiter :: Parser ArrayLiter
-pArrayLiter = waccBrackets $ sepBy pExpr $ waccComma
-
+pArrayLiter = waccBrackets $ waccCommaSep pExpr 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <pair-liter> ::= 'null' ::::::::::::::::::::::::::::::::::::::::::::::: --
 pPairLiter :: Parser PairLiter
-pPairLiter = pWaccWord "null" Null 
+pPairLiter = pWaccWord "null" Null
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -390,3 +409,6 @@ parseWithLeftOver p = parse ( (,) <$> p <*> leftOver ) ""
   where leftOver = manyTill anyToken eof
 
 
+
+-- (⋟﹏⋞) = error 
+-- (✿__✿) = error 
