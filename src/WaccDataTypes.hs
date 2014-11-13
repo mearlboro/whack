@@ -57,21 +57,16 @@ data PairElem                                   -- <pair-elem> ::=
   deriving ( Show , Eq )          
   
 data Type                                       -- <type> ::=
-  = TypeBase  BaseType                          -- <base-type>
-  | TypePair  PairType                          -- <pair-type>
-  | TypeArray Type                              -- <array-type>
+  = IntType                                     -- 'int' 
+  | BoolType                                    -- 'bool'
+  | CharType                                    -- 'char'
+  | StringType                                  -- 'string'
+  | PairType ( Maybe ( Type, Type ) )           -- <pair-type> ::= 'pair' '(' <pair-elem-type> ',' <pair-elem-type> ')'    
+  | ArrayType Type                              -- <array-type>
+  | NullType
+  | EmptyType
   deriving ( Show , Eq )                        
   
-data BaseType                                   -- <base-type> ::=
-  = IntBaseType                                 -- 'int' 
-  | BoolBaseType                                -- 'bool'
-  | CharBaseType                                -- 'char'
-  | StringBaseType                              -- 'string'
-  deriving ( Show , Eq )
-
-type PairType                                   -- <pair-type> ::= 'pair' '(' <pair-elem-type> ',' <pair-elem-type> ')'    
-  = Maybe ( Type , Type )
-
 data Expr                                       -- <expr> ::=
   = BoolLiterExpr     Bool                      -- <bool-liter>
   | CharLiterExpr     Char                      -- <char-liter>

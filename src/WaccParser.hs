@@ -13,14 +13,15 @@ import Text.ParserCombinators.Parsec.Token
 import Text.Parsec.Language       ( haskellDef )
 import Control.Applicative hiding ( (<|>) , many )
 import Control.Monad              ( liftM , liftM2 )
+import Control.Monad.Fix
 
---(⋟﹏⋞) = error 
+-- (⋟﹏⋞) = error 
 
---(✿_✿) = error 
+-- (✿_✿)  = error 
 
--- |3.1.1 program .......................................................  26 --    
--- |3.1.2 Statements ....................................................  66 -- 
--- |3.1.3 Types ......................................................... 183 -- 
+-- |3.1.1 program .......................................................  28 --    
+-- |3.1.2 Statements ....................................................  85 -- 
+-- |3.1.3 Types ......................................................... 205 -- 
 -- |3.1.4 Expressions ................................................... 232 -- 
 -- |3.1.5 Identifiers, literals ......................................... 314 -- 
 
@@ -206,42 +207,48 @@ pPairElem
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <type> ::= <base-type> | <array-type> | <pair-type> ::::::::::::::::::: --
-pType :: Parser Type
+-- |For easier management of datatypes, they are represented linearly.
+
+-- pType :: Parser Type
+-- pType = do 
+--     base  <-  pBaseType 
+--           <|> pPairType
+--     fix ( \f -> (string "[]" >> fmap ArrayType f ) 
+--           <|> return base)
+--
 pType = do 
-    base <- liftM TypePair pPairType <|> liftM TypeBase pBaseType 
+    base <- pPairType <|> pBaseType 
     dims <- length <$> many ( string "[]" ) 
 
     if   dims == 0 
     then return   base 
-    else return $ iterate TypeArray base !! dims
+    else return $ iterate ArrayType base !! dims
+ 
+        where
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <base-type> ::= 'int' | 'bool' | 'char' | 'string' :::::::::::::::::::: --
-pBaseType :: Parser BaseType
-pBaseType = choice 
-    [ pWaccWord "int"    IntBaseType    
-    , pWaccWord "bool"   BoolBaseType   
-    , pWaccWord "char"   CharBaseType   
-    , pWaccWord "string" StringBaseType ]
+            -- <base-type> ::= 'int' | 'bool' | 'char' | 'string'
+            pBaseType :: Parser Type
+            pBaseType = choice 
+                [ pWaccWord "int"    IntType    
+                , pWaccWord "bool"   BoolType   
+                , pWaccWord "char"   CharType   
+                , pWaccWord "string" StringType ]
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: 'pair' '(' <pair-elem-type> ',' <pair-elem-type> ')' :::::::::::::::::: --
--- |For easier management of the nested pair case, we chose a Maybe approach on
--- the pair type,y thus considering the nested pair just another graphical form of
--- the same type.
-pPairType :: Parser PairType
-pPairType = do
-    waccReserved "pair"
-    waccParens $ do
-        pairElem  <- pPairElemType
-        waccComma
-        pairElem' <- pPairElemType
-        return $ Just ( pairElem , pairElem' ) 
+            -- 'pair' '(' <type> ',' <type> ')'
+            -- |For easier management of the nested pair case, we chose a Maybe
+            -- approach on the pair type, thus considering the nested pair just
+            -- another graphical form of the same type.
+            pPairType :: Parser Type
+            pPairType = do
+                waccReserved "pair"
+                waccParens $ do
+                    pairElem  <- pPairElemType
+                    waccComma
+                    pairElem' <- pPairElemType
+                    return $ PairType ( Just ( pairElem , pairElem' ) )
 
-    where
-
-        pPairElemType :: Parser Type
-        pPairElemType = pWaccWord "pair" ( TypePair Nothing ) <|> pType
+            pPairElemType :: Parser Type
+            pPairElemType = pWaccWord "pair" ( PairType Nothing ) <|> pType
 
 
 -- 3.4. Expressions
@@ -357,12 +364,10 @@ pStrLiter = waccStrLiter
 pArrayLiter :: Parser ArrayLiter
 pArrayLiter = waccBrackets $ waccCommaSep pExpr 
 
-
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <pair-liter> ::= 'null' ::::::::::::::::::::::::::::::::::::::::::::::: --
 pPairLiter :: Parser PairLiter
 pPairLiter = pWaccWord "null" Null
-
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -411,5 +416,4 @@ parseWithEof p = parse ( p <* eof ) ""
 parseWithLeftOver :: Parser a -> String -> Either ParseError (a,String)
 parseWithLeftOver p = parse ( (,) <$> p <*> leftOver ) ""
   where leftOver = manyTill anyToken eof
-
 
