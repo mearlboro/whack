@@ -20,7 +20,7 @@ data PROGRAM = PROGRAM [ FUNC ] STAT Scope
 data FUNC = FUNC Type Ident ParamList STAT Scope 
 
 -- | Some statement (while, if, scoped) introduce a new scope.
--- | All statements have a reference to the current scope.
+-- | All statements have a reference to the current scope they are in
 data STAT 
   = SKIPstat      
   | FREEstat      Expr        Scope                                               
@@ -43,6 +43,7 @@ data STAT
 -- 1. The Global Scope in all of its majesty
 -- 2. Build the main statement thus updating the global scope
 -- 3. Add all function identifiers
+-- 4. Build all the program functions
 buildPROGRAM :: Program -> PROGRAM 
 buildPROGRAM p@( Program funcs main ) = PROGRAM funcs' main' globalScope''
     where
@@ -55,10 +56,9 @@ buildPROGRAM p@( Program funcs main ) = PROGRAM funcs' main' globalScope''
 -- | Given a function and its parent scope (the global scope), build its 
 --   semantically-augmented version (FUNC) and in the process create 
 --   its own childScope(s). Also updates the global scope
---   1. Add funcion name to the global scope
---   2. Create function scope, parented by the global scope
---   3. Build the body STATement, updating the function scope 
---   4. Add function parameters to the function scope
+--   1. Create function scope, parented by the global scope
+--   2. Build the body STATement, updating the function scope 
+--   3. Add function parameters to the function scope
 buildFUNC :: Func -> Scope -> FUNC 
 buildFUNC func@( Func ftype name plist body ) globalScope = func'
     where
@@ -70,7 +70,7 @@ buildFUNC func@( Func ftype name plist body ) globalScope = func'
 
 -- | Given a statement and the currentScope it is in, produce a STAT 
 --   with its own scope, if needed. The current scope gets populated by 
---   the identifiers, if any, declared or used in the statement.
+--   the identifiers, if any, declared in a DeclareStat statement.
 buildSTAT                            :: Stat -> Scope -> ( Scope , STAT )  
 buildSTAT   ( SkipStat            )  =  flip (,)          SKIPstat 
 buildSTAT   ( FreeStat    expr    )  =  buildSimpleStat ( FREEstat    expr    )
@@ -91,7 +91,7 @@ buildSimpleStat stat parentScope = ( parentScope , stat parentScope )
 
 
 -- A scoped statement introduces its own local childScope, enclosed
--- by the parentScope, and leaves the parentscope unchanged.
+-- by the parentScope, and leaves the parentScope unchanged.
 buildSCOPEDstat ( ScopedStat body ) parentScope = 
     let childScope = ST parentScope empty 
         ( _childScope' , body' ) = buildSTAT body childScope
