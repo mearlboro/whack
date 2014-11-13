@@ -1,0 +1,44 @@
+Bugfix-1-7.11.2014 
+
+1. Cleanups
+- added a structure to the files, with table of contents with the line numbers for easy navigation in the parsers and tests file
+- added comments at the beggining of each file
+- aligned the reserved words and operators
+- removed list of tokens from WaccDataTypes.hs
+-------------------------------------------------------------------------------
+
+2. Additions/changes
+-------------------------------------------------------------------------------
+   A. WaccLanguageDef.hs
+      A.1 Added waccBrackets to parse [ ], and removed it from WaccParser.hs, waccComma, waccBraces, etc.
+
+      A.2 Added opStart and opLetter 
+        opStart :: ParsecT s u m Char
+        This parser should accept any start characters of operators. For example oneOf ":!#$%&*+./<=>?@\\^|-~"
+        opLetter :: ParsecT s u m Char
+        This parser should accept any legal tail characters of operators. Note that this parser should even be defined if the language doesn't support user-defined operators, or otherwise the reservedOp parser won't work correctly.
+
+-------------------------------------------------------------------------------
+   B. WaccParser.hs
+      B.1 Removed IntSign. WaccInteger deals with a number with either +,- or no sign in front.
+
+      B.2 Fixed (bug/paramList/1)
+          Replaced occurences of char ',' with waccComma.
+
+      B.3 Replaced occurences of char '[', char ']', char '(' etc with waccParens, waccBrackets. 
+
+      B.4 Removed pComment because comments don't appear in AST. Token.commentLine in WaccLanguageDef.hs deals with it.
+
+      B.5 Added pArgList
+
+      B.6 Fixed (bug/pPairType/1)
+          Removed the pairElemType Type. PairType is now Maybe (Type, Type). The pPairElemType is now just a helper function for pPairType, since it's not a standalone type anymore. 
+          In the type definition "pair(int, pair)", the AST will be "Just (TypeBase IntBaseType, TypePair Nothing)". Will be helpful when trying to retrieve type information for the nested pairs, having an actual TypePair type.
+
+
+-------------------------------------------------------------------------------
+   C. WaccDataTypes.hs
+      C.1 Removed IntSign.
+
+      C.2 Removed the pairElemType Type. PairType is now Maybe (Type, Type). 
+
