@@ -1,10 +1,10 @@
 module WaccSemantics where
 
-import Data.Maybe ( isNothing , fromMaybe , fromJust )
+import Data.Maybe ( isNothing , fromMaybe , fromJust , isJust )
 import Data.Map   ( empty                            )
 import Control.Applicative hiding ( empty )
 import Data.Char  ( isSpace )
-
+import Control.Monad ( when )
 import WaccParser
 import WaccExamplesTester
 import WaccDataTypes
@@ -160,14 +160,14 @@ checkStat stat  =  case stat of
     RETURNstat    expr  scope                    -> error "TODO"   
   
     EXITstat      expr  scope                    -> do  
-      err <- checkExpr expr scope
+      let err = checkExpr expr scope
       if (isNothing err) 
-        then
-          eType <- getTypeExpr expr scope
+        then do
+          let eType = getTypeExpr expr scope
           if(eType /= IntType) 
             then return "Exit Statement expects int type"
             else Nothing
-        else return err
+        else err
   
     PRINTstat     expr  scope                    -> checkExpr expr scope                
     PRINTLNstat   expr  scope                    -> checkExpr expr scope
@@ -180,32 +180,41 @@ checkStat stat  =  case stat of
     READstat      (LhsArrayElem arrayElem) scope -> checkExpr (ArrayElemExpr arrayElem) scope
 
     WHILEstat     expr  body  scope              -> do
-      err <- checkExpr expr scope 
+      let err = checkExpr expr scope 
       if (isNothing err) 
-        then 
-          eType <- getTypeExpr expr scope
+        then do
+          let eType = getTypeExpr expr scope
           if(eType /= BoolType) 
             then return "Conditional expression should be of type Bool" 
             else checkStat body
-        else return err
+        else err
 
     SEQstat       stat  stat'                    -> do
-      err <- checkStat stat 
-      when (isJust err) return err
-      err' <- checkStat stat'
-      return err'
-
+      let err = checkStat stat
+      err' <- checkStat stat' 
+      if (isJust err) 
+        then err
+        else return err'
+    
     ASSIGNstat    lhs   rhs   scope              -> error "TODO"          
+    
     IFstat        expr  sthen selse scope        -> do
-      err <- checkExpr expr scope
+      let err = checkExpr expr scope
       if(isNothing err)
-        then 
-          eType <- getTypeExpr expr scope
+        then do
+          let eType = getTypeExpr expr scope
           if(eType /= BoolType)
             then return "Conditional expression should be of type Bool"
-            else 
+            else checkStat (SEQstat sthen selse)
+        else err
 
-    DECLAREstat   stype ident rhs   scope        -> error "TODO"
+--    DECLAREstat   stype ident rhs   scope        -> do
+--        let aType = getTypeAssignRhs rhs scope
+--        if(stype /= aType) 
+--          then return "Assignment should have the same type as the identifier"
+--          else Nothing
+
+
 
 
 -- | Check semantics of an expression
@@ -228,7 +237,7 @@ getTypeExpr :: Expr -> Scope -> Type
 getTypeExpr expr scope = case expr of
     BoolLiterExpr     bool             -> BoolType 
     CharLiterExpr     char             -> CharType   
-    IdentExpr         ident            -> fst (findIdent ident scope)   
+    IdentExpr         ident            -> fst (fromJust (findIdent ident scope))
     UnaryOperExpr     NotUnOp    expr  -> BoolType
     UnaryOperExpr     LenUnOp    expr  -> IntType
     UnaryOperExpr     OrdUnOp    expr  -> IntType  
@@ -246,6 +255,16 @@ getTypeExpr expr scope = case expr of
     BinaryOperExpr DivBinOp _ _        -> IntType                                    
     BinaryOperExpr ModBinOp _ _        -> IntType                                    
     BinaryOperExpr _        _ _        -> BoolType  
+        
+-- |Gets the type of a RHS Assignment 
+--getTypeAssignRhs :: AssignRhs -> Scope -> Type
+--getTypeAssignRhs ass scope = case ass of 
+--    RhsExpr       expr                 -> getTypeExpr expr scope
+--    RhsPairElem   (Fst expr)           -> getTypeExpr expr scope 
+--    RhsPairElem   (Snd expr)           -> getTypeExpr expr scope 
+--  | RhsArrayLiter ArrayLiter                    -- <array-liter>
+--  | RhsNewPair    Expr       Expr               -- 'newpair' '(' <expr> ',' <expr> ')'
+--  | RhsCall       Ident      ArgList            -- 'call' <ident> '(' <arg-list>? ')'
         
 -- Nothing means no semantic error, Just contains the semantic error message
 type SemanticErr = Maybe String 
