@@ -2,6 +2,7 @@ module Main where
 
 import System.Directory
 import System.Environment
+import System.Exit
 import System.FilePath.Posix
 import Control.Monad ( liftM )
 
@@ -23,6 +24,8 @@ main = do
 
 -- TODO: make a file management and compiler module
 
+
+-- | Checks if the file at the given path exists.
 isFile :: FilePath -> IO Bool
 isFile file = do 
    exists <- doesFileExist file
@@ -46,5 +49,5 @@ parse source = do
   case result of
       Right r -> putStrLn "exit:\n0\n"
 
-      Left  e -> error errorMessage
+      Left  e -> exitWith $ ExitFailure 100
 
