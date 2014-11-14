@@ -22,8 +22,6 @@ main = do
            parse program
 
 
--- TODO: make a file management and compiler module
-
 
 -- | Checks if the file at the given path exists.
 isFile :: FilePath -> IO Bool
@@ -42,9 +40,6 @@ parse source = do
   -- Parse source file
   let result = parseWithEof pProgram source
   
-  -- Error message expected by LabTS
-  let errorMessage = "#syntax_error#\nexit:\n100\n"
-
   -- Get the result and act accordingly
   case result of
       Right r -> putStrLn "exit:\n0\n"
