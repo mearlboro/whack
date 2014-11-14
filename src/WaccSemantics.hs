@@ -231,9 +231,40 @@ checkExpr expr scope  =  case expr of
     ArrayElemExpr     arr              -> error "TODO"
     BinaryOperExpr    op    expr expr' -> error "TODO"     
 
+checkAssignRhs  :: AssignRhs -> Scope -> SemanticErr
+checkAssignRhs assignRhs scope = case assignRhs of
+    RhsExpr       expr        scope         ->  checkExpr expr scope  
+    RhsPairElem   (Fst expr)  scope         ->  checkExpr expr scope  
+    RhsPairElem   (Snd expr)  scope         ->  checkExpr expr scope 
+    RhsArrayLiter exprs       scope         ->  do
+      let checkedExps = map (`checkExpr` scope) exprs
+      let typeExpr    = map (`getTypeExpr` scope) exprs
+      if(all (==Nothing) checkExpr && all (==head typeExpr) typeExpr) --all exprs have to be correct and have the same type 
+        then Nothing
+        else return "Array literal error" 
+
+    RhsNewPair    expr expr'  scope         ->  do
+      let err  = checkExpr expr  scope
+      let err' = checkExpr expr' scope
+      if(isJust err) 
+        then err
+        else err'
+
+    RhsCall       ident exprs scope         ->  do
+      let typeAndContext = findIdent' ident scope
+      if(isNothing typeAndContext) 
+        then return "Function identifier not found"
+        else do
+          let iContext = case snd (fromJust typeAndContext) of
+            Function (Func _ _ paramList _) -> do   
+              let typeExpr = map (`getTypeExpr` scope) exprs 
+              if(paramList == typeExpr)
+                then Nothing
+                else return "Function parameters have wrong types"
+            _                               -> return "Not a function" 
 
 -- |Gets the type of an expression
-getTypeExpr :: Expr -> Scope -> Type
+getTypeExpr :: Expr -> Scope -> Maybe Type
 getTypeExpr expr scope = case expr of
     BoolLiterExpr     bool             -> BoolType 
     CharLiterExpr     char             -> CharType   
