@@ -14,10 +14,19 @@ data Program                                     -- <program> ::=
   deriving ( Eq , Ord )   
  
  
-data Func                                        -- <func> ::= 
-  = Func Type IdentName ParamList Stat It        -- <type> <ident> '(' <param-list>? ')' 'is' <stat> 'end'  
-  deriving ( Eq , Ord )   
-    
+--data Func                                        -- <func> ::= 
+--  = Func Type IdentName ParamList Stat It        -- <type> <ident> '(' <param-list>? ')' 'is' <stat> 'end'  
+--  deriving ( Eq , Ord )   
+  
+
+data Func                                         -- <func> ::= 
+  = Func                                          -- <type> <ident> '(' <param-list>? ')' 'is' <stat> 'end'  
+  { typeOf   :: Type 
+  , nameOf   :: IdentName
+  , paramsOf :: ParamList
+  , bodyOf   :: Stat 
+  , scopeOf  :: It 
+  } deriving ( Eq , Ord )
  
 type ParamList = [ Param ]                       -- <param-list> ::= <param> (';' <param>)*   
    
