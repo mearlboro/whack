@@ -1,8 +1,8 @@
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: 3.2.2 WACC file tester :::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: WACC file tester :::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
-module Wacc.WaccExamplesTester where
+module WaccTesting.WaccExamplesTester where
 
 import Wacc.WaccDataTypes
 import Wacc.WaccLanguageDef
@@ -40,17 +40,6 @@ getRecursiveContents dir = do
     concat <$> forM children extract
 
 --------------------------------------------------------------------------------
-
-parseOne' :: FilePath -> IO Program 
-parseOne' path = do 
-    -- Read source file 
-    source <- readFile path -- putStrLn $ source
-    -- Parse source file
-    let result = parseWithEof pProgram source
-    case result of 
-      Right r -> return r 
-      Left  e -> error "Not parsed" 
-
 
 -- | Parses one wacc file and returns true if it was parsed correctly
 parseOne :: Bool 
