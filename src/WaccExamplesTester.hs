@@ -3,6 +3,7 @@ module WaccExamplesTester where
 import WaccParser
 import WaccLanguageDef
 import WaccDataTypes
+import WaccSemantics
 
 import Text.Parsec.Token
 import Text.ParserCombinators.Parsec
@@ -12,7 +13,6 @@ import Data.List
 import Control.Applicative
 import Control.Monad
 import System.FilePath ( (</>) )
-
 
 --------------------------------------------------------------------------------
 
@@ -49,9 +49,6 @@ parseOne' path = do
     Right r -> return r 
     Left  e -> error "Not parsed" 
 
-  
-
-
 -- | Parses one wacc file and returns true if it was parsed correctly
 parseOne :: Bool 
          -> File    -- * Is it supposed to pass (True) or fail (False) ?
@@ -78,7 +75,9 @@ parseOne shouldPass ( name , path ) = do
   -- Get the result and act accordingly
   case result of -- putStrLn $ show result
       Right r -> if   shouldPass 
-                 then putStrLn ( show r ) >> return True 
+                 then putStrLn ( show $ buildPROGRAM r ) >> 
+                      putStrLn ( replicate 80 '#') >> 
+                      return True 
                  else handlePhantomParse r >> return False
 
       Left  e -> if   shouldPass 
