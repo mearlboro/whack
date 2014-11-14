@@ -19,18 +19,17 @@ instance Show Program where
 
 
 instance Show Func where
-  show ( Func ftype name plist body ) = 
-    show ftype ++ " " ++ name ++ "(" ++ showMany plist "," ++ ") is\n\t" ++ 
-      show' "\t" body ++ 
-    "\nend" 
+  show ( Func ftype name plist body it ) = 
+    show ftype ++ " " ++ name ++ "(" ++ showMany plist "," ++ ") is\t\t" ++ 
+      showTable it ++ "\n" ++ show' "\t" body ++ "\nend" 
 
 
 instance Show Param where
-  show ( Param t i ) = show t ++ " " ++ show i
+  show ( Param t i ) = show t ++ " " ++ i
 
 instance Show Context where
   show Variable       = "•"
-  show ( Function _ ) = "ƒ"
+  show ( Function _ ) = "ƒ "
   show Parameter      = "¶"
 
 show' :: [ Char ] -> Stat -> [ Char ]

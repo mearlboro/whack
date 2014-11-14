@@ -63,8 +63,8 @@ pFunc = do
             _                    -> False 
 
     if   returnsOrExits body 
-    then return $ Func ftype name params body
-    else fail "No Reachable Return/Exit Statement" 
+    then return $ Func ftype name params body Empty
+    else error "No Reachable Return/Exit Statement" 
 
 
 -- :: <param-list> ::= <param> (',' <param>)* ::::::::::::::::::::::::::::::: --

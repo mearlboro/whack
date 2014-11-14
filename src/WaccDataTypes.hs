@@ -15,7 +15,7 @@ data Program                                     -- <program> ::=
  
  
 data Func                                        -- <func> ::= 
-  = Func Type IdentName ParamList Stat           -- <type> <ident> '(' <param-list>? ')' 'is' <stat> 'end'  
+  = Func Type IdentName ParamList Stat It        -- <type> <ident> '(' <param-list>? ')' 'is' <stat> 'end'  
   deriving ( Eq , Ord )   
     
  
