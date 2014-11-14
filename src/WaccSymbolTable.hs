@@ -3,20 +3,26 @@ module WaccSymbolTable
 , encloseIn
 , addParams
 , addFuncs
+, addFunc
+, findEnclFunc
 , addVariable
 , findIdent
 , findIdent'
 ) where
 
-import Data.Map       ( Map (..) 
+import Data.Map       ( Map (..)
+                      
                       , insert 
                       , empty 
                       , insertWith
                       , findWithDefault 
                       , lookup
-                      , toList )
+                      , toList ) 
 
-import Prelude hiding ( lookup , empty )
+import Prelude hiding      ( lookup , empty )
+import Control.Applicative ( (<$>)          )
+import Data.Maybe ( fromMaybe , fromJust , Maybe (..) )
+import Data.Tuple ( swap )
 
 import WaccDataTypes
 import WaccShowInstances
@@ -50,9 +56,10 @@ addParams  =  foldr addParam
 -- | Add a list of functions to the table
 addFuncs  :: It -> [ Func ] -> It 
 addFuncs  =  foldr addFunc
-  where
-    addFunc                            :: Func -> It -> It 
-    addFunc f@( Func ftype name _ _ )  =  addObject name ftype ( Function f )
+
+
+addFunc                              :: Func -> It -> It 
+addFunc f@( Func ftype name _ _ _ )  =  addObject name ftype ( Function f )
   
 
 -- | Add a variable to the table
@@ -73,7 +80,8 @@ addObject name otype ctx table  =
 -- | Handle case of re-declaration of a variable already declared
 onClash          :: ( IdentObj -> IdentObj -> IdentObj )
 onClash new old  =  
-    error $ "Variable Declared Twice: " ++ show new ++ "->" ++ show old
+    error $ "Identifier Declared Twice In The Same Scope: " ++ 
+            show new ++ "->" ++ show old
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -91,6 +99,63 @@ findIdent' name it
   -- If the lookup fails in this table, try the enclosed table
   -- If the lookup succeeds wrap its result int a Just.
   = maybe ( findIdent' name `onEncl` it ) Just ( findIdent name it )
+
+
+
+findEnclFunc                   :: It -> Maybe IdentObj
+findEnclFunc   Empty           =  Nothing
+findEnclFunc ( ST Empty _   )  =  Nothing -- Global scope
+findEnclFunc ( ST encl dict )  =  
+  case filter ( isFuncCtx . snd ) . map snd $ toList dict of 
+    []  -> findEnclFunc encl
+    [x] -> Just x
+    _   -> error "Two Funcions In The Same Scope: This Should Never Happen"
+
+
+
+isFuncCtx :: Context -> Bool 
+isFuncCtx ( Function _ ) = True 
+isFuncCtx            _   = False
+
+findType          :: IdentName -> It -> Maybe Type 
+findType name it  =  fst <$> findIdent name it 
+
+
+findType'          :: IdentName -> It -> Maybe Type 
+findType' name it  =  fst <$> findIdent' name it 
+
+
+findContext          :: IdentName -> It -> Maybe Context 
+findContext name it  =  snd <$> findIdent name it 
+
+
+findContext'          :: IdentName -> It -> Maybe Context 
+findContext' name it  =  snd <$> findIdent' name it
+
+
+
+isFunc          :: IdentName -> It -> Bool 
+isFunc name it  =  findContext name it == Just Function {} 
+
+
+isFunc'          :: IdentName -> It -> Bool 
+isFunc' name it  =  findContext' name it == Just Function {} 
+
+
+isVariable          :: IdentName -> It -> Bool 
+isVariable name it  =  findContext name it == Just Variable
+
+
+isVariable'          :: IdentName -> It -> Bool 
+isVariable' name it  =  findContext' name it == Just Variable
+
+
+isParam          :: IdentName -> It -> Bool 
+isParam name it  =  findContext name it == Just Parameter 
+
+
+isParam'          :: IdentName -> It -> Bool 
+isParam' name it  =  findContext' name it == Just Parameter 
 
 
 -- | Performs a retrieval operation on the table's dictionary
