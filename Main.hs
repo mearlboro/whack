@@ -10,15 +10,15 @@ import Wacc.WaccParser
 main = do
   args <- getArgs
   if length args < 1 
-  then putStrLn "Expecting a .wacc file."
-  else do
-    let file = head args
-    exists <- isFile file
-    if not $ isWacc file && exists
-       then putStrLn "Expecting a .wacc file."
-       else do
-         program <- readFile $ file
-         parse program
+    then putStrLn "Expecting a .wacc file."
+    else do
+      let file = head args
+      exists <- isFile file
+      if not $ isWacc file && exists
+         then putStrLn "Expecting a .wacc file."
+         else do
+           program <- readFile $ file
+           parse program
 
 
 -- TODO: make a file management and compiler module
