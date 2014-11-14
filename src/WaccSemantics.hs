@@ -159,8 +159,15 @@ checkStat stat  =  case stat of
       
     RETURNstat    expr  scope                    -> error "TODO"   
   
-    EXITstat      expr  scope                    -> if (checkExpr expr scope == Nothing && getTypeExpr expr scope == IntType) then Nothing 
-                                                    else Just "Exit Statement expects int type"
+    EXITstat      expr  scope                    -> do  
+      err <- checkExpr expr scope
+      if (isNothing err) 
+        then
+          eType <- getTypeExpr expr scope
+          if(eType /= IntType) 
+            then return "Exit Statement expects int type"
+            else Nothing
+        else return err
   
     PRINTstat     expr  scope                    -> checkExpr expr scope                
     PRINTLNstat   expr  scope                    -> checkExpr expr scope
@@ -172,11 +179,32 @@ checkStat stat  =  case stat of
     READstat      (LhsPairElem (Snd expr)) scope -> checkExpr expr scope
     READstat      (LhsArrayElem arrayElem) scope -> checkExpr (ArrayElemExpr arrayElem) scope
 
-    WHILEstat     expr  body  scope              -> if (checkExpr expr scope == Nothing && getTypeExpr expr scope == BoolType) then checkStat body
-                                                    else Just "Conditional expression error"         
-    SEQstat       stat  stat'                    -> error "TODO"          
+    WHILEstat     expr  body  scope              -> do
+      err <- checkExpr expr scope 
+      if (isNothing err) 
+        then 
+          eType <- getTypeExpr expr scope
+          if(eType /= BoolType) 
+            then return "Conditional expression should be of type Bool" 
+            else checkStat body
+        else return err
+
+    SEQstat       stat  stat'                    -> do
+      err <- checkStat stat 
+      when (isJust err) return err
+      err' <- checkStat stat'
+      return err'
+
     ASSIGNstat    lhs   rhs   scope              -> error "TODO"          
-    IFstat        expr  sthen selse scope        -> error "TODO"   
+    IFstat        expr  sthen selse scope        -> do
+      err <- checkExpr expr scope
+      if(isNothing err)
+        then 
+          eType <- getTypeExpr expr scope
+          if(eType /= BoolType)
+            then return "Conditional expression should be of type Bool"
+            else 
+
     DECLAREstat   stype ident rhs   scope        -> error "TODO"
 
 
