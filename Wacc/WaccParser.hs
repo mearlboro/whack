@@ -2,10 +2,10 @@
 -- :: 3.1. WACC Parsers ::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
-module WaccParser where
+module Wacc.WaccParser where
 
-import WaccDataTypes
-import WaccLanguageDef
+import Wacc.WaccDataTypes
+import Wacc.WaccLanguageDef
 
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
@@ -62,9 +62,9 @@ pFunc = do
             IfStat      e s s' -> and $ map returnsOrExits $ s:s':[]
             _                  -> False 
 
-    if   returnsOrExits body 
-    then return $ Func ftype name params body
-    else fail "No Reachable Return/Exit Statement" 
+    if returnsOrExits body 
+		then return $ Func ftype name params body
+		else fail "No Reachable Return/Exit Statement" 
 
 
 -- :: <param-list> ::= <param> (',' <param>)* ::::::::::::::::::::::::::::::: --
@@ -303,9 +303,9 @@ pExpr = buildExpressionParser waccOperators pExpr'
 -- :: <array-elem> ::= <ident> '[' <expr> ']' ::::::::::::::::::::::::::::::: --
 pArrayElem :: Parser ArrayElem
 pArrayElem = do 
-  ident <- waccIdentifier
-  dims  <- many1 $ waccBrackets pExpr 
-  return $ ArrayElem ident dims
+    ident <- waccIdentifier
+    dims  <- many1 $ waccBrackets pExpr 
+    return $ ArrayElem ident dims
 
 
 -- 3.5. Literals
@@ -314,35 +314,34 @@ pArrayElem = do
 -- :: <int-liter> ::= <int-sign>? <digit>+ :::::::::::::::::::::::::::::::::: --
 pIntLiter :: Parser IntLiter
 pIntLiter = do
-  -- −2^31 to 2^31 − 1 inclusive.
-  int <- waccInteger
-  if   int >= -2^31 && int <= 2^31-1
-  then return int
-  else fail "Integer Out Of Bounds" 
+    -- −2^31 to 2^31 − 1 inclusive.
+    int <- waccInteger
+    if int >= -2^31 && int <= 2^31-1
+        then return int
+        else fail "Integer Out Of Bounds" 
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <bool-liter> ::= 'true' | 'false' ::::::::::::::::::::::::::::::::::::: --
 pBoolLiter :: Parser BoolLiter
 pBoolLiter 
-	=  pWaccWord "true" True 
+    =  pWaccWord "true" True 
    <|> pWaccWord "false" False 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <char-liter> ::= ''' <char> ''' ::::::::::::::::::::::::::::::::::::::: --
 pCharLiter :: Parser CharLiter
 pCharLiter = do
-
-  c <- lookAhead waccCharLiter
-
-  if      c `elem` "\\\"\'" -- If char was one of "\' 
-  then do char  '\''        -- Then make sure it was escaped correctly
-          char  '\\'
-          oneOf "\\\"\'"
-          char  '\''
-          waccWhiteSpace
-          return c
-  else do waccCharLiter >>= return 
+    c <- lookAhead waccCharLiter
+  
+    if c `elem` "\\\"\'"     -- If char was one of "\' 
+        then do char  '\''   -- Then make sure it was escaped correctly
+                char  '\\'
+                oneOf "\\\"\'"
+                char  '\''
+                waccWhiteSpace
+                return c
+        else do waccCharLiter >>= return 
 
 
 

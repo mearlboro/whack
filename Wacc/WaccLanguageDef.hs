@@ -2,7 +2,7 @@
 -- :: 2. WACC Language Definition ::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
-module WaccLanguageDef 
+module Wacc.WaccLanguageDef 
 ( waccIdentifier 
 , waccReserved   
 , waccReservedOp 
@@ -23,7 +23,7 @@ module WaccLanguageDef
 , waccLexeme
 ) where
 
-import WaccDataTypes 
+import Wacc.WaccDataTypes 
 
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
