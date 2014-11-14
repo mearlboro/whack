@@ -1,4 +1,4 @@
 #!/bin/bash
 
-./dist/build/Wacc/Wacc $1
+./dist/build/wacc/wacc $1
 
