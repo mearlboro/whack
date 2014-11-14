@@ -1,18 +1,21 @@
-module WaccExamplesTester where
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: 3.2.2 WACC file tester :::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
-import WaccParser
-import WaccLanguageDef
-import WaccDataTypes
+module Wacc.WaccExamplesTester where
+
+import Wacc.WaccDataTypes
+import Wacc.WaccLanguageDef
+import Wacc.WaccParser
 
 import Text.Parsec.Token
 import Text.ParserCombinators.Parsec
-import Control.Monad.IO.Class ( liftIO )
-import System.Directory
-import Data.List 
 import Control.Applicative
+import Control.Monad.IO.Class ( liftIO )
 import Control.Monad
-import System.FilePath ( (</>) )
-
+import Data.List 
+import System.Directory
+import System.FilePath        ( (</>) )
 
 --------------------------------------------------------------------------------
 
@@ -28,28 +31,25 @@ isHidden  =  not . isPrefixOf "."
 getRecursiveContents :: FilePath -> IO [ File ] 
 getRecursiveContents dir = do    
     children <- filter isHidden <$> getDirectoryContents dir
-    let extract name = do {
-      let path = dir </> name 
-    ; isDirectory <- doesDirectoryExist path
-    ; if   isDirectory 
-      then getRecursiveContents path 
-      else return [( name , path )]
-    }
+    let extract name = do
+        let path = dir </> name 
+        isDirectory <- doesDirectoryExist path
+        if isDirectory 
+           then getRecursiveContents path 
+           else return [( name , path )]
     concat <$> forM children extract
 
 --------------------------------------------------------------------------------
 
 parseOne' :: FilePath -> IO Program 
 parseOne' path = do 
-  -- Read source file 
-  source <- readFile path -- putStrLn $ source
-  -- Parse source file
-  let result = parseWithEof pProgram source
-  case result of 
-    Right r -> return r 
-    Left  e -> error "Not parsed" 
-
-  
+    -- Read source file 
+    source <- readFile path -- putStrLn $ source
+    -- Parse source file
+    let result = parseWithEof pProgram source
+    case result of 
+      Right r -> return r 
+      Left  e -> error "Not parsed" 
 
 
 -- | Parses one wacc file and returns true if it was parsed correctly
@@ -78,7 +78,7 @@ parseOne shouldPass ( name , path ) = do
   -- Get the result and act accordingly
   case result of -- putStrLn $ show result
       Right r -> if   shouldPass 
-                 then putStrLn ( show r ) >> return True 
+                 then return True 
                  else handlePhantomParse r >> return False
 
       Left  e -> if   shouldPass 

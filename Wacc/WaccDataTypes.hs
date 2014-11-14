@@ -2,7 +2,7 @@
 -- :: 1. Datatype Definitions ::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
-module WaccDataTypes where
+module Wacc.WaccDataTypes where
 
 data Program                                    -- <program> ::=
   = Program [ Func ] Stat                       -- 'begin' <func>* <stat> 'end'   

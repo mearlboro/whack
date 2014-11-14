@@ -1,14 +1,14 @@
-module WaccSemantics where
+module Wacc.WaccSemantics where
 
-import Data.Maybe ( isNothing , fromMaybe , fromJust )
-import Data.Map   ( empty                            )
 import Control.Applicative hiding ( empty )
 import Data.Char  ( isSpace )
+import Data.Maybe ( isNothing , fromMaybe , fromJust )
+import Data.Map   ( empty )
 
-import WaccParser
-import WaccExamplesTester
-import WaccDataTypes
-import WaccSymbolTable
+import Wacc.WaccParser
+import Wacc.WaccExamplesTester
+import Wacc.WaccDataTypes
+import Wacc.WaccSymbolTable
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: Data Definitions :::::::::::::::::::::::::::::::::::::::::::::::::::::: --
