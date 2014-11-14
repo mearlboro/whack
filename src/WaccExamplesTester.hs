@@ -39,15 +39,16 @@ getRecursiveContents dir = do
 
 --------------------------------------------------------------------------------
 
-parseOne' :: FilePath -> IO Program 
-parseOne' path = do 
+
+testOne :: FilePath -> IO Program 
+testOne path = do 
   -- Read source file 
-  source <- readFile path -- putStrLn $ source
+  source <- readFile $ "wacc_examples/" ++ path -- putStrLn $ source
   -- Parse source file
   let result = parseWithEof pProgram source
   case result of 
-    Right r -> return r 
-    Left  e -> error "Not parsed" 
+    Right r -> return $ augmentProgram  r 
+    Left  e -> error $ "Not parsed: " ++ show e 
 
 -- | Parses one wacc file and returns true if it was parsed correctly
 parseOne :: Bool 
@@ -68,6 +69,7 @@ parseOne shouldPass ( name , path ) = do
       putStrLn $ "FAILED (" ++ path ++ ")\n" ++ show r
       -- "Parser was supposed to fail but it parsed this: " ++ show r 
   
+
   -- Parser failed to parse something it was supposed to be able to parse
   let handleFail e = do 
       putStrLn $ replicate 80 '~' ++ "\nFAILED (" ++ path ++ ")\n" ++ show e
@@ -75,7 +77,7 @@ parseOne shouldPass ( name , path ) = do
   -- Get the result and act accordingly
   case result of -- putStrLn $ show result
       Right r -> if   shouldPass 
-                 then putStrLn ( show $ buildPROGRAM r ) >> 
+                 then putStrLn ( show $ augmentProgram r ) >> 
                       putStrLn ( replicate 80 '#') >> 
                       return True 
                  else handlePhantomParse r >> return False
