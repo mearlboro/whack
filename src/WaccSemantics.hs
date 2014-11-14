@@ -1,7 +1,7 @@
 module WaccSemantics where
 
 import Data.Maybe ( isNothing , fromMaybe , fromJust )
-import Data.Map   ( empty                            )
+import Data.Map   ( empty )
 import Control.Applicative hiding ( empty )
 import Data.Char  ( isSpace )
 
@@ -169,17 +169,109 @@ checkStat stat  =  case stat of
 -- | Check semantics of an expression
 checkExpr             :: Expr -> Scope -> SemanticErr 
 checkExpr expr scope  =  case expr of 
-    BoolLiterExpr     bool             -> error "TODO"  
-    CharLiterExpr     char             -> error "TODO"   
-    IdentExpr         ident            -> error "TODO"  
-    UnaryOperExpr     op    expr       -> error "TODO"   
-    ParenthesisedExpr expr             -> error "TODO"   
-    IntLiterExpr      int              -> error "TODO"   
-    StrLiterExpr      str              -> error "TODO"   
-    PairLiterExpr     pair             -> error "TODO"     
-    ArrayElemExpr     arr              -> error "TODO"
-    BinaryOperExpr    op    expr expr' -> error "TODO"     
+    BoolLiterExpr     bool             -> Nothing     
+    CharLiterExpr     char             -> Nothing     
+    IntLiterExpr      int              -> Nothing
+    StrLiterExpr      str              -> Nothing
+    PairLiterExpr     pair             -> Nothing
+    IdentExpr         ident            -> if not $ isNothing $ findIdent' ident scope then Nothing else Just "Variable undeclared"
+    UnaryOperExpr     op    expr       -> checkUnaryOp op expr scope
+    ParenthesisedExpr expr             -> checkExpr expr scope
+    ArrayElemExpr     arr              -> checkArrayElem arr scope
+    BinaryOperExpr    op    expr expr' -> checkBinaryOp op expr expr' scope
 
+checkBinaryOp :: BinaryOper -> Expr -> Expr -> Scope -> SemanticErr
+checkBinaryOp op expr expr' scope
+  | elem op [AddBinOp, SubBinOp, MulBinOp, DivBinOp, ModBinOp] 
+                   = if (checkBinaryExprs expr expr' scope &&
+                          getExprType expr scope == Just IntType)
+                      then Nothing else Just "Ill-formed Binary Operator Expression" 
+  | elem op [AndBinOp, OrrBinOp]
+                   = if (checkBinaryExprs expr expr' scope &&
+                          getExprType expr scope == Just BoolType)
+                      then Nothing else Just "Ill-formed Binary Operator Expression"
+  | elem op [LsBinOp, GtBinOp, LEBinOp, GEBinOp, EqBinOp, NEBinOp]
+                   = if (checkBinaryExprs expr expr' scope &&
+                          (getExprType expr scope == Just IntType ||
+                           getExprType expr scope == Just CharType))
+                      then Nothing else Just "Ill-formed Binary Operator Expression"
+
+checkBinaryExprs :: Expr -> Expr -> Scope -> Bool
+checkBinaryExprs expr expr' scope 
+  = (isNothing $ checkExpr expr  scope) &&
+    (isNothing $ checkExpr expr' scope) &&
+    (getExprType expr scope == getExprType expr' scope) &&
+    (getExprType expr scope == Just IntType)
+
+
+checkUnaryOp :: UnaryOper -> Expr -> Scope -> SemanticErr
+checkUnaryOp op expr scope
+  | op == NotUnOp = if (getExprType expr scope == Just BoolType) && 
+                                             (isNothing $ checkExpr expr scope) 
+                      then Nothing else Just "Bad use of NOT Unary Operator"
+  | op == LenUnOp = if (getExprType expr scope == Just ArrayType {}) &&
+                                             (isNothing $ checkExpr expr scope)
+                      then Nothing else Just "Bad use of LEN Unary Operator"
+  | op == OrdUnOp = if (getExprType expr scope == Just CharType) &&
+                                              (isNothing $ checkExpr expr scope)
+                      then Nothing else Just "Bad use of ORD Unary Operator"
+  | op == ChrUnOp = if (getExprType expr scope == Just IntType)  &&
+                                              (isNothing $ checkExpr expr scope)
+                      then Nothing else Just "Bad use of CHR Unary Operator"
+  | op == NegUnOp = if (getExprType expr scope == Just IntType)  && 
+                                              (isNothing $ checkExpr expr scope)
+                      then Nothing else Just "Bad use of NEG Unary Operator"
+
+checkArrayElem :: ArrayElem -> Scope -> SemanticErr
+checkArrayElem (ArrayElem ident exprs) scope
+ = if ( checkArrExprs exprs scope ) && ( countNestedArray (fromMaybe IntType (findType ident scope)) == length exprs )
+    then Nothing else Just "Invalid ArrayElemExpr"
+
+
+--TODO: This is a placeholder
+--findType :: Ident -> Scope -> Maybe Type
+--findType ident scope = Just ArrayType IntType
+--PLACEHOLDER
+
+countNestedArray :: Type -> Int
+countNestedArray ( ArrayType arrType ) = countNestedArray + 1
+countNestedArray _ = 0
+
+checkArrExprs :: [Expr] -> Scope -> Bool
+checkArrExprs [] _ = True
+checkArrExprs (expr:exprs) scope
+  | checkExpr expr scope      == Nothing 
+    && getExprType expr scope == Just IntType
+                                             = checkArrExprs exprs scope
+  | otherwise                                = False  
+
+
+-- |Gets the type of an expression
+getExprType :: Expr -> Scope -> Maybe Type
+getExprType expr scope = case expr of
+    BoolLiterExpr     bool               -> Just BoolType 
+    CharLiterExpr     char               -> Just CharType   
+    IdentExpr         ident              -> findFirst $ findIdent' ident scope
+    UnaryOperExpr     NotUnOp    expr    -> Just BoolType
+    UnaryOperExpr     LenUnOp    expr    -> Just IntType
+    UnaryOperExpr     OrdUnOp    expr    -> Just IntType  
+    UnaryOperExpr     ChrUnOp    expr    -> Just CharType
+    UnaryOperExpr     NegUnOp    expr    -> Just IntType
+    ParenthesisedExpr expr               -> getExprType expr scope   
+    IntLiterExpr      int                -> Just IntType   
+    StrLiterExpr      str                -> Just StringType   
+    PairLiterExpr     pair               -> Just NullType
+    ArrayElemExpr (ArrayElem ident expr) -> findFirst $ findIdent' ident scope
+    BinaryOperExpr AddBinOp _ _          -> Just IntType
+    BinaryOperExpr SubBinOp _ _          -> Just IntType                                  
+    BinaryOperExpr MulBinOp _ _          -> Just IntType                                   
+    BinaryOperExpr DivBinOp _ _          -> Just IntType                                    
+    BinaryOperExpr ModBinOp _ _          -> Just IntType                                    
+    BinaryOperExpr _        _ _          -> Just BoolType
+
+findFirst :: Maybe Identifier -> Maybe Type
+findFirst Nothing              = Nothing
+findFirst ( Just (myType, _) ) = Just myType
 
 -- Nothing means no semantic error, Just contains the semantic error message
 type SemanticErr = Maybe String 
