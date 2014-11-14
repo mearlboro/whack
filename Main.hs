@@ -44,7 +44,7 @@ parse source = do
 
   -- Get the result and act accordingly
   case result of
-      Right r -> putStrLn "The exit code is 0."
+      Right r -> putStrLn "exit:\n0\n"
 
-      Left  e -> putStr errorMessage
+      Left  e -> error errorMessage
 
