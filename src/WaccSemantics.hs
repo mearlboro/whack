@@ -4,6 +4,7 @@ import Data.Maybe                 ( isNothing , fromMaybe , fromJust )
 import Data.Map                   ( empty                            )
 import Control.Applicative hiding ( empty                            )
 import Data.Char                  ( isSpace                          )
+import Data.List                  ( group , sort                     )
 
 import WaccParser
 import WaccDataTypes
@@ -54,7 +55,7 @@ augmentStat
                    --   statement and the augmented input Stat
 -- | Given a stament and a parent table of identifiers, return the table
 --   of identifiers for the NEXT statement together with the newly-built Stat
-augmentStat stat parentIt = 
+augmentStat stat parentIt  = 
   case stat of 
     SkipStat              -> (,) parentIt   SkipStat 
     FreeStat    expr    _ -> augmentSimple  FreeStat    expr    
@@ -119,4 +120,47 @@ printError err  =  putStrLn $ case err of
 -- :: Testing ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
+type SemanticError = [ Char ]
 
+
+-- | Check for semantic errors in a program
+checkProgram                         :: Program -> [ SemanticError ]
+checkProgram ( Program funcs main )  =  
+  checkDuplFuncs funcs ++ 
+  concatMap checkDuplParams funcs ++ 
+  concatMap checkFuncParamClash funcs 
+
+ 
+-- | Check for semantic errors in a function
+checkFuncParamClash :: Func -> [ SemanticError ]
+checkFuncParamClash func = 
+  let diffName ( Param _ pname )  =  pname /= nameOf func
+      isUnique =  and . map diffName $ paramsOf func 
+  in  if isUnique 
+      then [] 
+      else [ "Function and parameter share the same name @" ++ nameOf func ] 
+
+
+checkDuplParams :: Func -> [ SemanticError ]
+checkDuplParams func = 
+  let genErr ps = duplParam ( head ps ) ( length ps )
+      duplParam pname n = "Parameter " ++ pname ++ " defined " ++ show n ++ " times!"
+      getName ( Param _ pname ) = pname
+  in  map genErr . filter ( (<) 1 . length ) . group . sort . map getName $ paramsOf func
+  
+
+checkDuplFuncs :: [ Func ] -> [ SemanticError ] 
+checkDuplFuncs funcs =  
+  let genErr fs = duplFunc ( head fs ) ( length fs )
+      duplFunc fname n = "Function " ++ fname ++ " defined " ++ show n ++ " times!"
+  in  map genErr . filter ( (<) 1 . length ) . group . sort . map nameOf $ funcs
+  
+ 
+
+
+
+
+
+
+
+checkStat = undefined

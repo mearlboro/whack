@@ -79,9 +79,9 @@ addObject name otype ctx table  =
 
 -- | Handle case of re-declaration of a variable already declared
 onClash          :: ( IdentObj -> IdentObj -> IdentObj )
-onClash new old  =  
-    error $ "Identifier Declared Twice In The Same Scope: " ++ 
-            show new ++ "->" ++ show old
+onClash new old  =  new
+    --error $ "Identifier Declared Twice In The Same Scope: " ++ 
+    --        show new ++ "->" ++ show old
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
