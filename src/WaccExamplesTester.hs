@@ -1,10 +1,5 @@
 module WaccExamplesTester where
 
-import WaccParser
-import WaccLanguageDef
-import WaccDataTypes
-import WaccSemantics
-
 import Text.Parsec.Token
 import Text.ParserCombinators.Parsec
 import Control.Monad.IO.Class ( liftIO )
@@ -13,6 +8,12 @@ import Data.List
 import Control.Applicative
 import Control.Monad
 import System.FilePath ( (</>) )
+
+import WaccParser
+import WaccLanguageDef
+import WaccDataTypes
+import WaccSemAugmenter
+import WaccSemChecker
 
 --------------------------------------------------------------------------------
 

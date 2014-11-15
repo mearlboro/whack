@@ -1,4 +1,4 @@
-module WaccDataTypes where -- TODO rename into WaccTypes
+module WaccDataTypes where -- TODO rename into WaccTypes ?
 
 import Data.Map ( Map (..) )
 
@@ -12,11 +12,6 @@ data Program                                     -- <program> ::=
   = Program [ Func ] Stat                        -- 'begin' <func>* <stat> 'end'   
   deriving ( Eq , Ord )   
  
- 
---data Func                                        -- <func> ::= 
---  = Func Type IdentName ParamList Stat It        -- <type> <ident> '(' <param-list>? ')' 'is' <stat> 'end'  
---  deriving ( Eq , Ord )   
-  
 
 data Func                                         -- <func> ::= 
   = Func                                          -- <type> <ident> '(' <param-list>? ')' 'is' <stat> 'end'  
@@ -30,11 +25,11 @@ data Func                                         -- <func> ::=
 type ParamList = [ Param ]                       -- <param-list> ::= <param> (';' <param>)*   
    
  
---type Param = ( Type , IdentName)
--- TODO make into a type synonym
+-- TODO make into a type synonym ?
+-- type Param = ( Type , IdentName )
 data Param                                       -- <param> ::=
-  = Param
-  { ptypeOf :: Type              -- <type> <ident>   
+  = Param                                        -- <type> <ident> 
+  { ptypeOf :: Type                                
   , pnameOf :: IdentName
   } deriving ( Eq , Ord )  
 
@@ -174,7 +169,7 @@ type IdentTable = SymbolTable IdentName IdentObj
 
 
 -- | An identifier may appear in a program as a Variable name, Function name 
---   or Parameter name. In case of a funcion we save the actual Function object
+--   or Parameter name. In case of a funcion we save the actual Func object
 data Context 
   = Variable 
   | Function Func 

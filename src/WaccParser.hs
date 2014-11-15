@@ -58,7 +58,7 @@ pFunc = do
             ScopedStat  s        -> returnsOrExits s        
             WhileStat   _ s _    -> returnsOrExits s
             SeqStat     _ s      -> returnsOrExits s
-            IfStat      e s s' _ -> and $ map returnsOrExits [ s , s' ]
+            IfStat      _ s s' _ -> and $ map returnsOrExits [ s , s' ]
             _                    -> False 
     
     if   returnsOrExits body 
