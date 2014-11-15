@@ -8,7 +8,6 @@ import Data.Map ( Map (..) )
 
 -- TODO fit each comment into 80 chars
 
-
 data Program                                     -- <program> ::=
   = Program [ Func ] Stat                        -- 'begin' <func>* <stat> 'end'   
   deriving ( Eq , Ord )   
