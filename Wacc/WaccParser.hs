@@ -17,10 +17,10 @@ import Control.Monad.Fix
 
 
 -- |3.1.1 Program .......................................................  28 --    
--- |3.1.2 Statements ....................................................  85 -- 
--- |3.1.3 Types ......................................................... 206 -- 
--- |3.1.4 Expressions ................................................... 246 -- 
--- |3.1.5 Identifiers, literals ......................................... 312 -- 
+-- |3.1.2 Statements ....................................................  86 -- 
+-- |3.1.3 Types ......................................................... 208 -- 
+-- |3.1.4 Expressions ................................................... 248 -- 
+-- |3.1.5 Identifiers, literals ......................................... 314 -- 
 
 -- | Utils .............................................................. 365 --
 -- | Test parser ........................................................ 392 --
@@ -67,6 +67,7 @@ pFunc = do
 		else fail "No Reachable Return/Exit Statement" 
 
 
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <param-list> ::= <param> (',' <param>)* ::::::::::::::::::::::::::::::: --
 pParamList :: Parser ParamList
 pParamList = waccCommaSep pParam
@@ -189,10 +190,12 @@ pAssignRhs = choice
           args  <- waccParens pArgList
           return $ RhsCall fname args
 
+
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 -- :: <arg-list> ::= <expr> (',' <expr>)* ::::::::::::::::::::::::::::::::::: --
 pArgList :: Parser ArgList
 pArgList = waccCommaSep pExpr
+
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <pair-elem> ::= 'fst' <expr> | 'snd' <expr' ::::::::::::::::::::::::::: --
@@ -206,14 +209,14 @@ pPairElem
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <type> ::= <base-type> | <array-type> | <pair-type> ::::::::::::::::::: --
--- |For easier management of datatypes, they are represented linearly.
 
+-- |For easier management of datatypes, they are represented linearly.
 pType :: Parser Type
 pType = do 
     base  <-  pBaseType 
           <|> pPairType
-    fix ( \f -> (string "[]" >> fmap ArrayType f ) 
-          <|> return base)
+    fix ( \f  -> ( string "[]" >> fmap ArrayType f ) 
+             <|> return base )
 
         where
 
@@ -328,6 +331,7 @@ pBoolLiter
     =  pWaccWord "true" True 
    <|> pWaccWord "false" False 
 
+
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <char-liter> ::= ''' <char> ''' ::::::::::::::::::::::::::::::::::::::: --
 pCharLiter :: Parser CharLiter
@@ -337,12 +341,11 @@ pCharLiter = do
     if c `elem` "\\\"\'"     -- If char was one of "\' 
         then do char  '\''   -- Then make sure it was escaped correctly
                 char  '\\'
-                oneOf "\\\"\'"
+                oneOf "\\\"\'\0\n\r\t"
                 char  '\''
                 waccWhiteSpace
                 return c
         else do waccCharLiter >>= return 
-
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
