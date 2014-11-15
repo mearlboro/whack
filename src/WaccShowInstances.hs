@@ -6,16 +6,17 @@ import Data.List  ( intersperse )
 import Data.Maybe ( fromJust    )
 import Data.Map   ( toList      )
 
+
 showMany       :: Show a => [ a ] -> [ Char ] -> [ Char ]
 showMany xs i  =  concat . intersperse i . map show $ xs
 
 
 instance Show Program where
   show ( Program funcs main ) = 
-    "begin\n"                     ++ 
-      showMany funcs "\n" ++ "\n" ++ 
-      show' "\t" main             ++ 
-    "\nend"
+    "begin\n\n"                     ++ 
+      showMany funcs "\n\n" ++ "\n\n" ++ 
+      show' "" main             ++ 
+    "\n\nend"
 
 
 instance Show Func where
@@ -29,7 +30,7 @@ instance Show Param where
 
 instance Show Context where
   show Variable       = "•"
-  show ( Function _ ) = "ƒ "
+  show ( Function _ ) = "ƒ"
   show Parameter      = "¶"
 
 show' :: [ Char ] -> Stat -> [ Char ]
@@ -138,10 +139,10 @@ showTable table =
     ST st    m -> showTable st ++ "|" ++ show' m 
   where
     show' :: Dictionary -> [ Char ]
-    show' m = concat . intersperse "-" . map show'' . toList $ m
+    show' m = concat . intersperse " " . map show'' . toList $ m
       where 
         show'' ( name , ( ttype , ctx ) ) =
-          show ctx ++ name ++ ":" ++ show ttype 
+          show ctx ++ name -- ++ ":" ++ show ttype 
 
 
 

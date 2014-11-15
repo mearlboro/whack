@@ -31,10 +31,13 @@ data Func                                         -- <func> ::=
 type ParamList = [ Param ]                       -- <param-list> ::= <param> (';' <param>)*   
    
  
+--type Param = ( Type , IdentName)
 -- TODO make into a type synonym
 data Param                                       -- <param> ::=
-  = Param Type IdentName                         -- <type> <ident>                                          
-  deriving ( Eq , Ord )  
+  = Param
+  { ptypeOf :: Type              -- <type> <ident>   
+  , pnameOf :: IdentName
+  } deriving ( Eq , Ord )  
 
 
 data Stat                                        -- <stat> ::=

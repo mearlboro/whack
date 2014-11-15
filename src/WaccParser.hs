@@ -33,7 +33,7 @@ pProgram :: Parser Program
 pProgram = do
     waccWhiteSpace
     waccReserved "begin"
-    funcs <- many $ try pFunc 
+    funcs <- many ( try pFunc <?> "func" ) 
     waccWhiteSpace
     body  <- pStat
     waccReserved "end"
@@ -44,7 +44,7 @@ pProgram = do
 -- :: <func> ::= <type> <ident> '(' <param-list>? ')' 'is' <stat> 'end' ::::: --
 pFunc :: Parser Func
 pFunc = do
-    ftype  <- pType
+    ftype  <- pType <?> "type"
     waccWhiteSpace
     name   <- waccIdentifier
     params <- waccParens pParamList
@@ -59,13 +59,13 @@ pFunc = do
             ScopedStat  s        -> returnsOrExits s        
             WhileStat   _ s _    -> returnsOrExits s
             SeqStat     _ s      -> returnsOrExits s
-            IfStat      e s s' _ -> and $ map returnsOrExits $ s:s':[]
+            IfStat      e s s' _ -> and $ map returnsOrExits [ s , s' ]
             _                    -> False 
-
+    
     if   returnsOrExits body 
     then return $ Func ftype name params body Empty
     else fail "No Reachable Return/Exit Statement" 
-
+    
 
 -- :: <param-list> ::= <param> (',' <param>)* ::::::::::::::::::::::::::::::: --
 pParamList :: Parser ParamList
