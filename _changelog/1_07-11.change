@@ -1,0 +1,49 @@
+Changelog-1-7.11.2014 
+
+-------------------------------------------------------------------------------
+1. Cleanups
+- added a structure to the files, with title comments, table of contents etc
+- aligned, indented, removed whitespace in all files
+- removed list of tokens from WaccDataTypes.hs
+
+
+2. Additions/changes
+-------------------------------------------------------------------------------
+   A. WaccDataTypes.hs
+      A.1 Removed IntSign.
+
+      A.2 Removed the pairElemType Type. PairType is now Maybe (Type, Type). 
+
+   B. WaccLanguageDef.hs
+      B.1 Added waccBrackets, waccComma, waccBraces, waccComaSep, waccSemiSep etc.
+
+      B.2 Added opStart and opLetter 
+
+   C. WaccParser.hs
+      C.1 Removed IntSign. WaccInteger deals with a number with either +,- or no 
+          sign in front. Now using only WaccInteger for parsing ints.
+
+      C.2 Replaced occurences of char ',' with waccCommaSep.
+
+      C.3 Replaced occurences of char '[', char '(' etc with waccParens, waccBrackets. 
+
+      C.4 Removed pComment because comments don't appear in AST. Token.commentLine 
+          in WaccLanguageDef.hs deals with it.
+
+      C.5 Added pArgList.
+
+      C.6 Fixed bug/pPairType/1.
+          Removed the pairElemType Type. PairType is now Maybe (Type, Type). The
+          pPairElemType is now just a helper function for pPairType, since it's 
+          not a standalone type anymore. 
+          In the type definition "pair(int, pair)", the AST will be 
+          "Just (TypeBase IntBaseType, TypePair Nothing)".
+          Will be helpful when trying to retrieve type information for the nested
+          pairs, having an actual TypePair type.
+
+      C.7 Implemented pStrLiter and pCharLiter using haskellDef language definition.
+
+
+3. Testing
+-------------------------------------------------------------------------------
+- improved test library with tests for all literals

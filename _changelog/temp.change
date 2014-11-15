@@ -1,0 +1,35 @@
+Changelog-#number#-#date dd.mm.yyyy# 
+
+--------------------------------------------------------------------------------
+1. Cleanups
+- ..
+
+2. Additions/changes
+-------------------------------------------------------------------------------
+  A. Main.hs
+     A.1 ..
+
+  B. Wacc/WaccDataTypes.hs
+     B.1 ..
+
+  C. Wacc/WaccLanguageDef.hs
+     C.1 ..
+
+  D. Wacc/WaccParsers.hs
+     D.1 ..
+
+  E. Wacc/WaccSymbolTable.hs
+     E.1 ..
+
+  F. Wacc/WaccSemantics.hs
+     F.1 ..
+
+  G. #new_file#
+     ..
+
+3. Testing
+-------------------------------------------------------------------------------
+- ..
+
+
+
