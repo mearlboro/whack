@@ -1,4 +1,4 @@
-7.11.2014 
+MILESTONE I
 
 -- Improvements
 -------------------------------------------------------------------------------
@@ -30,15 +30,17 @@ P1     | TODO(bug/unop/1)  make neg operator appliable several times
 
 
 
-FIXED  | TODO(bug/paramList/1) unexpected ',' when trying to parse "int a, int b"            
+FIXED  | TODO(bug/paramList/1)  unexpected ',' when trying to parse "int a, int b"            
 
-FIXED  | TODO(bug/pStat/1) unexpected ';' when trying to parse "skip; skip"            
+FIXED  | TODO(bug/pStat/1)      unexpected ';' when trying to parse "skip; skip"            
+
+FIXED  | TODO(bug/pStat/2)      Infinite loops because of whitespace.
+
+FIXED  | TODO(bug/pPairType/1)  unexpected token when "pair(int,pair)"
+
+FIXED  | TODO(bug/pArrayType/1) infinite loop when parsing non existent type or "".
+
+FIXED  | TODO(bug/charLiter/1)  should fail at '"'
 
 
-FIXED  | TODO(bug/pPairType/1) unexpected token when "pair(int,pair)"
 
-
-FIXED  | TODO(bug/pArrayType/1) infinite loop when parsing non existent type
-
-
-FIXED  | TODO(bug/infinite_loop/3/pStat) Infinite loops because of whitespace.

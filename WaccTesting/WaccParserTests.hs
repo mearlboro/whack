@@ -191,7 +191,7 @@ tExpr
     , ( "a / 21"        , True  )
     , ( "True && x"     , True  )
 -- TODO: resolve multiple use of NegUnOp, should be valid!
---  , ( "----1"         , True  ) 
+    , ( "----1"         , True  ) 
     , ( "1 + "          , False )
     , ( " x / && y "    , False )
     , ( "1 = 2"         , False )

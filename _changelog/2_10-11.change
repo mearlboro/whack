@@ -1,0 +1,44 @@
+Changelog-2-10.11.2014 
+
+--------------------------------------------------------------------------------
+1. Cleanups
+- replaced the <|> operator with choice [ .. ]
+- indented code, moved local functions to where statements, cleanups, renaming
+
+
+2. Additions/changes
+-------------------------------------------------------------------------------
+  A. WaccDataTypes.hs
+     B.1 Changed ArrayElem definition to a multi-dimensional one: 
+         ArrayElem Ident [ Expr ]   
+
+  B. WaccLanguageDef.hs
+     A.1 Added waccSemiSep1 waccCommaSep1 waccOperators waccLexeme    
+ 
+     A.2 Removed Token.opstart and Token.opLetter from language def.
+
+  C. WaccParsers.hs
+     C.1 Added waccWhiteSpace in all statements, functions, programs, params.
+	 Fixed bug/pStat/2.
+
+     C.2 Removed pSeq stat, now parsing sequences of statements with waccSemiSep.
+         Fixed bug/pStat/1.
+
+     C.3 Changed implemetation of pType. Now checks for a baseType (either base or
+         pair) and then counts whether there are any array dimensions (i.e. counts 
+         pairs of "[]"). 
+         Fixed bug/pArrayType/1
+
+     C.4 Added waccWhitespace to pParamList. 
+         Fixed bug/paramList/1.
+
+     C.5 Range check for integer.
+
+     C.6 Checks whether functions have a return statement.
+
+     C.7 Added try where necessary and removed the redundant ones.
+
+3. Testing
+-------------------------------------------------------------------------------
+- added more tests for each liter + types + array elem + param + prog + stat + func
+- added wacExamplesTester library for testing .wacc files in the provided examples
