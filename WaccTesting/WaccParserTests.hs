@@ -15,7 +15,6 @@ import Text.ParserCombinators.Parsec
 
 
 --------------------------------------------------------------------------------
-
 -- Tests for literals and identifiers
 
 -- |Note: the apparently redundant literal tests are design to check whether the
@@ -111,10 +110,10 @@ tPairLiter
     , ( "nulla "   , False )
     , ( "Null "    , False ) ]
 
--- TODO: identifiers
 
-
+--------------------------------------------------------------------------------
 -- Tests for statements
+
 tStat
   = [ ( "skip"                             ,  True  )
     , ( "int x = 10"                       ,  True  )
@@ -143,21 +142,107 @@ tStat
     , ( "skip ; skip skip; "               ,  False )  ]
 
 
+--------------------------------------------------------------------------------
+-- Tests for types
+
+tBaseType
+  = [ ( "int    "   , True ) 
+    , ( "bool   "   , True  ) 
+    , ( "string "   , True  )
+    , ( "char   "   , True  )
+    , ( ",char   "  , False ) 
+    , ( "achar   "  , False ) 
+    , ( ""          , False ) 
+    , ( ""          , False ) ]
+
+
+tPairType
+  = [ ( "pair(int, int)"           , True  )
+    , ( "pair(pair, int)"          , True  )
+    , ( "pair(int, bla)"           , False )
+    , ( "pair(int, pair(int,int))" , False )
+    , ( "pair(int, )"              , False )
+    , ( "pair(,)"                  , False )
+    , ( "pair()"                   , False )
+    , ( "newpair(int, int)"        , False )
+    , ( "pair(1,2)"                , False ) ]
+
+
+tArrayType 
+  = [ ( "int[][]"                          ,  True  )
+    , ( "bool[][][][]"                     ,  True  ) 
+    , ( "pair (pair ,   pair)[][]"         ,  True  ) 
+    , ( "pair(pair(char,int)[], pair)[][]" ,  False ) 
+    , ( "int["                             ,  False ) 
+    , ( "int[][]["                         ,  False ) 
+    , ( "int[10]"                          ,  False ) ] 
+
+
+--------------------------------------------------------------------------------
 -- Tests for expressions
 
--- |For Int, Bool, Char, Str, Pair literals see Section 3.2.1 Literals
--- TODO:
+-- |For Int, Bool, Char, Str, Pair literal expressions see "Literals" (Ln 18)
 
--- Tests for programs and function
--- TODO:
+tExpr 
+  = [ ( "1 + 2 - 18 / 9", True  )
+    , ( "-a"            , True  )
+    , ( "len a"         , True  )
+    , ( "chr ord 'a'"   , True  )
+    , ( "a / 21"        , True  )
+    , ( "True && x"     , True  )
+-- TODO: resolve multiple use of NegUnOp, should be valid!
+--  , ( "----1"         , True  ) 
+    , ( "1 + "          , False )
+    , ( " x / && y "    , False )
+    , ( "1 = 2"         , False )
+    , ( "&& 6"          , False ) ]
+
+tArrayElem 
+  = [ ( "hello[1] "        ,  True  ) 
+    , ( "a[1+1] "          ,  True  ) 
+    , ( "b[a]"             ,  True  ) 
+    , ( "b[a[a]]"          ,  True  )
+    , ( "b[1][a][b][c][d]" ,  True  ) 
+    , ( "b[true]"          ,  True  ) 
+    , ( "b [true] "        ,  True  )
+    , ( "b [true][a] [d]"  ,  True  )
+    , ( "b[1][]"           ,  False ) 
+    , ( "a[] "             ,  False ) ]
+
+
+--------------------------------------------------------------------------------
+-- Tests for parameters
+
+tParam
+  = [ ( "int asd1"         , True  ) 
+    , ( "char a "          , True  ) 
+    , ( "bool[][] _i"      , True  )
+    , ( "bool _"           , True  )
+    , ( "pair(int, char) p", True  )
+    , ( "int[] a"          , True  )
+    , ( "int    "          , False ) 
+    , ( "bool[] , "        , False )
+    , ( "@bool _"          , False )
+    , ( "char a b"         , False )
+    , ( "pair x"           , False ) ]
+  
+
+tParamList 
+  = [ ( "int a , bool b, int z"   , True  ) 
+    , ( "int g"                   , True  )
+    , ( "int g , char xx, bool e" , True  )
+    , ( "int g , "                , False )
+    , ( "int g , bool zz,,"       , False )
+    , ( "int g , bool "           , False )
+    , ( "int g ; bool a"          , False ) ]
 
 
 
-
--- :: Unit Test Framework ::::::::::::::::::::::::::::::::::::::::::::::::::: --
+--------------------------------------------------------------------------------
 
 -- |Runs all tests, grouped by parser and outputs for each whether all the tests
 -- have passed. Will display details only for the failed tests.
+
 runAll = do
     runTests "pBoolLiter"  pBoolLiter  tBoolLiter
     runTests "pIntLiter"   pIntLiter   tIntLiter
@@ -166,12 +251,24 @@ runAll = do
     runTests "pPairLiter"  pPairLiter  tPairLiter
     runTests "pArrayLiter" pArrayLiter tArrayLiter
     
-    runTests "pStat"       pStat       tStat
- 
+    runTests "pStatement"  pStat       tStat
+
+    runTests "BaseType"    pType       tBaseType
+    runTests "PairType"    pType       tPairType
+    runTests "ArrayType"   pType       tArrayType
+
+    runTests "pExpression" pExpr       tExpr
+    runTests "pArrayElem"  pArrayElem  tArrayElem
+
+    runTests "pParameter"  pParam      tParam
+    runTests "pParamList"  pParamList  tParamList
+    
+
       where
 
           -- |Runs the parser test for all pairs in the list
           runTests fname parser tests = do
+
               -- number of passed tests
               let p = length $ filter (verifyTest fname parser) tests
               -- total number of tests
