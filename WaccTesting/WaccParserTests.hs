@@ -266,7 +266,7 @@ runAll = do
 
       where
 
-          -- |Runs the parser test for all pairs in the list
+          -- |Runs the parser test for all pairs in the list.
           runTests fname parser tests = do
 
               -- number of passed tests
@@ -285,25 +285,37 @@ runAll = do
                       ++ show p ++ "/" ++ show t ++ "\n"
                       ++ ( concatMap ( runTest fname parser ) tests )
 
-          -- |Verifies if an individual pair test passed
+          -- |Verifies whether an individual pair test passed.
           verifyTest fname parser ( input , pass )
               = case parseWithEof parser input of
                   Left  e -> not pass
                   Right r -> pass
 
--- |Runs a test individually. To be used when testing individual pairs in the
--- command line.
+-- |Runs a test individually. Gets details only at failure. 
 runTest :: (Show a) => [Char] -> Parser a -> ([Char], Bool) -> [Char]
 runTest fname parser ( input , pass )
     = case parseWithEof parser input of
         Left  e -> log $ if not pass then ""
-                         else "pass (" ++ show e ++ ")"
+                         else "fail but (" ++ show e ++ ")"
         Right r -> log $ if pass     then ""
-                         else "fail (" ++ show r ++ ")"
+                         else "pass but (" ++ show r ++ ")"
       where
           log msg
             | msg == "" = ""
             | otherwise = "FAIL!  " ++ fname ++ " \t" ++ input
                              ++ " \t: should " ++ msg ++ "\n"
+
+
+--------------------------------------------------------------------------------
+
+-- |Runs a test individually. To be used when testing individual pairs in the
+-- command line. Prints all details.
+runDetails :: (Show a) => Parser a -> ([Char], Bool) -> IO () 
+runDetails parser ( input , pass )
+    = case parseWithEof parser input of
+        Left  e -> putStrLn $ if not pass then "Pass! ("     ++ show e ++ ")"
+                              else "Fail! Should pass but (" ++ show e ++ ")"
+        Right r -> putStrLn $ if pass     then "Pass! ("     ++ show r ++ ")"
+                              else "Fail! Should fail but (" ++ show r ++ ")"
 
 
