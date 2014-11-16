@@ -9,192 +9,369 @@ import Control.Monad              ( when                                      )
 
 import WaccDataTypes
 import WaccSymbolTable
+import WaccSemAugmenter
+import WaccShowInstances
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: Program Semantic Analisys ::::::::::::::::::::::::::::::::::::::::::::: --
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- ************************************************************************** --
+-- *************************                       ************************** --
+-- *************************   Program Semantics   ************************** --
+-- *************************                       ************************** -- 
+-- ************************************************************************** --
 
--- | Check for semantic errors in a program BEFORE it is augmented 
-checkProgram                         :: Program -> [ SemanticError ]
-checkProgram ( Program funcs main )  =  
-  checkDuplFuncs                funcs ++ 
-  concatMap checkDuplParams     funcs ++ 
-  concatMap checkFuncParamClash funcs 
-
-
--- | Check that there is no paramter that shares the function name
-checkFuncParamClash                             :: Func -> [ SemanticError ]
-checkFuncParamClash ( Func _ fname plist _ _ )  = 
-  if   not . and . map ( (/=) fname . pnameOf ) $ plist
-  then [ "Function and parameter share the same name @" ++ fname ] 
-  else [] 
-
-
--- | Check for duplicate parameter names in a funcion parameter list
-checkDuplParams  :: Func -> [ SemanticError ]
-checkDuplParams  = reportDupl "Parameter " . map pnameOf . paramsOf  
-  
-
--- | Check for duplicate funcion names in a program
-checkDuplFuncs  :: [ Func ] -> [ SemanticError ] 
-checkDuplFuncs  =  reportDupl "Function " . map nameOf  
-  
-
--- | Check for duplicate elements in a list and output a semantic error message
-reportDupl    :: String -> [ String ] -> [ SemanticError ]
-reportDupl t  =  map ( logDupl t ) . filter ( (<) 1 . length ) . group . sort
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Check for semantic errors in a program. Check for duplicate functions, and 
+-- for each function check for duplicate parameter names and parameter-function
+-- name clashes. If there are errors we stop here. Reason being that agumenting 
+-- the program when there are duplicate identifiers will overwrite existing 
+-- identifiers in the tables resulting in inaccurate semantic error messages.
+-- If there are no errors we proceed and augment the program and check each 
+-- function body and the main body for semantic errors. 
+checkProgram                           :: Program -> [ SemanticErr ]
+checkProgram prog@( Program funcs _ )  = 
+    if null duplicateErrs then statementErrs else duplicateErrs
   where
-    logDupl t l = t++" "++(head l)++" defined "++(show$length l)++" times!" 
+    Program funcs' main  =  augmentProgram prog
+    statementErrs        =  concatMap checkStat ( map bodyOf funcs' ) ++
+                            checkStat main 
+    duplicateErrs        =  checkFuncs            funcs ++ 
+                            concatMap checkParams funcs ++ 
+                            concatMap checkClash  funcs
 
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: Statement Semantic Analisys ::::::::::::::::::::::::::::::::::::::::::: --
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Check that there is no parameter that shares its function name
+checkClash                             :: Func -> [ SemanticErr ]
+checkClash ( Func _ name params _ _ )  =
+    checkDupl "Parameter Clash @" $ [ name ] ++ map pnameOf params 
 
----- | Check semantics of a statement 
---checkStat       :: STAT -> SemanticErr 
---checkStat stat  =  case stat of 
---    SkipStat                                     -> Nothing
-      
---    FreeStat      (PairLiterExpr pair)  scope    -> checkExpr (PairLiterExpr pair) scope
---    FreeStat      (ArrayElemExpr arr)   scope    -> checkExpr (ArrayElemExpr arr)  scope
---    FreeStat      _ _                            -> Just "Cannot free that type of memory"                
-      
---    ReturnStat    expr  scope                    -> error "TODO"   
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Check for duplicate parameter names in a function parameter list
+checkParams  :: Func -> [ SemanticErr ]
+checkParams  =  checkDupl "Duplicate Parameter @" . map pnameOf . paramsOf  
   
---    ExitStat      expr  scope                    -> do  
---      let err = checkExpr expr scope
---      if (isNothing err) 
---        then do
---          let eType = getTypeExpr expr scope
---          if(eType /= IntType) 
---            then return "Exit Statement expects int type"
---            else Nothing
---        else err
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Check for duplicate function names in a program
+checkFuncs  :: [ Func ] -> [ SemanticErr ] 
+checkFuncs  =  checkDupl "Duplicate Function @" . map nameOf  
   
---    PrintStat     expr  scope                    -> checkExpr expr scope                
---    PrintlnStat   expr  scope                    -> checkExpr expr scope
-       
---    ScopedStat    stat                           -> checkStat stat  
 
---    ReadStat      (LhsIdent  ident)   scope      -> checkExpr (IdentExpr ident) scope
---    ReadStat      (LhsPairElem (Fst expr)) scope -> checkExpr expr scope  
---    ReadStat      (LhsPairElem (Snd expr)) scope -> checkExpr expr scope
---    ReadStat      (LhsArrayElem arrayElem) scope -> checkExpr (ArrayElemExpr arrayElem) scope
-
---    WhileStat     expr  body  scope              -> do
---      let err = checkExpr expr scope 
---      if (isNothing err) 
---        then do
---          let eType = getTypeExpr expr scope
---          if(eType /= BoolType) 
---            then return "Conditional expression should be of type Bool" 
---            else checkStat body
---        else err
-
---    SeqStat       stat  stat'                    -> do
---      let err = checkStat stat
---      err' <- checkStat stat' 
---      if (isJust err) 
---        then err
---        else return err'
-    
---    AssignStat    lhs   rhs   scope              -> error "TODO"          
-    
---    IfStat        expr  sthen selse scope        -> do
---      let err = checkExpr expr scope
---      if(isNothing err)
---        then do
---          let eType = getTypeExpr expr scope
---          if(eType /= BoolType)
---            then return "Conditional expression should be of type Bool"
---            else checkStat (SeqStat sthen selse)
---        else err
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Check for duplicate elements in a list and output a semantic error message
+checkDupl      :: String -> [ String ] -> [ SemanticErr ]
+checkDupl msg  =  map ( (++) msg. head ). filter ( (<) 1. length ). group. sort
 
 
+-- ************************************************************************** --
+-- ************************                         ************************* --
+-- ************************   Statement Semantics   ************************* --
+-- ************************                         ************************* -- 
+-- ************************************************************************** --
 
---checkAssignRhs  :: AssignRhs -> Scope -> SemanticErr
---checkAssignRhs assignRhs scope = case assignRhs of
---    RhsExpr       expr        scope         ->  checkExpr expr scope  
---    RhsPairElem   (Fst expr)  scope         ->  checkExpr expr scope  
---    RhsPairElem   (Snd expr)  scope         ->  checkExpr expr scope 
---    RhsArrayLiter exprs       scope         ->  do
---      let checkedExps = map (`checkExpr` scope) exprs
---      let typeExpr    = map (`getTypeExpr` scope) exprs
---      if(all (==Nothing) checkExpr && all (==head typeExpr) typeExpr) --all exprs have to be correct and have the same type 
---        then Nothing
---        else return "Array literal error" 
-
---    RhsNewPair    expr expr'  scope         ->  do
---      let err  = checkExpr expr  scope
---      let err' = checkExpr expr' scope
---      if(isJust err) 
---        then err
---        else err'
-
---    RhsCall       ident exprs scope         ->  do
---      let typeAndContext = findIdent' ident scope
---      if(isNothing typeAndContext) 
---        then return "Function identifier not found"
---        else do
---          let iContext = case snd (fromJust typeAndContext) of
---            Function (Func _ _ paramList _) -> do   
---              let typeExpr = map (`getTypeExpr` scope) exprs 
---              if(paramList == typeExpr)
---                then Nothing
---                else return "Function parameters have wrong types"
---            _                               -> return "Not a function" 
-
----- |Gets the type of an expression
---getTypeExpr :: Expr -> Scope -> Maybe Type
---getTypeExpr expr scope = case expr of
---    BoolLiterExpr     bool             -> BoolType 
---    CharLiterExpr     char             -> CharType   
---    IdentExpr         ident            -> fst (fromJust (findIdent ident scope))
---    UnaryOperExpr     NotUnOp    expr  -> BoolType
---    UnaryOperExpr     LenUnOp    expr  -> IntType
---    UnaryOperExpr     OrdUnOp    expr  -> IntType  
---    UnaryOperExpr     ChrUnOp    expr  -> CharType
---    UnaryOperExpr     NegUnOp    expr  -> IntType
---    ParenthesisedExpr expr             -> getTypeExpr expr scope   
---    IntLiterExpr      int              -> IntType   
---    StrLiterExpr      str              -> StringType   
---    PairLiterExpr     pair             -> NullType 
--- -- ArrayElemExpr     ArrayType (arrIdent exprs) -> ArrayType (findIdent arrIdent scope) TODO
-    
---    BinaryOperExpr AddBinOp _ _        -> IntType
---    BinaryOperExpr SubBinOp _ _        -> IntType                                  
---    BinaryOperExpr MulBinOp _ _        -> IntType                                   
---    BinaryOperExpr DivBinOp _ _        -> IntType                                    
---    BinaryOperExpr ModBinOp _ _        -> IntType                                    
---    BinaryOperExpr _        _ _        -> BoolType  
-        
--- |Gets the type of a RHS Assignment 
---getTypeAssignRhs :: AssignRhs -> Scope -> Type
---getTypeAssignRhs ass scope = case ass of 
---    RhsExpr       expr                 -> getTypeExpr expr scope
---    RhsPairElem   (Fst expr)           -> getTypeExpr expr scope 
---    RhsPairElem   (Snd expr)           -> getTypeExpr expr scope 
---  | RhsArrayLiter ArrayLiter                    -- <array-liter>
---  | RhsNewPair    Expr       Expr               -- 'newpair' '(' <expr> ',' <expr> ')'
---  | RhsCall       Ident      ArgList            -- 'call' <ident> '(' <arg-list>? ')'
-        
--- Nothing means no semantic error, Just contains the semantic error message
-type SemanticErr = Maybe String 
-
-printError      :: SemanticErr -> IO ()
-printError err  =  putStrLn $ case err of
-    Nothing  -> "No Semantic Errors"
-    Just msg -> "SemanticError: " ++ msg 
-
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: Testing ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
-
-type SemanticError = [ Char ]
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Semantic check for a Stat
+checkStat 
+  :: Stat            -- Given an augmented statement
+  -> [ SemanticErr ] -- Return a bunch of SemanticErr's (or none)
 
 
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Skip statement
+checkStat SkipStat  =  error "TODO"
 
 
-checkStat = undefined
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- A Free statement can only free a *variable* that points to a *pair* or to an
+-- *array* type. So we pattern match to capture an IdentExpr and check that it
+-- is a Variable or a Paramteer and that it is of type array or pair
+checkStat s@( FreeStat expr@( IdentExpr _ ) it )  =  error "TODO"
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Any attempt to free another kind of expression is invalid
+checkStat s@( FreeStat _ _ )  =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- A Return statement must not appear inside the main function body and it must 
+-- evaluate to a result that is the same type of the result of the function
+-- it appears in
+checkStat s@( ReturnStat expr it )  =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- An Exit statement must evaluate to a value of type integer 
+checkStat s@( ExitStat expr it )  =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- A Print statement is legal as long as it doesn't use undefined identifiers
+checkStat s@( PrintStat expr it )  =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Semantic rules identical to those of PrintStat
+checkStat s@( PrintlnStat expr it )  =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- For a Scoped statement we check the enclosed statement
+checkStat ( ScopedStat stat )  =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- For a Read statement we check semantic errors in its lhs expression
+checkStat s@( ReadStat lhs it )  =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- A While statement requires the condition expression to be of BoolType
+checkStat ( WhileStat cond body it )  =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Sequential checking of statements
+checkStat ( SeqStat stat stat' )  =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- For an If statement the condition must be bool
+checkStat ( IfStat cond sthen selse it )  =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Not an easy one
+checkStat s@( AssignStat lhs rhs it ) =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Check for redeclarations in the same scope
+checkStat s@( DeclareStat vtype name rhs it )  =  error "TODO"
+
+
+-- ************************************************************************** --
+-- ***************************                   **************************** --
+-- ***************************   LHS Semantics   **************************** --
+-- ***************************                   **************************** -- 
+-- ************************************************************************** --
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- | Semantic check for AssignLhs
+checkAssignLhs :: AssignLhs -> It -> [ Context ] -> [ Type ] -> [ SemanticErr ]
+checkAssignLhs lhs it ctxs types  =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- A PairElem is either `fst` or `snd` of some expression. The only valid 
+-- expressions are identifier expressions and array element expressions.
+-- In both cases they must point to an identifier of PairType
+checkPairElem :: PairElem -> It -> [ Context ] -> [ Type ] -> [ SemanticErr ]
+checkPairElem pelem it _ctxs types =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- For an ArrayElem we first check that the identifier has been declared, then
+-- we count the number of dimensions on exprs and check that the obtained type
+-- matches one of the expected types. We also check that all exprs representing
+-- the indices, evaluate to integers
+checkArrayElem  :: ArrayElem -> It -> [ Context ] -> [ Type ] -> [ SemanticErr ]
+checkArrayElem aelem@( ArrayElem ident exprs ) it ctxs types  =  error "TODO"
+
+
+-- ************************************************************************** --
+-- ******************************               ***************************** --
+-- ******************************   LHS Types   ***************************** --
+-- ******************************               ***************************** -- 
+-- ************************************************************************** --
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Get the type of a lhs assignment
+getLhsType         :: AssignLhs -> It -> Maybe Type
+getLhsType lhs it  =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Get the type of a pair element. We try to check the containing expression
+-- and it must be of type PairType. If it fails there's no type to return.
+-- Otherwise we can safely pattermatch on PairType and retrieve the pair 
+-- element type
+getPairElemType           :: PairElem -> It -> Maybe Type
+getPairElemType pelem it  =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Get the type of an array element. 
+getArrayElemType                               :: ArrayElem -> It -> Maybe Type
+getArrayElemType ( ArrayElem ident exprs ) it  =  error "TODO"
+
+
+-- ************************************************************************** --
+-- ************************                         ************************* --
+-- ************************   AssignRhs Semantics   ************************* --
+-- ************************                         ************************* -- 
+-- ************************************************************************** --
+
+checkAssignRhs 
+  :: AssignRhs       -- Similar to checkExpr, this is the rhs to check
+  -> It              -- The identifier table
+  -> [ Context ]     -- The expected contexts
+  -> [ Type ]        -- The expected types
+  -> [ SemanticErr ] -- Return a bunch of SemanticErr's (or none)
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Simple expression check here
+checkAssignRhs ( RhsExpr expr ) it ctxs types  =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Delegate the check to checkPairElem
+checkAssignRhs ( RhsPairElem pelem ) it ctxs types  =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- ArrayLiter only ever appears in AssignRhs, no need to create a separate
+-- function. Check that all the expressions in the ArrayLiter are valid.
+-- Then check that they are of the same type and of one of the types provided.
+-- Since AssignRhs only occurs in AssignStat and DeclareStat we are certain 
+-- that `types` will be a singleton list containing the array type, so we
+-- don't actually need to check explicitly that they are all of the same type
+checkAssignRhs ( RhsArrayLiter exprs ) it ctxs types  =  error "TODO"
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Once again, since AssignRhs only occurs in AssignStat and DeclareStat we are 
+-- certain that `types` is a singleton list containing a PairType. 
+checkAssignRhs ( RhsNewPair efst esnd ) it ctxs types  =  error "TODO"
+  
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Here we are calling a function so we need to check that the name provided
+-- refers to a function object that is in scope. Then check that the argument
+-- list of expressions evaluates to a list of types that matches the number and 
+-- the types of the parameters of the function we are calling. 
+checkAssignRhs rhs@( RhsCall fname args ) it ctxs types  =  error "TODO"
+
+
+-- ************************************************************************** --
+-- **************************                    **************************** --
+-- **************************   Expr Semantics   **************************** --
+-- **************************                    **************************** -- 
+-- ************************************************************************** --
+
+checkExpr 
+  :: Expr            -- Given an expression
+  -> It              -- And its identifier table
+  -> [ Context ]     -- In case of an IdentExpr, check that the identifier 
+                     -- appears as one of the contexes provided, where empty 
+                     -- list means any Context
+  -> [ Type ]        -- Check that the expression evaluates to one of the 
+                     -- expected types, where empty list means any Type
+  -> [ SemanticErr ] -- Return a bunch of SemanticErr's (or none)
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Simple literals are only checked against the exptected types
+checkExpr ( BoolLiterExpr _ ) _ _ types  =  error "TODO"
+checkExpr ( CharLiterExpr _ ) _ _ types  =  error "TODO"  
+checkExpr ( IntLiterExpr  _ ) _ _ types  =  error "TODO"
+checkExpr ( StrLiterExpr  _ ) _ _ types  =  error "TODO"
+checkExpr   PairLiterExpr     _ _ types  =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- For a ParenthesisedExpr we check the expression contained therein
+checkExpr ( ParenthesisedExpr expr ) it ctxs types  =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- For an IdentExpr we check that the identifier has beed declared and is 
+-- within scope. If it is we check for type and context as well.
+checkExpr ( IdentExpr ident ) it ctxs types  =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Let checkArrayElem do the job 
+checkExpr ( ArrayElemExpr arr ) it ctxs types  =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- For a UnaryOperExpr we make sure the unary operation returns one of the 
+-- expected types and also that the expression argument for the operator is 
+-- of the expected type needed by the operator itself
+checkExpr unop@( UnaryOperExpr op expr ) it ctxs types  =  error "TODO"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- For a BinaryOperExpr we make sure the binary operator returns one of the 
+-- expected types and also that the expression arguments for the operator  
+-- are of the expected type needed by the operator itself
+checkExpr binop@( BinaryOperExpr op expr expr' ) it ctxs types  =  error "TODO"
+
+
+-- ************************************************************************** --
+-- *************************                      *************************** --
+-- *************************   Error Generation   *************************** --
+-- *************************                      *************************** -- 
+-- ************************************************************************** --
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- A SemanticErr is just a string definitg the error message
+type SemanticErr  =  [ Char ]
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Given an error message and a predicate, puts the message in a singleton
+-- list if the pridicate fails, otherwise it returns the empty list
+toSemErr            :: String -> Bool -> [ SemanticErr ] 
+toSemErr msg True   =  [] 
+toSemErr msg False  =  [ msg ]
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Appends a statement to the error messages 
+onStat            :: Stat -> [ SemanticErr ] -> [ SemanticErr ]
+onStat stat errs  =  map ( \err -> show' "" stat ++ " -> " ++ err ) errs
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Appends an expression to the error messages 
+onExpr            :: Expr -> [ SemanticErr ] -> [ SemanticErr ]
+onExpr expr errs  =  map ( \err -> show expr ++ " -> " ++ err ) errs
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Given an input type and a list of expected types, will produce a single 
+-- semantic error in case of a type mismatch 
+checkType       :: Type -> [ Type ] -> [ SemanticErr ]
+checkType t ts  =  toSemErr errMsg ( null ts || any ( ~== t ) ts )
+  where 
+    errMsg  =  "Expecting Types: " ++ show ts ++ " | Found Type: " ++ show t
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Given an input context and a list of expected contexts, will produce a single 
+-- semantic error in case of a context mismatch 
+checkCtx      :: Context -> [ Context ] -> [ SemanticErr ]
+checkCtx c cs =  toSemErr errMsg ( null cs || any ( ~== c ) cs )
+  where
+    errMsg  =  "Expecting Ctxs: " ++ show cs ++ " | Found Ctx: " ++ str c
+
+    str   Variable      =  "Variable"  -- TODO eventually remove and derive Show
+    str   Parameter     =  "Parameter"
+    str ( Function _ )  =  "Function"
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- Given an identifier name and Maybe its associated identifier objcet, will
+-- produce a single semantic error in case the identifier object is Nothing
+checkFound           :: IdentName -> Maybe IdentObj -> [ SemanticErr ]
+checkFound name obj  =  toSemErr errMsg ( isJust obj )
+  where
+    errMsg  =  "Identifier Not Found @" ++ name 
+
+
+
+
+
+
 

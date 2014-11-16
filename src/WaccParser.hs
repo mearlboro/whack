@@ -265,8 +265,8 @@ pExpr = buildExpressionParser waccOperators pExpr'
             ,       liftM IntLiterExpr  pIntLiter
             ,       liftM CharLiterExpr pCharLiter
             ,       liftM StrLiterExpr  pStrLiter
-            ,       pWaccWord "null" PairLiterExpr 
             ,       liftM IdentExpr     waccIdentifier
+            ,       pWaccWord "null"    PairLiterExpr 
             , pBinaryOperExpr
             , pUnaryOperExpr 
             ] <?> "pExpr"
