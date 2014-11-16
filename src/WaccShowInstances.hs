@@ -14,15 +14,16 @@ showMany xs i  =  concat . intersperse i . map show $ xs
 instance Show Program where
   show ( Program funcs main ) = 
     "begin\n\n"                     ++ 
-      showMany funcs "\n\n" ++ "\n\n" ++ 
-      show' "" main             ++ 
+      showMany funcs "\n\n" ++ 
+      (if length funcs == 0 then "" else "\n\n") ++
+      show' "  " main             ++ 
     "\n\nend"
 
 
 instance Show Func where
   show ( Func ftype name plist body it ) = 
-    show ftype ++ " " ++ name ++ "(" ++ showMany plist "," ++ ") is\t\t" ++ 
-      showTable it ++ "\n" ++ show' "\t" body ++ "\nend" 
+    "  " ++ show ftype ++ " " ++ name ++ "(" ++ showMany plist "," ++ ") is    " ++ 
+      showTable it ++ "\n" ++ show' "    " body ++ "\n  end" 
 
 
 instance Show Param where
@@ -36,34 +37,34 @@ instance Show Context where
 show' :: [ Char ] -> Stat -> [ Char ]
 show' indent stat = case stat of 
   SkipStat            -> indent ++ "skip"                            
-  FreeStat    e it      -> indent ++ "free "     ++ show e ++ "\t" ++ showTable it                       
-  ReturnStat  e it      -> indent ++ "return "   ++ show e ++ "\t" ++ showTable it                       
-  ExitStat    e it      -> indent ++ "exit "     ++ show e ++ "\t" ++ showTable it                 
-  PrintStat   e it      -> indent ++ "print "    ++ show e ++ "\t" ++ showTable it                   
-  PrintlnStat e it      -> indent ++ "println "  ++ show e ++ "\t" ++ showTable it
+  FreeStat    e it      -> indent ++ "free "     ++ show e ++ "  " ++ showTable it                       
+  ReturnStat  e it      -> indent ++ "return "   ++ show e ++ "  " ++ showTable it                       
+  ExitStat    e it      -> indent ++ "exit "     ++ show e ++ "  " ++ showTable it                 
+  PrintStat   e it      -> indent ++ "print "    ++ show e ++ "  " ++ showTable it                   
+  PrintlnStat e it      -> indent ++ "println "  ++ show e ++ "  " ++ showTable it
 
   ScopedStat  s       -> indent ++ "begin\n"   ++ 
-                            show' ( indent ++ "\t" ) s ++ "\n" ++
+                            show' ( indent ++ "  " ) s ++ "\n" ++
                          indent ++ "end"   
 
-  ReadStat    lhs it   -> indent ++ "read " ++ show lhs  ++ "\t" ++ showTable it
+  ReadStat    lhs it   -> indent ++ "read " ++ show lhs  ++ "  " ++ showTable it
 
-  WhileStat   e s it   -> indent ++ "while " ++ show e ++ " do\t" ++ showTable it ++ "\n" ++
-                            show' ( indent ++ "\t" ) s ++ "\n" ++
+  WhileStat   e s it   -> indent ++ "while " ++ show e ++ " do  " ++ showTable it ++ "\n" ++
+                            show' ( indent ++ "  " ) s ++ "\n" ++
                           indent ++ "done"  
 
   SeqStat     s s'    -> show' indent s ++ " ;\n" ++ 
                          show' indent s'   
 
-  AssignStat  lhs rhs it -> indent ++ show lhs ++ " = " ++ show rhs ++ "\t" ++ showTable it 
+  AssignStat  lhs rhs it -> indent ++ show lhs ++ " = " ++ show rhs ++ "  " ++ showTable it 
 
-  IfStat      e s s' it  -> indent ++ "if " ++ show e ++ " then\t" ++ showTable it ++ "\n" ++
-                            show' ( indent ++ "\t" ) s ++ "\n" ++
+  IfStat      e s s' it  -> indent ++ "if " ++ show e ++ " then  " ++ showTable it ++ "\n" ++
+                            show' ( indent ++ "  " ) s ++ "\n" ++
                          indent ++ "else\n" ++ 
-                            show' ( indent ++ "\t") s' ++ "\n" ++
+                            show' ( indent ++ "  ") s' ++ "\n" ++
                          indent ++ "fi"
 
-  DeclareStat t i lhs it -> indent ++ show t ++ " " ++ i ++ " = " ++ show lhs ++ "\t" ++ showTable it
+  DeclareStat t i lhs it -> indent ++ show t ++ " " ++ i ++ " = " ++ show lhs ++ "  " ++ showTable it
  
 
 instance Show AssignLhs where
@@ -132,17 +133,17 @@ instance Show ArrayElem where
 
 
 
-showTable table = 
-  case table of 
-    Empty      -> "ø"
-    --ST Empty m -> "(" ++ show' m ++ ")"
-    ST st    m -> showTable st ++ "|" ++ show' m 
-  where
-    show' :: Dictionary -> [ Char ]
-    show' m = concat . intersperse " " . map show'' . toList $ m
-      where 
-        show'' ( name , ( ttype , ctx ) ) =
-          show ctx ++ name -- ++ ":" ++ show ttype 
+showTable table = ""
+  --case table of 
+  --  Empty      -> "ø"
+  --  --ST Empty m -> "(" ++ show' m ++ ")"
+  --  ST st    m -> showTable st ++ "|" ++ show' m 
+  --where
+  --  show' :: Dictionary -> [ Char ]
+  --  show' m = concat . intersperse " " . map show'' . toList $ m
+  --    where 
+  --      show'' ( name , ( ttype , ctx ) ) =
+  --        show ctx ++ name -- ++ ":" ++ show ttype 
 
 
 

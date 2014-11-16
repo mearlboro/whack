@@ -48,12 +48,13 @@ testOne path = do
   -- Parse source file
   let result = parseWithEof pProgram source
 
+  putStrLn $ replicate 80 '@'
+  putStrLn $ "Compiling " ++ show path ++ "\n"
+
   case result of 
     Right r -> do 
         putStrLn $ show r 
         putStrLn ( show $ checkProgram r )
-        let augmented = augmentProgram r 
-        putStrLn ( show augmented )
     Left  e -> error $ "Not parsed: " ++ show e 
 
 
@@ -84,10 +85,22 @@ parseOne shouldPass ( name , path ) = do
   -- Get the result and act accordingly
   case result of -- putStrLn $ show result
       Right r -> if   shouldPass 
-                 then putStrLn "CORRECT" >> 
-                      --putStrLn ( show $ augmentProgram r ) >> 
-                      --putStrLn ( replicate 80 '#') >> 
-                      return True 
+                 then do 
+
+                  let errs = unlines ( checkProgram r )
+                  when ( length errs > 0 ) ( do  
+                      putStrLn ( replicate 80 '*' ++ "\n*..." ++ 
+                                 drop ( length path - 74 ) path ++ " *" )
+                      putStrLn $ replicate 80 '*'
+    
+                      putStrLn $ show r ++ "\n"
+                      putStrLn $ concat ( replicate 10 "~@" )
+                      putStrLn ("Semantic Errors: " )
+                      putStrLn ( errs ) )
+
+                  --putStrLn ( show $ augmentProgram r ) >> 
+                  --putStrLn ( replicate 80 '#') >> 
+                  return True 
                  else handlePhantomParse r >> return False
 
       Left  e -> if   shouldPass 
@@ -120,8 +133,10 @@ main = do
   -- ../WaccCompiler.hs_directory/wacc_examples
   pwd <- flip (++) "/wacc_examples/" <$> getCurrentDirectory 
   -- Check valid programs
-  parseBunch True ( pwd ++ "valid" ) 
+  --parseBunch True ( pwd ++ "valid" ) 
   -- Check invalid programs
-  parseBunch False ( pwd ++ "invalid" ) 
+  --parseBunch False ( pwd ++ "invalid" )
+  
+  parseBunch True ( pwd ++ "semanticErr" ) 
 
  

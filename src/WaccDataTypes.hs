@@ -7,7 +7,6 @@ import Data.Map ( Map (..) )
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
 -- TODO fit each comment into 80 chars
-
 data Program                                     -- <program> ::=
   = Program [ Func ] Stat                        -- 'begin' <func>* <stat> 'end'   
   deriving ( Eq , Ord )   
@@ -75,18 +74,20 @@ data PairElem                                    -- <pair-elem> ::=
   | Snd Expr                                     -- 'snd' <expr>
   deriving ( Eq , Ord )           
  
+
 -- TODO make into a type synonym
 data ArrayElem                                   -- <array-elem> ::=
   = ArrayElem IdentName [ Expr ]                 -- <ident> '[' <expr> ']'
   deriving ( Eq , Ord )   
  
- 
+
+-- TODO remove EmptyType?
 data Type                                        -- <type> ::=
   = IntType                                      -- 'int' 
   | BoolType                                     -- 'bool'
   | CharType                                     -- 'char'
   | StringType                                   -- 'string'
-  | PairType ( Maybe ( Type, Type ) )            -- <pair-type> ::= 'pair' '(' <pair-elem-type> ',' <pair-elem-type> ')'    
+  | PairType ( Maybe ( Type , Type ) )           -- <pair-type> ::= 'pair' '(' <pair-elem-type> ',' <pair-elem-type> ')'    
   | ArrayType Type                               -- <array-type>
   | NullType                                     -- 'null'
   | EmptyType                                    -- <empty-array>
@@ -185,4 +186,40 @@ type It = IdentTable
 
 -- | A Dictionary maps names to identifier objects
 type Dictionary = Map IdentName IdentObj
+
+
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: 3. Type Utils ::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+
+-- Relaxed Eq class 
+class Eq a => Eq' a where
+  (~==)    :: a -> a -> Bool
+  (~/=)    :: a -> a -> Bool
+
+  (~==)    =  (==)
+  x ~/= y  =  not ( x ~== y )
+
+
+-- A NullType is always a PairType and viceversa
+-- A pair of any two types is always a PairType
+-- An array of any type is always an ArrayType
+instance Eq' Type where
+  PairType  _ ~== PairType  _  =  True 
+  NullType    ~== PairType  _  =  True
+  PairType  _ ~== NullType     =  True
+  PairType  _ ~== _            =  False
+  ArrayType _ ~== ArrayType _  =  True
+  ArrayType _ ~== _            =  False
+  t           ~== t'           =  t == t'
+
+
+-- A Function identifier always appears in the context of a Function,
+-- regardless of the Func object it contains
+instance Eq' Context where
+  Function _  ~== Function _  =  True
+  Function _  ~== _           =  False
+  _           ~== Function _  =  False
+  c           ~== c'          =  c == c'
+
 

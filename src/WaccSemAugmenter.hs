@@ -13,8 +13,8 @@ augmentProgram
   :: Program -- | The Program AST
   -> Program -- | The agumented Program AST 
 -- | There is no "global scope" in WACC. Each function has its own little scope.
---   Nonetheless, we refer to hTe globalScope as the identifier table that 
---   contains the funcTion names, since the only "globally accessible" objects 
+--   Nonetheless, we refer to the globalScope as the identifier table that 
+--   contains the function names, since the only "globally accessible" objects 
 --   are the functions defined at the beginning of a WACC program.
 --   1. Create the globalScope and add the function names to it 
 --   2. Augment the main body, passing a reference to the globalScope
@@ -38,11 +38,11 @@ augmentFunc
 --   2. Add the funcion name and all its parameters to the functionScope 
 --   3. The body of a function is evaluated in its own scope, enclosed by the 
 --      functionScope.
-augmentFunc globalScope func@( Func ftype fname plist body _ )  =  func'
+augmentFunc globalScope func@( Func ftype name params body _ )  =  func'
   where
-    funcScope      =  addParams plist . addFunc func $ encloseIn globalScope
+    funcScope      =  addParams params . addFunc func $ encloseIn globalScope
     ( _ , body' )  =  augmentStat body funcScope
-    func'          =  Func ftype fname plist body' funcScope
+    func'          =  Func ftype name params body' funcScope
 
  -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
@@ -80,9 +80,9 @@ augmentStat stat prevIt  =
     -- statement. This is the only case where the table is updated, since we 
     -- just introduced a new variable that can be used by subsequent statements
     augmentDeclare                                    :: Stat -> ( It , Stat )
-    augmentDeclare ( DeclareStat vtype vname rhs _ )  = 
-      let nextIt  =  addVariable vname vtype $ encloseIn prevIt 
-      in  ( nextIt , DeclareStat vtype vname rhs nextIt )
+    augmentDeclare ( DeclareStat itype name rhs _ )  = 
+      let nextIt  =  addVariable name itype $ encloseIn prevIt 
+      in  ( nextIt , DeclareStat itype name rhs nextIt )
 
 
     augmentScoped                      :: Stat -> ( It , Stat )
@@ -105,7 +105,8 @@ augmentStat stat prevIt  =
   
 
     augmentSeq                           :: Stat -> ( It , Stat )
-    augmentSeq ( SeqStat first second )  =  -- Where the magic happens 
+    augmentSeq ( SeqStat first second )  = 
+      -- * Where the magic happens * --
       let ( nextIt  , first'  )  =  augmentStat first  prevIt
           ( nextIt' , second' )  =  augmentStat second nextIt
       in  ( nextIt' , SeqStat first' second' )
