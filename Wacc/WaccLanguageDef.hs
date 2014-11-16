@@ -80,23 +80,37 @@ waccLexeme     = Token.lexeme        lexer
 
 -- TODO write type signature
 waccOperators
-  = [ [ Prefix ( waccOperators' "!"   $ UnaryOperExpr  NotUnOp  )           ]
-    , [ Prefix ( waccOperators' "len" $ UnaryOperExpr  LenUnOp  )           ]
-    , [ Prefix ( waccOperators' "ord" $ UnaryOperExpr  OrdUnOp  )           ]
-    , [ Prefix ( waccOperators' "chr" $ UnaryOperExpr  ChrUnOp  )           ]
-    , [ Prefix ( waccOperators' "-"   $ UnaryOperExpr  NegUnOp  )           ]
-    , [ Infix  ( waccOperators' "+"   $ BinaryOperExpr AddBinOp ) AssocLeft ]
-    , [ Infix  ( waccOperators' "-"   $ BinaryOperExpr SubBinOp ) AssocLeft ]
-    , [ Infix  ( waccOperators' "*"   $ BinaryOperExpr MulBinOp ) AssocLeft ]
-    , [ Infix  ( waccOperators' "/"   $ BinaryOperExpr DivBinOp ) AssocLeft ]
-    , [ Infix  ( waccOperators' "%"   $ BinaryOperExpr ModBinOp ) AssocLeft ]
-    , [ Infix  ( waccOperators' "<"   $ BinaryOperExpr LsBinOp  ) AssocLeft ]
-    , [ Infix  ( waccOperators' ">"   $ BinaryOperExpr GtBinOp  ) AssocLeft ]
-    , [ Infix  ( waccOperators' "<="  $ BinaryOperExpr LEBinOp  ) AssocLeft ]
-    , [ Infix  ( waccOperators' ">="  $ BinaryOperExpr GEBinOp  ) AssocLeft ]
-    , [ Infix  ( waccOperators' "=="  $ BinaryOperExpr EqBinOp  ) AssocLeft ]
-    , [ Infix  ( waccOperators' "!="  $ BinaryOperExpr NEBinOp  ) AssocLeft ]
+   -- |Unary operators have the same precedence, which is 0.
+  = [ [ Prefix ( waccOperators' "!"   $ UnaryOperExpr  NotUnOp  )
+    ,   Prefix ( waccOperators' "len" $ UnaryOperExpr  LenUnOp  )
+    ,   Prefix ( waccOperators' "ord" $ UnaryOperExpr  OrdUnOp  )
+    ,   Prefix ( waccOperators' "chr" $ UnaryOperExpr  ChrUnOp  )
+    ,   Prefix ( waccOperators' "-"   $ UnaryOperExpr  NegUnOp  )           ]
+
+   -- |Arithmetic operators *, /, % have precedence 1.
+    , [ Infix  ( waccOperators' "*"   $ BinaryOperExpr MulBinOp ) AssocLeft
+    ,   Infix  ( waccOperators' "/"   $ BinaryOperExpr DivBinOp ) AssocLeft
+    ,   Infix  ( waccOperators' "%"   $ BinaryOperExpr ModBinOp ) AssocLeft ]
+
+   -- |Arithmetic operators +, - have precedence 2.
+    , [ Infix  ( waccOperators' "+"   $ BinaryOperExpr AddBinOp ) AssocLeft
+    ,   Infix  ( waccOperators' "-"   $ BinaryOperExpr SubBinOp ) AssocLeft ]
+
+   -- |Relational operators have precedence 3.
+    , [ Infix  ( waccOperators' "<"   $ BinaryOperExpr LsBinOp  ) AssocLeft
+    ,   Infix  ( waccOperators' ">"   $ BinaryOperExpr GtBinOp  ) AssocLeft
+    ,   Infix  ( waccOperators' "<="  $ BinaryOperExpr LEBinOp  ) AssocLeft
+    ,   Infix  ( waccOperators' ">="  $ BinaryOperExpr GEBinOp  ) AssocLeft ]
+
+   -- |Equality and inequality operators have precedence 4.
+    , [ Infix  ( waccOperators' "=="  $ BinaryOperExpr EqBinOp  ) AssocLeft
+    ,   Infix  ( waccOperators' "!="  $ BinaryOperExpr NEBinOp  ) AssocLeft ]
+
+   -- |Logical and operator has precedence 5.
     , [ Infix  ( waccOperators' "&&"  $ BinaryOperExpr AndBinOp ) AssocLeft ]
+
+ 
+   -- |Logical or operator has precedence 6. 
     , [ Infix  ( waccOperators' "||"  $ BinaryOperExpr OrrBinOp ) AssocLeft ] ]
 
     where
