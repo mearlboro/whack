@@ -7,6 +7,13 @@
   (major1) == 4 && (major2) <  5 || \
   (major1) == 4 && (major2) == 5 && (minor) <= 0)
 
+/* package containers-0.4.2.1 */
+#define VERSION_containers "0.4.2.1"
+#define MIN_VERSION_containers(major1,major2,minor) (\
+  (major1) <  0 || \
+  (major1) == 0 && (major2) <  4 || \
+  (major1) == 0 && (major2) == 4 && (minor) <= 2)
+
 /* package directory-1.1.0.2 */
 #define VERSION_directory "1.1.0.2"
 #define MIN_VERSION_directory(major1,major2,minor) (\
