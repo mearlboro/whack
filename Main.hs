@@ -6,9 +6,9 @@ import System.Exit
 import System.FilePath.Posix
 
 import Wacc.WaccParser
+import Wacc.WaccSemChecker
 
 -------------------------------------------------------------------------------
-
 -- |Runs the wacc compiler after checking argument validity.
 main = do
     args       <- getArgs
@@ -17,6 +17,7 @@ main = do
         then do
             program <- readFile f
             parse program
+            
         else putStrLn f
 
 -------------------------------------------------------------------------------
@@ -52,7 +53,6 @@ verifyArgs args = do
 -- exit 100 : #syntax_error#
 -- exit 200 : #semantic_error#
 
--- TODO: semantic
 parse :: FilePath -> IO ()
 parse source = do 
   
@@ -61,7 +61,16 @@ parse source = do
   
   -- Get the result and act accordingly
   case result of
-      Right r -> exitWith $ ExitSuccess
+      Right r -> exitWith   ExitSuccess
 
       Left  e -> exitWith $ ExitFailure 100
 
+-- TODO: type signature
+check programAST = do
+  -- Takes a program AST and gets a list of error
+  let errors = checkProgram programAST
+
+  -- If list is empty, exit with success
+  if null errors 
+    then exitWith   ExitSuccess
+    else exitWith $ ExitFailure 200

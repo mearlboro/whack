@@ -1,4 +1,4 @@
-module WaccSemChecker where
+module Wacc.WaccSemChecker where
 
 import Data.Maybe                 ( isNothing , fromMaybe , fromJust , isJust )
 import Data.Map                   ( empty                                     )
@@ -7,10 +7,10 @@ import Data.Char                  ( isSpace                                   )
 import Data.List                  ( group , sort                              )
 import Control.Monad              ( when                                      )
 
-import WaccDataTypes
-import WaccSymbolTable
-import WaccSemAugmenter
-import WaccShowInstances
+import Wacc.WaccDataTypes
+import Wacc.WaccSymbolTable
+import Wacc.WaccSemAugmenter
+import Wacc.WaccShowInstances
 
 -- ************************************************************************** --
 -- *************************                       ************************** --

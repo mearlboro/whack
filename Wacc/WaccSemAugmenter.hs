@@ -1,9 +1,9 @@
-module WaccSemAugmenter 
+module Wacc.WaccSemAugmenter 
 ( augmentProgram
 ) where 
 
-import WaccDataTypes
-import WaccSymbolTable
+import Wacc.WaccDataTypes
+import Wacc.WaccSymbolTable
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: Semantic Augmentation ::::::::::::::::::::::::::::::::::::::::::::::::: --

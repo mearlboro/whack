@@ -1,3 +1,5 @@
+
+
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: 3.2.1 WACC Parser "unit" tester  :::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -5,6 +7,7 @@
 module WaccTesting.WaccParsersTest where
 
 import Wacc.WaccParser
+import Wacc.WaccShowInstances
 
 import Text.ParserCombinators.Parsec
 
@@ -102,13 +105,6 @@ tArrayLiter
     , ( "[\"a]"               , False )
     , ( " [a,b,c,int ] "      , False )
     , ( " [ [ ] ] "           , False ) ]
-
-tPairLiter
-  = [ ( "null   "  , True  )
-    , ( ""         , False )
-    , ( "null   a" , False )
-    , ( "nulla "   , False )
-    , ( "Null "    , False ) ]
 
 
 --------------------------------------------------------------------------------
@@ -248,7 +244,6 @@ runAll = do
     runTests "pIntLiter"   pIntLiter   tIntLiter
     runTests "pCharLiter"  pCharLiter  tCharLiter
     runTests "pStrLiter"   pStrLiter   tStrLiter
-    runTests "pPairLiter"  pPairLiter  tPairLiter
     runTests "pArrayLiter" pArrayLiter tArrayLiter
     
     runTests "pStatement"  pStat       tStat
@@ -317,5 +312,3 @@ runDetails parser ( input , pass )
                               else "Fail! Should pass but (" ++ show e ++ ")"
         Right r -> putStrLn $ if pass     then "Pass! ("     ++ show r ++ ")"
                               else "Fail! Should fail but (" ++ show r ++ ")"
-
-
