@@ -150,19 +150,31 @@ checkStat ( SeqStat stat stat' )  =
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For an If statement the condition must be bool
-checkStat ( IfStat cond sthen selse it )  =  error "TODO"
+checkStat ( IfStat cond sthen selse it )  = 
+	onExpr cond $ checkExpr cond it nonFunction [ BoolType ] ++ 
+	checkStat sthen ++
+	checkStat selse
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Not an easy one
-checkStat s@( AssignStat lhs rhs it ) =  error "TODO"
+checkStat s@( AssignStat lhs rhs it ) = 
+	onStat s $ if null lhsErr then rhsErr else lhsErr
+	where
+		lhsErr  = checkAssignLhs lhs it nonFunction [] 
+		lhsType = getLhsType ( lhs it )
+		rhsErr  = checkAssignRhs rhs it nonFunction [ lhsType ]
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Check for redeclarations in the same scope
-checkStat s@( DeclareStat vtype name rhs it )  =  error "TODO"
-
-
+checkStat s@( DeclareStat vtype name rhs it )  = 
+	onStat s $ if null definedErr then rhsErr else definedErr
+  	where
+    	rhsErr         =  checkAssignRhs rhs it nonFunction [ vtype ]
+    	definedErr     =  toSemErr definedErrMsg ( isDefined' name it )
+    	definedErrMsg  =  "Variable Already Defined @" ++ name
+    	
 -- ************************************************************************** --
 -- ***************************                   **************************** --
 -- ***************************   LHS Semantics   **************************** --
