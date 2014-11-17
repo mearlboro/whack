@@ -261,11 +261,11 @@ pExpr = buildExpressionParser waccOperators pExpr'
         pExpr' = choice 
             [ waccParens pExpr
             , try $ liftM ArrayElemExpr pArrayElem      
+            ,       liftM IdentExpr     waccIdentifier
             ,       liftM BoolLiterExpr pBoolLiter
             ,       liftM IntLiterExpr  pIntLiter
             ,       liftM CharLiterExpr pCharLiter
             ,       liftM StrLiterExpr  pStrLiter
-            ,       liftM IdentExpr     waccIdentifier
             ,       pWaccWord "null"    PairLiterExpr 
             , pBinaryOperExpr
             , pUnaryOperExpr 

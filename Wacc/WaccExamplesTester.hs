@@ -133,10 +133,10 @@ main = do
   -- ../WaccCompiler.hs_directory/wacc_examples
   pwd <- flip (++) "/wacc_examples/" <$> getCurrentDirectory 
   -- Check valid programs
-  --parseBunch True ( pwd ++ "valid" ) 
+  parseBunch True ( pwd ++ "valid" ) 
   -- Check invalid programs
   --parseBunch False ( pwd ++ "invalid" )
   
-  parseBunch True ( pwd ++ "semanticErr" ) 
+  --parseBunch False ( pwd ++ "semanticErr" ) 
 
  
