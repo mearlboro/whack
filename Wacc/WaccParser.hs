@@ -10,10 +10,9 @@ import Wacc.WaccLanguageDef
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Token
-import Text.Parsec.Language       ( haskellDef )
-import Control.Applicative hiding ( (<|>) , many )
+import Control.Applicative hiding ( (<|>) , many   )
 import Control.Monad              ( liftM , liftM2 )
-import Control.Monad.Fix
+import Control.Monad.Fix          ( fix            )
 
 
 -- |3.1.1 Program .......................................................  28 --    
@@ -33,18 +32,18 @@ pProgram :: Parser Program
 pProgram = do
     waccWhiteSpace
     waccReserved "begin"
-    funcs <- many $ try pFunc 
+    funcs <- many ( try pFunc <?> "func" ) 
     waccWhiteSpace
     body  <- pStat
     waccReserved "end"
-    return $ Program funcs body 
+    return $ Program funcs body -- Empty
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <func> ::= <type> <ident> '(' <param-list>? ')' 'is' <stat> 'end' ::::: --
 pFunc :: Parser Func
 pFunc = do
-    ftype  <- pType
+    ftype  <- pType <?> "type"
     waccWhiteSpace
     name   <- waccIdentifier
     params <- waccParens pParamList
@@ -54,17 +53,17 @@ pFunc = do
 
     -- Control flow in functions must eventually reach a return or exit stat
     let returnsOrExits x = case x of                
-            ReturnStat  _      -> True  
-            ExitStat    _      -> True   
-            ScopedStat  s      -> returnsOrExits s        
-            WhileStat   _ s    -> returnsOrExits s
-            SeqStat     _ s    -> returnsOrExits s
-            IfStat      e s s' -> and $ map returnsOrExits $ s:s':[]
-            _                  -> False 
-
+            ReturnStat  _ _      -> True  
+            ExitStat    _ _      -> True   
+            ScopedStat  s        -> returnsOrExits s        
+            WhileStat   _ s _    -> returnsOrExits s
+            SeqStat     _ s      -> returnsOrExits s
+            IfStat      _ s s' _ -> and $ map returnsOrExits [ s , s' ]
+            _                    -> False 
+    
     if returnsOrExits body 
-		then return $ Func ftype name params body
-		else fail "No Reachable Return/Exit Statement" 
+        then return $ Func ftype name params body Empty
+        else fail "No Reachable Return/Exit Statement" 
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -99,19 +98,29 @@ pStat = pStat' >>= \stat ->
     where
 
         pStat' = choice 
-            [ pWaccWord "skip"    SkipStat
-            , pWaccLift "free"    FreeStat    pExpr
-            , pWaccLift "return"  ReturnStat  pExpr
-            , pWaccLift "exit"    ExitStat    pExpr
-            , pWaccLift "print"   PrintStat   pExpr
-            , pWaccLift "println" PrintlnStat pExpr
-            , pWaccLift "read"    ReadStat    pAssignLhs
+            [ pWaccWord   "skip"    SkipStat
+            , pSimpleStat "free"    FreeStat   
+            , pSimpleStat "return"  ReturnStat 
+            , pSimpleStat "exit"    ExitStat   
+            , pSimpleStat "print"   PrintStat  
+            , pSimpleStat "println" PrintlnStat
+            , pReadStat
             , pDeclareStat
             , pAssignStat
             , pIfStat
             , pWhileStat
             , pScopedStat ]
-    
+        
+        pSimpleStat key constr = do
+            waccReserved key 
+            expr <- pExpr
+            return $ constr expr Empty
+
+        pReadStat = do 
+            waccReserved "read"
+            lhs <- pAssignLhs
+            return $  ReadStat lhs Empty
+
         pDeclareStat = do -- <type> <ident> '=' <assign-rhs>
             stype <- pType
             waccWhiteSpace
@@ -120,7 +129,7 @@ pStat = pStat' >>= \stat ->
             waccReservedOp "="
             waccWhiteSpace
             rhs   <- pAssignRhs
-            return $ DeclareStat stype ident rhs
+            return $ DeclareStat stype ident rhs Empty
     
         pAssignStat = do -- <assign-lhs> = <assign-rhs>
             lhs <- pAssignLhs
@@ -128,7 +137,7 @@ pStat = pStat' >>= \stat ->
             waccReservedOp "="
             waccWhiteSpace
             rhs <- pAssignRhs
-            return $ AssignStat lhs rhs
+            return $ AssignStat lhs rhs Empty
     
         pIfStat = do -- 'if' <expr> 'then' <stat> 'else' <stat> 'fi'
             waccReserved "if"
@@ -138,7 +147,7 @@ pStat = pStat' >>= \stat ->
             waccReserved "else"
             stat' <- pStat
             waccReserved "fi"
-            return $ IfStat expr stat stat'
+            return $ IfStat expr stat stat' Empty
     
         pWhileStat = do -- 'while' <expr> 'do' <stat> 'done'
             waccReserved "while"
@@ -146,7 +155,7 @@ pStat = pStat' >>= \stat ->
             waccReserved "do"
             stat <- pStat
             waccReserved "done"
-            return $ WhileStat expr stat
+            return $ WhileStat expr stat Empty
     
         pScopedStat = do -- 'begin' <stat> 'end'
             waccReserved "begin"
@@ -209,8 +218,8 @@ pPairElem
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <type> ::= <base-type> | <array-type> | <pair-type> ::::::::::::::::::: --
-
 -- |For easier management of datatypes, they are represented linearly.
+
 pType :: Parser Type
 pType = do 
     base  <-  pBaseType 
@@ -261,7 +270,7 @@ pExpr = buildExpressionParser waccOperators pExpr'
             ,       liftM IntLiterExpr  pIntLiter
             ,       liftM CharLiterExpr pCharLiter
             ,       liftM StrLiterExpr  pStrLiter
-            ,       liftM PairLiterExpr pPairLiter
+            ,       pWaccWord "null"    PairLiterExpr
             ,       liftM IdentExpr     waccIdentifier
             , pBinaryOperExpr
             , pUnaryOperExpr 
@@ -336,16 +345,17 @@ pBoolLiter
 -- :: <char-liter> ::= ''' <char> ''' ::::::::::::::::::::::::::::::::::::::: --
 pCharLiter :: Parser CharLiter
 pCharLiter = do
-    c <- lookAhead waccCharLiter
-  
-    if c `elem` "\\\"\'"     -- If char was one of "\' 
-        then do char  '\''   -- Then make sure it was escaped correctly
-                char  '\\'
-                oneOf "\\\"\'\0\n\r\t"
-                char  '\''
-                waccWhiteSpace
-                return c
-        else do waccCharLiter >>= return 
+  c <- lookAhead waccCharLiter
+
+  if      c `elem` "\\\"\'" -- If char was one of "\' 
+      then do char  '\''        -- Then make sure it was escaped correctly
+              char  '\\'
+              oneOf "\\\"\'"
+              char  '\''
+              waccWhiteSpace
+              return c
+      else do waccCharLiter >>= return 
+
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -353,14 +363,11 @@ pCharLiter = do
 pStrLiter :: Parser StrLiter
 pStrLiter = waccStrLiter
 
+
 -- :: <array-liter> ::= '[' ( <expr> (',' <expr>)* )? ']' ::::::::::::::::::: --
 pArrayLiter :: Parser ArrayLiter
 pArrayLiter = waccBrackets $ waccCommaSep pExpr 
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <pair-liter> ::= 'null' ::::::::::::::::::::::::::::::::::::::::::::::: --
-pPairLiter :: Parser PairLiter
-pPairLiter = pWaccWord "null" Null
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
