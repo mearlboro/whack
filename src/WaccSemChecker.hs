@@ -271,22 +271,31 @@ checkExpr
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Simple literals are only checked against the exptected types
-checkExpr ( BoolLiterExpr _ ) _ _ types  =  error "TODO"
-checkExpr ( CharLiterExpr _ ) _ _ types  =  error "TODO"  
-checkExpr ( IntLiterExpr  _ ) _ _ types  =  error "TODO"
-checkExpr ( StrLiterExpr  _ ) _ _ types  =  error "TODO"
-checkExpr   PairLiterExpr     _ _ types  =  error "TODO"
+checkExpr ( BoolLiterExpr _ ) _ _ types  =  checkType BoolType   types
+checkExpr ( CharLiterExpr _ ) _ _ types  =  checkType CharType   types
+checkExpr ( IntLiterExpr  _ ) _ _ types  =  checkType IntType    types
+checkExpr ( StrLiterExpr  _ ) _ _ types  =  checkType StringType types
+checkExpr   PairLiterExpr     _ _ types  =  checkType NullType   types
 
 
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -e- -- -- 
 -- For a ParenthesisedExpr we check the expression contained therein
-checkExpr ( ParenthesisedExpr expr ) it ctxs types  =  error "TODO"
+checkExpr ( ParenthesisedExpr expr ) it ctxs types 
+  = checkExpr expr it ctxs types
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For an IdentExpr we check that the identifier has beed declared and is 
 -- within scope. If it is we check for type and context as well.
-checkExpr ( IdentExpr ident ) it ctxs types  =  error "TODO"
+checkExpr ( IdentExpr ident ) it ctxs types  
+  =  if  isJust identObj
+      then checkType itype types ++
+          checkCtx  ctx   ctxs
+      else notFoundErr
+  where
+    identObj      = findIdent' ident it
+    notFoundErr   = checkFound ident identObj
+    (,) itype ctx = fromJust identObj
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
