@@ -126,22 +126,26 @@ checkStat s@( PrintlnStat expr it )  =
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For a Scoped statement we check the enclosed statement
-checkStat ( ScopedStat stat )  =  error "TODO"
+checkStat ( ScopedStat stat )  = 
+	checkStat stat
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For a Read statement we check semantic errors in its lhs expression
-checkStat s@( ReadStat lhs it )  =  error "TODO"
+checkStat s@( ReadStat lhs it )  = 
+	onStat s $ checkAssignLhs lhs it nonFunction []
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- A While statement requires the condition expression to be of BoolType
-checkStat ( WhileStat cond body it )  =  error "TODO"
+checkStat ( WhileStat cond body it )  = 
+	onExpr cond $ checkExpr cond it nonFunction [ BoolType ] ++ checkStat body
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Sequential checking of statements
-checkStat ( SeqStat stat stat' )  =  error "TODO"
+checkStat ( SeqStat stat stat' )  = 
+	checkStat stat ++ checkStat stat'
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
