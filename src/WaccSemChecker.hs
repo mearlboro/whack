@@ -85,7 +85,6 @@ checkStat SkipStat  =  []
 -- A Free statement can only free a *variable* that points to a *pair* or to an
 -- *array* type. So we pattern match to capture an IdentExpr and check that it
 -- is a Variable or a Paramteer and that it is of type array or pair
-checkStat s@( FreeStat expr@( IdentExpr _ ) it )  =  
 checkStat s@( FreeStat expr@( IdentExpr _ ) it )  = 
     onStat s $ checkExpr expr it nonFunction [ PairType {} , ArrayType {} ]
 
@@ -100,80 +99,79 @@ checkStat s@( FreeStat _ _ )  =
 -- evaluate to a result that is the same type of the result of the function
 -- it appears in
 checkStat s@( ReturnStat expr it )  =
-	onStat s $ if isNothing enclFunc then mainErr else enclErr
-	where
-		enclFunc = findEnclFunc it
-		enclErr  = checkExpr expr it nonFunction [ typeOf ( fromJust enclFunc ) ]
-		mainErr  = [ "Cannot Return From Main Function Body" ]
-		
+    onStat s $ if isNothing enclFunc then mainErr else enclErr
+  where
+    enclFunc = findEnclFunc it
+    enclErr  = checkExpr expr it nonFunction [ typeOf ( fromJust enclFunc ) ]
+    mainErr  = [ "Cannot Return From Main Function Body" ]
+    
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- An Exit statement must evaluate to a value of type integer 
 checkStat s@( ExitStat expr it )  =
-	onStat s $ checkExpr expr it nonFunction [ IntType ]
+    onStat s $ checkExpr expr it nonFunction [ IntType ]
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- A Print statement is legal as long as it doesn't use undefined identifiers
 checkStat s@( PrintStat expr it )  = 
-	onStat s $ checkExpr expr it nonFunction []
+    onStat s $ checkExpr expr it nonFunction []
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Semantic rules identical to those of PrintStat
 checkStat s@( PrintlnStat expr it )  = 
-	onStat s $ checkExpr expr it nonFunction []
+    onStat s $ checkExpr expr it nonFunction []
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For a Scoped statement we check the enclosed statement
-checkStat ( ScopedStat stat )  = 
-	checkStat stat
+checkStat ( ScopedStat stat )  =  checkStat stat
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For a Read statement we check semantic errors in its lhs expression
 checkStat s@( ReadStat lhs it )  = 
-	onStat s $ checkAssignLhs lhs it nonFunction []
+    onStat s $ checkAssignLhs lhs it nonFunction []
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- A While statement requires the condition expression to be of BoolType
 checkStat ( WhileStat cond body it )  = 
-	onExpr cond $ checkExpr cond it nonFunction [ BoolType ] ++ checkStat body
+    onExpr cond $ checkExpr cond it nonFunction [ BoolType ] ++ checkStat body
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Sequential checking of statements
 checkStat ( SeqStat stat stat' )  = 
-	checkStat stat ++ checkStat stat'
+    checkStat stat ++ checkStat stat'
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For an If statement the condition must be bool
 checkStat ( IfStat cond sthen selse it )  = 
-	onExpr cond $ checkExpr cond it nonFunction [ BoolType ] ++ 
-	checkStat sthen ++
-	checkStat selse
+    onExpr cond $ checkExpr cond it nonFunction [ BoolType ] ++ 
+    checkStat sthen ++
+    checkStat selse
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Not an easy one
-checkStat s@( AssignStat lhs rhs it ) = 
-	onStat s $ if null lhsErr then rhsErr else lhsErr
-	where
-		lhsErr  = checkAssignLhs lhs it nonFunction [] 
-		lhsType = getLhsType ( lhs it )
-		rhsErr  = checkAssignRhs rhs it nonFunction [ lhsType ]
+checkStat s@( AssignStat lhs rhs it )  = 
+    onStat s $ if null lhsErr then rhsErr else lhsErr
+  where
+    lhsErr   =  checkAssignLhs lhs it nonFunction [] 
+    lhsType  =  fromJust ( getLhsType lhs it )
+    rhsErr   =  checkAssignRhs rhs it nonFunction [ lhsType ]
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Check for redeclarations in the same scope
 checkStat s@( DeclareStat vtype name rhs it )  = 
-	onStat s $ if null definedErr then rhsErr else definedErr
-  	where
-    	rhsErr         =  checkAssignRhs rhs it nonFunction [ vtype ]
-    	definedErr     =  toSemErr definedErrMsg ( isDefined' name it )
-    	definedErrMsg  =  "Variable Already Defined @" ++ name
+    onStat s $ if null definedErr then rhsErr else definedErr
+  where
+    rhsErr         =  checkAssignRhs rhs it nonFunction [ vtype ]
+    definedErr     =  toSemErr definedErrMsg ( isDefined' name it )
+    definedErrMsg  =  "Variable Already Defined @" ++ name
 
 -- ************************************************************************** --
 -- ***************************                   **************************** --
@@ -183,9 +181,9 @@ checkStat s@( DeclareStat vtype name rhs it )  =
 
 checkAssignLhs :: AssignLhs -> It -> [ Context ] -> [ Type ] -> [ SemanticErr ]
 checkAssignLhs lhs it ctxs types  =  case lhs of 
-  LhsIdent     ident    -> checkExpr      ( IdentExpr ident ) it ctxs types           
-  LhsPairElem  pelem    -> checkPairElem    pelem             it ctxs types                 
-  LhsArrayElem arrelem  -> checkArrayElem   arrelem           it ctxs types
+    LhsIdent     ident    -> checkExpr      ( IdentExpr ident ) it ctxs types           
+    LhsPairElem  pelem    -> checkPairElem    pelem             it ctxs types                 
+    LhsArrayElem arrelem  -> checkArrayElem   arrelem           it ctxs types
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
@@ -193,7 +191,7 @@ checkAssignLhs lhs it ctxs types  =  case lhs of
 -- expressions are identifier expressions and array element expressions.
 -- In both cases they must point to an identifier of PairType
 checkPairElem :: PairElem -> It -> [ Context ] -> [ Type ] -> [ SemanticErr ]
-checkPairElem pelem it _ctxs types =  
+checkPairElem pelem it _ctxs types  =  
     if   isJust pelemType
     then typeErr 
     else [ "Could Not Retrieve Pair Type" ]
@@ -228,8 +226,8 @@ checkArrayElem aelem@( ArrayElem ident exprs ) it ctxs types  =
 -- Get the type of a lhs assignment
 getLhsType         :: AssignLhs -> It -> Maybe Type
 getLhsType lhs it  =  case lhs of
-	LhsIdent    ident  -> findType' ident it
-    LhsPairElem pelem  -> getPairElemType pelem it
+    LhsIdent     ident -> findType'        ident it
+    LhsPairElem  pelem -> getPairElemType  pelem it
     LhsArrayElem aelem -> getArrayElemType aelem it
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
@@ -238,7 +236,9 @@ getLhsType lhs it  =  case lhs of
 -- Otherwise we can safely pattermatch on PairType and retrieve the pair 
 -- element type
 getPairElemType           :: PairElem -> It -> Maybe Type
-getPairElemType pelem it  =  case pelem of
+getPairElemType pelem it  =  
+  case pelem of
+    
     Fst expr -> getPairElemType' expr fst 
     Snd expr -> getPairElemType' expr snd
   
@@ -269,7 +269,7 @@ getPairElemType pelem it  =  case pelem of
         isValidPair           =  isJust pairObj          && 
                                  ( pairType ~== PairType {} ||
                                    pairType  == NullType  ) && 
-                                 pairCtx ~/= Function {}
+                                   pairCtx ~/= Function {}
 
         obtainType            =  Just $ getType which pairType
 
@@ -279,14 +279,17 @@ getPairElemType pelem it  =  case pelem of
 -- Get the type of an array element. 
 getArrayElemType                               :: ArrayElem -> It -> Maybe Type
 getArrayElemType ( ArrayElem ident exprs ) it  = 
-	if isValidArray then arrElemType else Nothing
+    if isValidArray then arrElemType else Nothing
   where
     arrayObj                  =  findIdent' ident it
     (,) arrayType arrayCtx    =  fromJust arrayObj
     isValidArray              =  isJust arrayObj            && 
                                  arrayType ~== ArrayType {} && 
                                  arrayCtx ~/= Function {}
-    arrElemType               =  Just $ deepen ( length exprs +1 ) arrayType
+    arrElemType               =  Just $ 
+                                   if   arrayType == StringType 
+                                   then CharType 
+                                   else deepen ( length exprs +1 ) arrayType
 
     deepen 0   t              =  t
     deepen n ( ArrayType t )  =  deepen ( n-1 ) t   
@@ -309,14 +312,14 @@ checkAssignRhs
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Simple expression check here
-checkAssignRhs ( RhsExpr expr ) it ctxs types    
-  = checkExpr expr it ctxs types 
+checkAssignRhs ( RhsExpr expr ) it ctxs types  = 
+    checkExpr expr it ctxs types 
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Delegate the check to checkPairElem
-checkAssignRhs ( RhsPairElem pelem ) it ctxs types  
-  = checkPairElem pelem it ctxs types   
+checkAssignRhs ( RhsPairElem pelem ) it ctxs types  =  
+    checkPairElem pelem it ctxs types   
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
@@ -326,23 +329,23 @@ checkAssignRhs ( RhsPairElem pelem ) it ctxs types
 -- Since AssignRhs only occurs in AssignStat and DeclareStat we are certain 
 -- that `types` will be a singleton list containing the array type, so we
 -- don't actually need to check explicitly that they are all of the same type
-checkAssignRhs ( RhsArrayLiter exprs ) it ctxs types   
-  = concatMap ( \e -> checkExpr e it ctxs [ arrElemType ] ) exprs
-      where
-        arrElemType = case head types of 
-                        ArrayType t -> t 
-                        _           -> error "Weird"
+checkAssignRhs ( RhsArrayLiter exprs ) it ctxs types  = 
+    concatMap ( \e -> checkExpr e it ctxs [ arrElemType ] ) exprs
+  where
+    arrElemType = case head types of 
+                      ArrayType t -> t 
+                      _           -> error "Weird"
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Once again, since AssignRhs only occurs in AssignStat and DeclareStat we are 
 -- certain that `types` is a singleton list containing a PairType. So we can 
 -- safely pattern match to extract its type
-checkAssignRhs ( RhsNewPair efst esnd ) it ctxs types   
-  = checkExpr efst it ctxs [ ftype ] ++
+checkAssignRhs ( RhsNewPair efst esnd ) it ctxs types  = 
+    checkExpr efst it ctxs [ ftype ] ++
     checkExpr esnd it ctxs [ stype ]
-      where 
-        PairType ( Just ( ftype , stype ) )  =  head types
+  where 
+    PairType ( Just ( ftype , stype ) )  =  head types
   
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
@@ -353,17 +356,17 @@ checkAssignRhs ( RhsNewPair efst esnd ) it ctxs types
 -- Note: this could use some improvements. There is a repeted call to findIndet.
 -- So first we check that the identifier is in scope and that is is a function.
 -- Once we are sure it is a Function we pattern match to expose the Func object.
-checkAssignRhs rhs@( RhsCall fname args ) it ctxs types   
-  = if   null identErr 
-      then (checkType ( typeOf func ) types) ++ (concat checkArgs) ++ (lengthErr)          
-      else identErr
-        where
-          identErr       =  checkExpr ( IdentExpr fname ) it [ Function {} ] types 
-          Function func  =  fromJust ( findContext' fname it )
-          params         =  map ptypeOf ( paramsOf func )
-          checkArgs      =  zipWith ( \e t -> checkExpr e it ctxs [ t ] ) args params
-          lengthErrMsg   =  "Invalid Number Of Arguments In Function Call"
-          lengthErr      =  toSemErr lengthErrMsg ( length params == length args )
+checkAssignRhs rhs@( RhsCall fname args ) it ctxs types  = 
+    if   null identErr 
+    then (checkType ( typeOf func ) types) ++ (concat checkArgs) ++ (lengthErr)          
+    else identErr
+  where
+    identErr       =  checkExpr ( IdentExpr fname ) it [ Function {} ] types 
+    Function func  =  fromJust ( findContext' fname it )
+    params         =  map ptypeOf ( paramsOf func )
+    checkArgs      =  zipWith ( \e t -> checkExpr e it ctxs [ t ] ) args params
+    lengthErrMsg   =  "Invalid Number Of Arguments In Function Call"
+    lengthErr      =  toSemErr lengthErrMsg ( length params == length args )
 
 
 -- ************************************************************************** --
@@ -394,49 +397,48 @@ checkExpr   PairLiterExpr     _ _ types  =  checkType NullType   types
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -e- -- -- 
 -- For a ParenthesisedExpr we check the expression contained therein
-checkExpr ( ParenthesisedExpr expr ) it ctxs types 
-  = checkExpr expr it ctxs types
+checkExpr ( ParenthesisedExpr expr ) it ctxs types  = 
+    checkExpr expr it ctxs types
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For an IdentExpr we check that the identifier has beed declared and is 
 -- within scope. If it is we check for type and context as well.
-checkExpr ( IdentExpr ident ) it ctxs types  
-  =  if  isJust identObj
-      then checkType itype types ++
-          checkCtx  ctx   ctxs
-      else notFoundErr
+checkExpr ( IdentExpr ident ) it ctxs types  =  
+    if   isJust identObj
+    then checkType itype types ++
+         checkCtx  ctx   ctxs
+    else notFoundErr
   where
-    identObj      = findIdent' ident it
-    notFoundErr   = checkFound ident identObj
-    (,) itype ctx = fromJust identObj
+    identObj       =  findIdent' ident it
+    notFoundErr    =  checkFound ident identObj
+    (,) itype ctx  =  fromJust identObj
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Let checkArrayElem do the job 
-checkExpr ( ArrayElemExpr arr ) it ctxs types
-  =  checkArrayElem arr it ctxs types
+checkExpr ( ArrayElemExpr arr ) it ctxs types  =  
+    checkArrayElem arr it ctxs types
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For a UnaryOperExpr we make sure the unary operation returns one of the 
 -- expected types and also that the expression argument for the operator is 
 -- of the expected type needed by the operator itself
-checkExpr unop@( UnaryOperExpr op expr ) it ctxs types
-  =  case op of  
-      NotUnOp -> checkUnOpExpr BoolType     BoolType    
-      LenUnOp -> checkUnOpExpr ArrayType {} IntType
-      OrdUnOp -> checkUnOpExpr CharType     IntType
-      ChrUnOp -> checkUnOpExpr IntType      CharType
-      NegUnOp -> checkUnOpExpr IntType      IntType
-      where
-        checkUnOpExpr     
-          :: Type            -- The type expected by the unary operator
-          -> Type            -- The type returned by the unary operator
-          -> [ SemanticErr ] -- Return a bunch of SemanticErr's (or none)
-        checkUnOpExpr inType outType
-          =  checkExpr expr it ctxs [ inType ] ++ 
-                               checkType outType types 
+checkExpr unop@( UnaryOperExpr op expr ) it ctxs types  =  
+  case op of  
+    NotUnOp -> checkUnOpExpr BoolType     BoolType    
+    LenUnOp -> checkUnOpExpr ArrayType {} IntType
+    OrdUnOp -> checkUnOpExpr CharType     IntType
+    ChrUnOp -> checkUnOpExpr IntType      CharType
+    NegUnOp -> checkUnOpExpr IntType      IntType
+  where
+    checkUnOpExpr     
+      :: Type            -- The type expected by the unary operator
+      -> Type            -- The type returned by the unary operator
+      -> [ SemanticErr ] -- Return a bunch of SemanticErr's (or none)
+    checkUnOpExpr inType outType  =  
+        checkExpr expr it ctxs [ inType ] ++ checkType outType types 
 
 
 
@@ -444,34 +446,34 @@ checkExpr unop@( UnaryOperExpr op expr ) it ctxs types
 -- For a BinaryOperExpr we make sure the binary operator returns one of the 
 -- expected types and also that the expression arguments for the operator  
 -- are of the expected type needed by the operator itself
-checkExpr binop@( BinaryOperExpr op expr expr' ) it ctxs types
-  =  case op of
-      -- Integer Binary Operators
-      AddBinOp -> checkBinOpExpr [ IntType ] IntType
-      SubBinOp -> checkBinOpExpr [ IntType ] IntType
-      MulBinOp -> checkBinOpExpr [ IntType ] IntType
-      DivBinOp -> checkBinOpExpr [ IntType ] IntType
-      ModBinOp -> checkBinOpExpr [ IntType ] IntType
-      -- Boolean Binary Operators
-      AndBinOp -> checkBinOpExpr [ BoolType ] BoolType
-      OrrBinOp -> checkBinOpExpr [ BoolType ] BoolType
-      -- Integer & Char Binary Operators
-      LsBinOp  -> checkBinOpExpr [ IntType , CharType ] BoolType
-      GtBinOp  -> checkBinOpExpr [ IntType , CharType ] BoolType
-      LEBinOp  -> checkBinOpExpr [ IntType , CharType ] BoolType
-      GEBinOp  -> checkBinOpExpr [ IntType , CharType ] BoolType
-      -- Equality Operators
-      NEBinOp  -> checkBinOpExpr [] BoolType
-      EqBinOp  -> checkBinOpExpr [] BoolType
-      where
-        checkBinOpExpr 
-          :: [ Type ]        -- The type(s) expected by the binary operator
-          -> Type            -- The type returned by the binary operator
-          -> [ SemanticErr ] -- Return a bunch of SemanticErr's (or none)
-        checkBinOpExpr inTypes outType    
-          = checkExpr expr  it ctxs inTypes ++
-            checkExpr expr' it ctxs inTypes ++
-            checkType outType types 
+checkExpr binop@( BinaryOperExpr op expr expr' ) it ctxs types  =  
+  case op of
+    -- Integer Binary Operators
+    AddBinOp -> checkBinOpExpr [ IntType ] IntType
+    SubBinOp -> checkBinOpExpr [ IntType ] IntType
+    MulBinOp -> checkBinOpExpr [ IntType ] IntType
+    DivBinOp -> checkBinOpExpr [ IntType ] IntType
+    ModBinOp -> checkBinOpExpr [ IntType ] IntType
+    -- Boolean Binary Operators
+    AndBinOp -> checkBinOpExpr [ BoolType ] BoolType
+    OrrBinOp -> checkBinOpExpr [ BoolType ] BoolType
+    -- Integer & Char Binary Operators
+    LsBinOp  -> checkBinOpExpr [ IntType , CharType ] BoolType
+    GtBinOp  -> checkBinOpExpr [ IntType , CharType ] BoolType
+    LEBinOp  -> checkBinOpExpr [ IntType , CharType ] BoolType
+    GEBinOp  -> checkBinOpExpr [ IntType , CharType ] BoolType
+    -- Equality Operators
+    NEBinOp  -> checkBinOpExpr [] BoolType
+    EqBinOp  -> checkBinOpExpr [] BoolType
+  where
+    checkBinOpExpr 
+      :: [ Type ]        -- The type(s) expected by the binary operator
+      -> Type            -- The type returned by the binary operator
+      -> [ SemanticErr ] -- Return a bunch of SemanticErr's (or none)
+    checkBinOpExpr inTypes outType  = 
+        checkExpr expr  it ctxs inTypes ++
+        checkExpr expr' it ctxs inTypes ++
+        checkType outType types 
 
 -- ************************************************************************** --
 -- *************************                      *************************** --

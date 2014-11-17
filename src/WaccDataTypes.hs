@@ -204,13 +204,18 @@ class Eq a => Eq' a where
 -- A NullType is always a PairType and viceversa
 -- A pair of any two types is always a PairType
 -- An array of any type is always an ArrayType
+-- A string is also an array type
 instance Eq' Type where
   PairType  _ ~== PairType  _  =  True 
   NullType    ~== PairType  _  =  True
   PairType  _ ~== NullType     =  True
   PairType  _ ~== _            =  False
+  
   ArrayType _ ~== ArrayType _  =  True
+  StringType  ~== ArrayType _  =  True
+  ArrayType _ ~== StringType   =  True 
   ArrayType _ ~== _            =  False
+
   t           ~== t'           =  t == t'
 
 
