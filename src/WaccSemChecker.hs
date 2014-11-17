@@ -77,77 +77,103 @@ checkStat
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
--- Skip statement
-checkStat SkipStat  =  error "TODO"
+-- Skip statement, nothing to do here
+checkStat SkipStat  =  []
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- A Free statement can only free a *variable* that points to a *pair* or to an
 -- *array* type. So we pattern match to capture an IdentExpr and check that it
 -- is a Variable or a Paramteer and that it is of type array or pair
-checkStat s@( FreeStat expr@( IdentExpr _ ) it )  =  error "TODO"
+checkStat s@( FreeStat expr@( IdentExpr _ ) it )  =  
+checkStat s@( FreeStat expr@( IdentExpr _ ) it )  = 
+    onStat s $ checkExpr expr it nonFunction [ PairType {} , ArrayType {} ]
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Any attempt to free another kind of expression is invalid
-checkStat s@( FreeStat _ _ )  =  error "TODO"
+checkStat s@( FreeStat _ _ )  = 
+    onStat s [ "Cannot Free A Non-Identifier Expression" ]
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- A Return statement must not appear inside the main function body and it must 
 -- evaluate to a result that is the same type of the result of the function
 -- it appears in
-checkStat s@( ReturnStat expr it )  =  error "TODO"
-
-
+checkStat s@( ReturnStat expr it )  =
+	onStat s $ if isNothing enclFunc then mainErr else enclErr
+	where
+		enclFunc = findEnclFunc it
+		enclErr  = checkExpr expr it nonFunction [ typeOf ( fromJust enclFunc ) ]
+		mainErr  = [ "Cannot Return From Main Function Body" ]
+		
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- An Exit statement must evaluate to a value of type integer 
-checkStat s@( ExitStat expr it )  =  error "TODO"
+checkStat s@( ExitStat expr it )  =
+	onStat s $ checkExpr expr it nonFunction [ IntType ]
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- A Print statement is legal as long as it doesn't use undefined identifiers
-checkStat s@( PrintStat expr it )  =  error "TODO"
+checkStat s@( PrintStat expr it )  = 
+	onStat s $ checkExpr expr it nonFunction []
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Semantic rules identical to those of PrintStat
-checkStat s@( PrintlnStat expr it )  =  error "TODO"
+checkStat s@( PrintlnStat expr it )  = 
+	onStat s $ checkExpr expr it nonFunction []
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For a Scoped statement we check the enclosed statement
-checkStat ( ScopedStat stat )  =  error "TODO"
+checkStat ( ScopedStat stat )  = 
+	checkStat stat
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For a Read statement we check semantic errors in its lhs expression
-checkStat s@( ReadStat lhs it )  =  error "TODO"
+checkStat s@( ReadStat lhs it )  = 
+	onStat s $ checkAssignLhs lhs it nonFunction []
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- A While statement requires the condition expression to be of BoolType
-checkStat ( WhileStat cond body it )  =  error "TODO"
+checkStat ( WhileStat cond body it )  = 
+	onExpr cond $ checkExpr cond it nonFunction [ BoolType ] ++ checkStat body
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Sequential checking of statements
-checkStat ( SeqStat stat stat' )  =  error "TODO"
+checkStat ( SeqStat stat stat' )  = 
+	checkStat stat ++ checkStat stat'
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For an If statement the condition must be bool
-checkStat ( IfStat cond sthen selse it )  =  error "TODO"
+checkStat ( IfStat cond sthen selse it )  = 
+	onExpr cond $ checkExpr cond it nonFunction [ BoolType ] ++ 
+	checkStat sthen ++
+	checkStat selse
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Not an easy one
-checkStat s@( AssignStat lhs rhs it ) =  error "TODO"
+checkStat s@( AssignStat lhs rhs it ) = 
+	onStat s $ if null lhsErr then rhsErr else lhsErr
+	where
+		lhsErr  = checkAssignLhs lhs it nonFunction [] 
+		lhsType = getLhsType ( lhs it )
+		rhsErr  = checkAssignRhs rhs it nonFunction [ lhsType ]
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Check for redeclarations in the same scope
-checkStat s@( DeclareStat vtype name rhs it )  =  error "TODO"
-
+checkStat s@( DeclareStat vtype name rhs it )  = 
+	onStat s $ if null definedErr then rhsErr else definedErr
+  	where
+    	rhsErr         =  checkAssignRhs rhs it nonFunction [ vtype ]
+    	definedErr     =  toSemErr definedErrMsg ( isDefined' name it )
+    	definedErrMsg  =  "Variable Already Defined @" ++ name
 
 -- ************************************************************************** --
 -- ***************************                   **************************** --
@@ -155,10 +181,11 @@ checkStat s@( DeclareStat vtype name rhs it )  =  error "TODO"
 -- ***************************                   **************************** -- 
 -- ************************************************************************** --
 
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
--- | Semantic check for AssignLhs
 checkAssignLhs :: AssignLhs -> It -> [ Context ] -> [ Type ] -> [ SemanticErr ]
-checkAssignLhs lhs it ctxs types  =  error "TODO"
+checkAssignLhs lhs it ctxs types  =  case lhs of 
+  LhsIdent     ident    -> checkExpr      ( IdentExpr ident ) it ctxs types           
+  LhsPairElem  pelem    -> checkPairElem    pelem             it ctxs types                 
+  LhsArrayElem arrelem  -> checkArrayElem   arrelem           it ctxs types
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
@@ -166,7 +193,13 @@ checkAssignLhs lhs it ctxs types  =  error "TODO"
 -- expressions are identifier expressions and array element expressions.
 -- In both cases they must point to an identifier of PairType
 checkPairElem :: PairElem -> It -> [ Context ] -> [ Type ] -> [ SemanticErr ]
-checkPairElem pelem it _ctxs types =  error "TODO"
+checkPairElem pelem it _ctxs types =  
+    if   isJust pelemType
+    then typeErr 
+    else [ "Could Not Retrieve Pair Type" ]
+  where
+    pelemType  =  getPairElemType pelem it 
+    typeErr    =  checkType ( fromJust pelemType ) types 
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
@@ -175,7 +208,14 @@ checkPairElem pelem it _ctxs types =  error "TODO"
 -- matches one of the expected types. We also check that all exprs representing
 -- the indices, evaluate to integers
 checkArrayElem  :: ArrayElem -> It -> [ Context ] -> [ Type ] -> [ SemanticErr ]
-checkArrayElem aelem@( ArrayElem ident exprs ) it ctxs types  =  error "TODO"
+checkArrayElem aelem@( ArrayElem ident exprs ) it ctxs types  = 
+    if   isJust aelemType
+    then typeErr ++ exprsErr
+    else [ "Could Not Retrieve Array Type @" ++ ident ]
+  where
+    aelemType  =  getArrayElemType aelem it 
+    typeErr    =  checkType ( fromJust aelemType ) types 
+    exprsErr   =  concatMap (\e -> checkExpr e it ctxs [ IntType ] ) exprs
 
 
 -- ************************************************************************** --
@@ -187,8 +227,10 @@ checkArrayElem aelem@( ArrayElem ident exprs ) it ctxs types  =  error "TODO"
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Get the type of a lhs assignment
 getLhsType         :: AssignLhs -> It -> Maybe Type
-getLhsType lhs it  =  error "TODO"
-
+getLhsType lhs it  =  case lhs of
+	LhsIdent    ident  -> findType' ident it
+    LhsPairElem pelem  -> getPairElemType pelem it
+    LhsArrayElem aelem -> getArrayElemType aelem it
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Get the type of a pair element. We try to check the containing expression
@@ -196,13 +238,59 @@ getLhsType lhs it  =  error "TODO"
 -- Otherwise we can safely pattermatch on PairType and retrieve the pair 
 -- element type
 getPairElemType           :: PairElem -> It -> Maybe Type
-getPairElemType pelem it  =  error "TODO"
+getPairElemType pelem it  =  case pelem of
+    Fst expr -> getPairElemType' expr fst 
+    Snd expr -> getPairElemType' expr snd
+  
+  where
+
+    getIdent                                          :: Expr -> Maybe IdentName
+    getIdent ( IdentExpr                 ident     )  =  Just ident
+    getIdent ( ArrayElemExpr ( ArrayElem ident _ ) )  =  Just ident
+    getIdent                                   _      =  Nothing
+
+    getType _     ( PairType   Nothing      )  =  NullType 
+    getType which ( PairType ( Just types ) )  =  which types  
+    getType _       _                          =  error "Unexpected"
+
+
+    getPairElemType' expr which  =  
+
+        if isJust pairIdent && isValidPair then obtainType else Nothing
+
+      where 
+
+        pairIdent             =  getIdent expr 
+
+        pairObj               =  findIdent' ( fromJust pairIdent ) it 
+  
+        (,) pairType pairCtx  =  fromJust pairObj
+
+        isValidPair           =  isJust pairObj          && 
+                                 ( pairType ~== PairType {} ||
+                                   pairType  == NullType  ) && 
+                                 pairCtx ~/= Function {}
+
+        obtainType            =  Just $ getType which pairType
+
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Get the type of an array element. 
 getArrayElemType                               :: ArrayElem -> It -> Maybe Type
-getArrayElemType ( ArrayElem ident exprs ) it  =  error "TODO"
+getArrayElemType ( ArrayElem ident exprs ) it  = 
+	if isValidArray then arrElemType else Nothing
+  where
+    arrayObj                  =  findIdent' ident it
+    (,) arrayType arrayCtx    =  fromJust arrayObj
+    isValidArray              =  isJust arrayObj            && 
+                                 arrayType ~== ArrayType {} && 
+                                 arrayCtx ~/= Function {}
+    arrElemType               =  Just $ deepen ( length exprs +1 ) arrayType
+
+    deepen 0   t              =  t
+    deepen n ( ArrayType t )  =  deepen ( n-1 ) t   
+    deepen _   t              =  t
 
 
 -- ************************************************************************** --
