@@ -17,7 +17,6 @@ main = do
         then do
             program <- readFile f
             parse program
-            
         else putStrLn f
 
 -------------------------------------------------------------------------------
@@ -61,16 +60,16 @@ parse source = do
   
   -- Get the result and act accordingly
   case result of
-      Right r -> exitWith   ExitSuccess
-
+      Right r -> check r
       Left  e -> exitWith $ ExitFailure 100
 
 -- TODO: type signature
 check programAST = do
   -- Takes a program AST and gets a list of error
-  let errors = checkProgram programAST
+  let errs = checkProgram programAST
+  putStrLn "errs"
 
   -- If list is empty, exit with success
-  if null errors 
-    then exitWith   ExitSuccess
-    else exitWith $ ExitFailure 200
+  if ( length errs > 0 )
+    then exitWith $ ExitFailure 200
+    else exitWith   ExitSuccess
