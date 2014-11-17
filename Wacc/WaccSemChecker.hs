@@ -34,8 +34,8 @@ checkProgram prog@( Program funcs _ )  =
     statementErrs        =  concatMap checkStat ( map bodyOf funcs' ) ++
                             checkStat main 
     duplicateErrs        =  checkFuncs            funcs ++ 
-                            concatMap checkParams funcs ++ 
-                            concatMap checkClash  funcs
+                            concatMap checkParams funcs  
+                            --concatMap checkClash  funcs
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
@@ -356,18 +356,38 @@ checkAssignRhs ( RhsNewPair efst esnd ) it ctxs types  =
 -- Note: this could use some improvements. There is a repeted call to findIndet.
 -- So first we check that the identifier is in scope and that is is a function.
 -- Once we are sure it is a Function we pattern match to expose the Func object.
-checkAssignRhs rhs@( RhsCall fname args ) it ctxs types  = 
-    if   null identErr 
-    then (checkType ( typeOf func ) types) ++ (concat checkArgs) ++ (lengthErr)          
-    else identErr
-  where
-    identErr       =  checkExpr ( IdentExpr fname ) it [ Function {} ] types 
-    Function func  =  fromJust ( findContext' fname it )
-    params         =  map ptypeOf ( paramsOf func )
-    checkArgs      =  zipWith ( \e t -> checkExpr e it ctxs [ t ] ) args params
-    lengthErrMsg   =  "Invalid Number Of Arguments In Function Call"
-    lengthErr      =  toSemErr lengthErrMsg ( length params == length args )
+checkAssignRhs rhs@( RhsCall fname args ) it@( ST encl _ ) ctxs types  =
+  
+  -- I look for fname in current table
+  case findIdent' fname it of 
 
+    -- Not found? Not found!
+    Nothing       -> [ "Function Not Found @" ++ fname ]
+
+    Just identObj -> case snd identObj of 
+                        Function func -> proceed func
+
+                        -- Keep looking one layer up
+                        _ -> case findIdent' fname encl of
+                               Nothing -> [ "Function Not Found @" ++ fname ]
+                               Just identObj -> case snd identObj of 
+                                                   Function func -> proceed func 
+                                                   _             -> [ "Wrong Ctx @" ++ fname ]
+
+  where
+
+    proceed  ( Func ftype _ params _ _ )  =   retTypeErr ++ concat argsErrs ++ lengthErr 
+      where 
+          retTypeErr     =  checkType ftype types  
+      
+          -- Args
+          argsErrs       =  zipWith ( \e t -> checkExpr e it ctxs [ t ] ) args ( map ptypeOf params )
+      
+          -- Lenght
+          lengthErrMsg   =  "Invalid Number Of Arguments In Function Call"
+          lengthErr      =  toSemErr lengthErrMsg ( length params == length args )
+
+---- 
 
 -- ************************************************************************** --
 -- **************************                    **************************** --

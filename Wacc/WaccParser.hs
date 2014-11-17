@@ -288,21 +288,18 @@ pExpr = buildExpressionParser waccOperators pExpr'
           then fail $ "Positive Integer Overflow @" ++ show int 
           else return int
         
-        
-        pNegIntLiter :: Parser IntLiter
-        pNegIntLiter = do
-          int <- waccInteger
-          return int 
 
         pNegUnOp str op = do 
             waccReservedOp str
             expr <- pExpr
 
             case expr of 
-                IntLiterExpr int -> if int > 2^31 
-                                    then fail $ "Negative Integer Overflow @" ++ show int 
-                                    else return $ UnaryOperExpr op expr 
-                _                -> return $ UnaryOperExpr op expr 
+                IntLiterExpr int -> 
+                    if int > 2^31 
+                    then fail   $ "Negative Integer Overflow @" ++ show int 
+                    else return $ UnaryOperExpr op expr 
+                _                ->  return $ UnaryOperExpr op expr 
+
 
 
         pUnOp string op = do 
