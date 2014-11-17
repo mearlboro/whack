@@ -174,17 +174,18 @@ checkStat s@( DeclareStat vtype name rhs it )  =
     	rhsErr         =  checkAssignRhs rhs it nonFunction [ vtype ]
     	definedErr     =  toSemErr definedErrMsg ( isDefined' name it )
     	definedErrMsg  =  "Variable Already Defined @" ++ name
-    	
+
 -- ************************************************************************** --
 -- ***************************                   **************************** --
 -- ***************************   LHS Semantics   **************************** --
 -- ***************************                   **************************** -- 
 -- ************************************************************************** --
 
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
--- | Semantic check for AssignLhs
 checkAssignLhs :: AssignLhs -> It -> [ Context ] -> [ Type ] -> [ SemanticErr ]
-checkAssignLhs lhs it ctxs types  =  error "TODO"
+checkAssignLhs lhs it ctxs types  =  case lhs of 
+  LhsIdent     ident    -> checkExpr      ( IdentExpr ident ) it ctxs types           
+  LhsPairElem  pelem    -> checkPairElem    pelem             it ctxs types                 
+  LhsArrayElem arrelem  -> checkArrayElem   arrelem           it ctxs types
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
@@ -192,7 +193,13 @@ checkAssignLhs lhs it ctxs types  =  error "TODO"
 -- expressions are identifier expressions and array element expressions.
 -- In both cases they must point to an identifier of PairType
 checkPairElem :: PairElem -> It -> [ Context ] -> [ Type ] -> [ SemanticErr ]
-checkPairElem pelem it _ctxs types =  error "TODO"
+checkPairElem pelem it _ctxs types =  
+    if   isJust pelemType
+    then typeErr 
+    else [ "Could Not Retrieve Pair Type" ]
+  where
+    pelemType  =  getPairElemType pelem it 
+    typeErr    =  checkType ( fromJust pelemType ) types 
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
@@ -201,7 +208,14 @@ checkPairElem pelem it _ctxs types =  error "TODO"
 -- matches one of the expected types. We also check that all exprs representing
 -- the indices, evaluate to integers
 checkArrayElem  :: ArrayElem -> It -> [ Context ] -> [ Type ] -> [ SemanticErr ]
-checkArrayElem aelem@( ArrayElem ident exprs ) it ctxs types  =  error "TODO"
+checkArrayElem aelem@( ArrayElem ident exprs ) it ctxs types  = 
+    if   isJust aelemType
+    then typeErr ++ exprsErr
+    else [ "Could Not Retrieve Array Type @" ++ ident ]
+  where
+    aelemType  =  getArrayElemType aelem it 
+    typeErr    =  checkType ( fromJust aelemType ) types 
+    exprsErr   =  concatMap (\e -> checkExpr e it ctxs [ IntType ] ) exprs
 
 
 -- ************************************************************************** --
@@ -213,8 +227,10 @@ checkArrayElem aelem@( ArrayElem ident exprs ) it ctxs types  =  error "TODO"
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Get the type of a lhs assignment
 getLhsType         :: AssignLhs -> It -> Maybe Type
-getLhsType lhs it  =  error "TODO"
-
+getLhsType lhs it  =  case lhs of
+	LhsIdent    ident  -> findType' ident it
+    LhsPairElem pelem  -> getPairElemType pelem it
+    LhsArrayElem aelem -> getArrayElemType aelem it
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Get the type of a pair element. We try to check the containing expression
@@ -222,13 +238,59 @@ getLhsType lhs it  =  error "TODO"
 -- Otherwise we can safely pattermatch on PairType and retrieve the pair 
 -- element type
 getPairElemType           :: PairElem -> It -> Maybe Type
-getPairElemType pelem it  =  error "TODO"
+getPairElemType pelem it  =  case pelem of
+    Fst expr -> getPairElemType' expr fst 
+    Snd expr -> getPairElemType' expr snd
+  
+  where
+
+    getIdent                                          :: Expr -> Maybe IdentName
+    getIdent ( IdentExpr                 ident     )  =  Just ident
+    getIdent ( ArrayElemExpr ( ArrayElem ident _ ) )  =  Just ident
+    getIdent                                   _      =  Nothing
+
+    getType _     ( PairType   Nothing      )  =  NullType 
+    getType which ( PairType ( Just types ) )  =  which types  
+    getType _       _                          =  error "Unexpected"
+
+
+    getPairElemType' expr which  =  
+
+        if isJust pairIdent && isValidPair then obtainType else Nothing
+
+      where 
+
+        pairIdent             =  getIdent expr 
+
+        pairObj               =  findIdent' ( fromJust pairIdent ) it 
+  
+        (,) pairType pairCtx  =  fromJust pairObj
+
+        isValidPair           =  isJust pairObj          && 
+                                 ( pairType ~== PairType {} ||
+                                   pairType  == NullType  ) && 
+                                 pairCtx ~/= Function {}
+
+        obtainType            =  Just $ getType which pairType
+
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Get the type of an array element. 
 getArrayElemType                               :: ArrayElem -> It -> Maybe Type
-getArrayElemType ( ArrayElem ident exprs ) it  =  error "TODO"
+getArrayElemType ( ArrayElem ident exprs ) it  = 
+	if isValidArray then arrElemType else Nothing
+  where
+    arrayObj                  =  findIdent' ident it
+    (,) arrayType arrayCtx    =  fromJust arrayObj
+    isValidArray              =  isJust arrayObj            && 
+                                 arrayType ~== ArrayType {} && 
+                                 arrayCtx ~/= Function {}
+    arrElemType               =  Just $ deepen ( length exprs +1 ) arrayType
+
+    deepen 0   t              =  t
+    deepen n ( ArrayType t )  =  deepen ( n-1 ) t   
+    deepen _   t              =  t
 
 
 -- ************************************************************************** --
