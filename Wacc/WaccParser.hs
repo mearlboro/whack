@@ -2,10 +2,10 @@
 -- :: 3.1. WACC Parsers ::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
-module WaccParser where
+module Wacc.WaccParser where
 
-import WaccDataTypes
-import WaccLanguageDef
+import Wacc.WaccDataTypes
+import Wacc.WaccLanguageDef
 
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
@@ -16,10 +16,10 @@ import Control.Monad.Fix          ( fix            )
 
 
 -- |3.1.1 Program .......................................................  28 --    
--- |3.1.2 Statements ....................................................  85 -- 
--- |3.1.3 Types ......................................................... 206 -- 
--- |3.1.4 Expressions ................................................... 246 -- 
--- |3.1.5 Identifiers, literals ......................................... 312 -- 
+-- |3.1.2 Statements ....................................................  86 -- 
+-- |3.1.3 Types ......................................................... 208 -- 
+-- |3.1.4 Expressions ................................................... 248 -- 
+-- |3.1.5 Identifiers, literals ......................................... 314 -- 
 
 -- | Utils .............................................................. 365 --
 -- | Test parser ........................................................ 392 --
@@ -61,11 +61,12 @@ pFunc = do
             IfStat      _ s s' _ -> and $ map returnsOrExits [ s , s' ]
             _                    -> False 
     
-    if   returnsOrExits body 
-    then return $ Func ftype name params body Empty
-    else fail "No Reachable Return/Exit Statement" 
-    
+    if returnsOrExits body 
+        then return $ Func ftype name params body Empty
+        else fail "No Reachable Return/Exit Statement" 
 
+
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <param-list> ::= <param> (',' <param>)* ::::::::::::::::::::::::::::::: --
 pParamList :: Parser ParamList
 pParamList = waccCommaSep pParam
@@ -198,10 +199,12 @@ pAssignRhs = choice
           args  <- waccParens pArgList
           return $ RhsCall fname args
 
+
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 -- :: <arg-list> ::= <expr> (',' <expr>)* ::::::::::::::::::::::::::::::::::: --
 pArgList :: Parser ArgList
 pArgList = waccCommaSep pExpr
+
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <pair-elem> ::= 'fst' <expr> | 'snd' <expr' ::::::::::::::::::::::::::: --
@@ -219,8 +222,10 @@ pPairElem
 
 pType :: Parser Type
 pType = do 
-    base  <-  pBaseType <|> pPairType
-    fix ( \f -> ( string "[]" >> fmap ArrayType f ) <|> return base )
+    base  <-  pBaseType 
+          <|> pPairType
+    fix ( \f  -> ( string "[]" >> fmap ArrayType f ) 
+             <|> return base )
 
         where
 
@@ -261,12 +266,12 @@ pExpr = buildExpressionParser waccOperators pExpr'
         pExpr' = choice 
             [ waccParens pExpr
             , try $ liftM ArrayElemExpr pArrayElem      
-            ,       liftM IdentExpr     waccIdentifier
             ,       liftM BoolLiterExpr pBoolLiter
             ,       liftM IntLiterExpr  pIntLiter
             ,       liftM CharLiterExpr pCharLiter
             ,       liftM StrLiterExpr  pStrLiter
-            ,       pWaccWord "null"    PairLiterExpr 
+            ,       pWaccWord "null"    PairLiterExpr
+            ,       liftM IdentExpr     waccIdentifier
             , pBinaryOperExpr
             , pUnaryOperExpr 
             ] <?> "pExpr"
@@ -310,9 +315,9 @@ pExpr = buildExpressionParser waccOperators pExpr'
 -- :: <array-elem> ::= <ident> '[' <expr> ']' ::::::::::::::::::::::::::::::: --
 pArrayElem :: Parser ArrayElem
 pArrayElem = do 
-  ident <- waccIdentifier
-  dims  <- many1 $ waccBrackets pExpr 
-  return $ ArrayElem ident dims
+    ident <- waccIdentifier
+    dims  <- many1 $ waccBrackets pExpr 
+    return $ ArrayElem ident dims
 
 
 -- 3.5. Literals
@@ -321,35 +326,35 @@ pArrayElem = do
 -- :: <int-liter> ::= <int-sign>? <digit>+ :::::::::::::::::::::::::::::::::: --
 pIntLiter :: Parser IntLiter
 pIntLiter = do
-  -- −2^31 to 2^31 − 1 inclusive.
-  int <- waccInteger
-  if   int >= -2^31 && int <= 2^31-1
-  then return int
-  else fail "Integer Out Of Bounds" 
+    -- −2^31 to 2^31 − 1 inclusive.
+    int <- waccInteger
+    if int >= -2^31 && int <= 2^31-1
+        then return int
+        else fail "Integer Out Of Bounds" 
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <bool-liter> ::= 'true' | 'false' ::::::::::::::::::::::::::::::::::::: --
 pBoolLiter :: Parser BoolLiter
 pBoolLiter 
-	=  pWaccWord "true" True 
+    =  pWaccWord "true" True 
    <|> pWaccWord "false" False 
+
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <char-liter> ::= ''' <char> ''' ::::::::::::::::::::::::::::::::::::::: --
 pCharLiter :: Parser CharLiter
 pCharLiter = do
-
   c <- lookAhead waccCharLiter
 
   if      c `elem` "\\\"\'" -- If char was one of "\' 
-  then do char  '\''        -- Then make sure it was escaped correctly
-          char  '\\'
-          oneOf "\\\"\'"
-          char  '\''
-          waccWhiteSpace
-          return c
-  else do waccCharLiter >>= return 
+      then do char  '\''        -- Then make sure it was escaped correctly
+              char  '\\'
+              oneOf "\\\"\'"
+              char  '\''
+              waccWhiteSpace
+              return c
+      else do waccCharLiter >>= return 
 
 
 
@@ -358,14 +363,11 @@ pCharLiter = do
 pStrLiter :: Parser StrLiter
 pStrLiter = waccStrLiter
 
+
 -- :: <array-liter> ::= '[' ( <expr> (',' <expr>)* )? ']' ::::::::::::::::::: --
 pArrayLiter :: Parser ArrayLiter
 pArrayLiter = waccBrackets $ waccCommaSep pExpr 
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <pair-liter> ::= 'null' ::::::::::::::::::::::::::::::::::::::::::::::: --
---pPairLiter :: Parser PairLiter
---pPairLiter = pWaccWord "null" Null
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -393,10 +395,6 @@ pWaccOp op value = waccReservedOp op >> return value
 --   return $ Data value
 pWaccLift :: String -> ( a -> b ) -> Parser a -> Parser b
 pWaccLift word f p = waccReserved word >> liftM f p
-
---   return $ Data value
---pWaccLift2 :: String -> ( a -> b -> c ) -> Parser a -> Parser b
---pWaccLift2 word f p t = waccReserved word >> liftM2 f p t
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --

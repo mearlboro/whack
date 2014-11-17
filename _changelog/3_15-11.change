@@ -1,0 +1,38 @@
+Changelog-3-15.11.2014 
+
+--------------------------------------------------------------------------------
+1. Cleanups
+- Renamed src/ to Wacc/ and each [Module] to Wacc.[Module].
+- Moved all testing libraries to a testing package.
+- Set up cabal package, compile script and makefile.
+
+2. Additions/changes
+-------------------------------------------------------------------------------
+  A. Main.hs
+     A.1 Added Main.hs, which will take a .wacc file and compiles it.
+
+     A.2 Main.hs throws the expected system exits for no_error and syntax_error.
+
+  B. Wacc/WaccDataTypes.hs
+     B.1 Implemented linear data types. (i.e. no more nested type, all are type
+         constructors of "Type").
+
+     B.2 Added NullType (for "null") and EmptyType (for "[]").
+
+  C. Wacc/WaccLanguageDef.hs
+     -
+
+  D. Wacc/WaccParsers.hs
+     D.1 pType now parses arrays with a fix function.
+
+     D.2 Implemented pCharLiter manually.
+         Fixed bug/charLiter/1.
+
+
+3. Testing
+-------------------------------------------------------------------------------
+- improved unit test library, which was temporary removed. All tests pass apart
+  from the one describing the behaviour of bug/unop/1.
+
+
+

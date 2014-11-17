@@ -1,19 +1,23 @@
-module WaccExamplesTester where
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: WACC file tester :::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+
+module WaccTesting.WaccExamplesTester where
+
+import Wacc.WaccDataTypes
+import Wacc.WaccLanguageDef
+import Wacc.WaccParser
+import Wacc.WaccSemAugmenter
+import Wacc.WaccSemChecker
 
 import Text.Parsec.Token
 import Text.ParserCombinators.Parsec
-import Control.Monad.IO.Class ( liftIO )
-import System.Directory
-import Data.List 
 import Control.Applicative
+import Control.Monad.IO.Class ( liftIO )
 import Control.Monad
-import System.FilePath ( (</>) )
-
-import WaccParser
-import WaccLanguageDef
-import WaccDataTypes
-import WaccSemAugmenter
-import WaccSemChecker
+import Data.List 
+import System.Directory
+import System.FilePath        ( (</>) )
 
 --------------------------------------------------------------------------------
 
@@ -29,18 +33,17 @@ isHidden  =  not . isPrefixOf "."
 getRecursiveContents :: FilePath -> IO [ File ] 
 getRecursiveContents dir = do    
     children <- filter isHidden <$> getDirectoryContents dir
-    let extract name = do {
-      let path = dir </> name 
-    ; isDirectory <- doesDirectoryExist path
-    ; if   isDirectory 
-      then getRecursiveContents path 
-      else return [( name , path )]
-    }
+    let extract name = do
+        let path = dir </> name 
+        isDirectory <- doesDirectoryExist path
+        if isDirectory 
+           then getRecursiveContents path 
+           else return [( name , path )]
     concat <$> forM children extract
 
 --------------------------------------------------------------------------------
 
-
+-- TODO: add comment/description
 testOne :: FilePath -> IO ()
 testOne path = do 
   -- Read source file 
@@ -77,7 +80,6 @@ parseOne shouldPass ( name , path ) = do
       putStrLn $ "FAILED (" ++ path ++ ")\n" ++ show r
       -- "Parser was supposed to fail but it parsed this: " ++ show r 
   
-
   -- Parser failed to parse something it was supposed to be able to parse
   let handleFail e = do 
       putStrLn $ replicate 80 '~' ++ "\nFAILED (" ++ path ++ ")\n" ++ show e
@@ -133,10 +135,10 @@ main = do
   -- ../WaccCompiler.hs_directory/wacc_examples
   pwd <- flip (++) "/wacc_examples/" <$> getCurrentDirectory 
   -- Check valid programs
-  parseBunch True ( pwd ++ "valid" ) 
+  --parseBunch True ( pwd ++ "valid" ) 
   -- Check invalid programs
   --parseBunch False ( pwd ++ "invalid" )
   
-  --parseBunch False ( pwd ++ "semanticErr" ) 
+  parseBunch True ( pwd ++ "semanticErr" ) 
 
  
