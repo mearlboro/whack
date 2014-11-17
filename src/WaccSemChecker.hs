@@ -99,9 +99,13 @@ checkStat s@( FreeStat _ _ )  =
 -- A Return statement must not appear inside the main function body and it must 
 -- evaluate to a result that is the same type of the result of the function
 -- it appears in
-checkStat s@( ReturnStat expr it )  =  error "TODO"
-
-
+checkStat s@( ReturnStat expr it )  =
+	onStat s $ if isNothing enclFunc then mainErr else enclErr
+	where
+		enclFunc = findEnclFunc it
+		enclErr  = checkExpr expr it [] [typeOf (fromJust enclFunc)]
+		mainErr  = ["Cannot Return From Main Function Body"]
+		
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- An Exit statement must evaluate to a value of type integer 
 checkStat s@( ExitStat expr it )  =  error "TODO"
