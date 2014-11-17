@@ -300,22 +300,64 @@ checkExpr ( IdentExpr ident ) it ctxs types
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Let checkArrayElem do the job 
-checkExpr ( ArrayElemExpr arr ) it ctxs types  =  error "TODO"
+checkExpr ( ArrayElemExpr arr ) it ctxs types
+  =  checkArrayElem arr it ctxs types
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For a UnaryOperExpr we make sure the unary operation returns one of the 
 -- expected types and also that the expression argument for the operator is 
 -- of the expected type needed by the operator itself
-checkExpr unop@( UnaryOperExpr op expr ) it ctxs types  =  error "TODO"
+checkExpr unop@( UnaryOperExpr op expr ) it ctxs types
+  =  case op of  
+      NotUnOp -> checkUnOpExpr BoolType     BoolType    
+      LenUnOp -> checkUnOpExpr ArrayType {} IntType
+      OrdUnOp -> checkUnOpExpr CharType     IntType
+      ChrUnOp -> checkUnOpExpr IntType      CharType
+      NegUnOp -> checkUnOpExpr IntType      IntType
+      where
+        checkUnOpExpr     
+          :: Type            -- The type expected by the unary operator
+          -> Type            -- The type returned by the unary operator
+          -> [ SemanticErr ] -- Return a bunch of SemanticErr's (or none)
+        checkUnOpExpr inType outType
+          =  checkExpr expr it ctxs [ inType ] ++ 
+                               checkType outType types 
+
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For a BinaryOperExpr we make sure the binary operator returns one of the 
 -- expected types and also that the expression arguments for the operator  
 -- are of the expected type needed by the operator itself
-checkExpr binop@( BinaryOperExpr op expr expr' ) it ctxs types  =  error "TODO"
-
+checkExpr binop@( BinaryOperExpr op expr expr' ) it ctxs types
+  =  case op of
+      -- Integer Binary Operators
+      AddBinOp -> checkBinOpExpr [ IntType ] IntType
+      SubBinOp -> checkBinOpExpr [ IntType ] IntType
+      MulBinOp -> checkBinOpExpr [ IntType ] IntType
+      DivBinOp -> checkBinOpExpr [ IntType ] IntType
+      ModBinOp -> checkBinOpExpr [ IntType ] IntType
+      -- Boolean Binary Operators
+      AndBinOp -> checkBinOpExpr [ BoolType ] BoolType
+      OrrBinOp -> checkBinOpExpr [ BoolType ] BoolType
+      -- Integer & Char Binary Operators
+      LsBinOp  -> checkBinOpExpr [ IntType , CharType ] BoolType
+      GtBinOp  -> checkBinOpExpr [ IntType , CharType ] BoolType
+      LEBinOp  -> checkBinOpExpr [ IntType , CharType ] BoolType
+      GEBinOp  -> checkBinOpExpr [ IntType , CharType ] BoolType
+      -- Equality Operators
+      NEBinOp  -> checkBinOpExpr [] BoolType
+      EqBinOp  -> checkBinOpExpr [] BoolType
+      where
+        checkBinOpExpr 
+          :: [ Type ]        -- The type(s) expected by the binary operator
+          -> Type            -- The type returned by the binary operator
+          -> [ SemanticErr ] -- Return a bunch of SemanticErr's (or none)
+        checkBinOpExpr inTypes outType    
+          = checkExpr expr  it ctxs inTypes ++
+            checkExpr expr' it ctxs inTypes ++
+            checkType outType types 
 
 -- ************************************************************************** --
 -- *************************                      *************************** --
