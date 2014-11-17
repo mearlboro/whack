@@ -221,12 +221,14 @@ checkAssignRhs
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Simple expression check here
-checkAssignRhs ( RhsExpr expr ) it ctxs types  =  error "TODO"
+checkAssignRhs ( RhsExpr expr ) it ctxs types    
+  = checkExpr expr it ctxs types 
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Delegate the check to checkPairElem
-checkAssignRhs ( RhsPairElem pelem ) it ctxs types  =  error "TODO"
+checkAssignRhs ( RhsPairElem pelem ) it ctxs types  
+  = checkPairElem pelem it ctxs types   
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
@@ -236,12 +238,23 @@ checkAssignRhs ( RhsPairElem pelem ) it ctxs types  =  error "TODO"
 -- Since AssignRhs only occurs in AssignStat and DeclareStat we are certain 
 -- that `types` will be a singleton list containing the array type, so we
 -- don't actually need to check explicitly that they are all of the same type
-checkAssignRhs ( RhsArrayLiter exprs ) it ctxs types  =  error "TODO"
+checkAssignRhs ( RhsArrayLiter exprs ) it ctxs types   
+  = concatMap ( \e -> checkExpr e it ctxs [ arrElemType ] ) exprs
+      where
+        arrElemType = case head types of 
+                        ArrayType t -> t 
+                        _           -> error "Weird"
+
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Once again, since AssignRhs only occurs in AssignStat and DeclareStat we are 
--- certain that `types` is a singleton list containing a PairType. 
-checkAssignRhs ( RhsNewPair efst esnd ) it ctxs types  =  error "TODO"
+-- certain that `types` is a singleton list containing a PairType. So we can 
+-- safely pattern match to extract its type
+checkAssignRhs ( RhsNewPair efst esnd ) it ctxs types   
+  = checkExpr efst it ctxs [ ftype ] ++
+    checkExpr esnd it ctxs [ stype ]
+      where 
+        PairType ( Just ( ftype , stype ) )  =  head types
   
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
@@ -249,7 +262,20 @@ checkAssignRhs ( RhsNewPair efst esnd ) it ctxs types  =  error "TODO"
 -- refers to a function object that is in scope. Then check that the argument
 -- list of expressions evaluates to a list of types that matches the number and 
 -- the types of the parameters of the function we are calling. 
-checkAssignRhs rhs@( RhsCall fname args ) it ctxs types  =  error "TODO"
+-- Note: this could use some improvements. There is a repeted call to findIndet.
+-- So first we check that the identifier is in scope and that is is a function.
+-- Once we are sure it is a Function we pattern match to expose the Func object.
+checkAssignRhs rhs@( RhsCall fname args ) it ctxs types   
+  = if   null identErr 
+      then (checkType ( typeOf func ) types) ++ (concat checkArgs) ++ (lengthErr)          
+      else identErr
+        where
+          identErr       =  checkExpr ( IdentExpr fname ) it [ Function {} ] types 
+          Function func  =  fromJust ( findContext' fname it )
+          params         =  map ptypeOf ( paramsOf func )
+          checkArgs      =  zipWith ( \e t -> checkExpr e it ctxs [ t ] ) args params
+          lengthErrMsg   =  "Invalid Number Of Arguments In Function Call"
+          lengthErr      =  toSemErr lengthErrMsg ( length params == length args )
 
 
 -- ************************************************************************** --
