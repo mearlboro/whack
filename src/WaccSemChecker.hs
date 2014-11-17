@@ -103,22 +103,25 @@ checkStat s@( ReturnStat expr it )  =
 	onStat s $ if isNothing enclFunc then mainErr else enclErr
 	where
 		enclFunc = findEnclFunc it
-		enclErr  = checkExpr expr it [] [typeOf (fromJust enclFunc)]
-		mainErr  = ["Cannot Return From Main Function Body"]
+		enclErr  = checkExpr expr it nonFunction [ typeOf ( fromJust enclFunc ) ]
+		mainErr  = [ "Cannot Return From Main Function Body" ]
 		
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- An Exit statement must evaluate to a value of type integer 
-checkStat s@( ExitStat expr it )  =  error "TODO"
+checkStat s@( ExitStat expr it )  =
+	onStat s $ checkExpr expr it nonFunction [ IntType ]
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- A Print statement is legal as long as it doesn't use undefined identifiers
-checkStat s@( PrintStat expr it )  =  error "TODO"
+checkStat s@( PrintStat expr it )  = 
+	onStat s $ checkExpr expr it nonFunction []
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Semantic rules identical to those of PrintStat
-checkStat s@( PrintlnStat expr it )  =  error "TODO"
+checkStat s@( PrintlnStat expr it )  = 
+	onStat s $ checkExpr expr it nonFunction []
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
