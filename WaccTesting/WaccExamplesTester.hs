@@ -139,7 +139,7 @@ main = do
   parseBunch True ( pwd ++ "valid" ) 
   -- Check invalid programs
   parseBunch False ( pwd ++ "syntaxErr" )
-  
-  parseBunch False ( pwd ++ "semanticErr" ) 
+  -- TODO: reimplement to be False 
+  parseBunch True  ( pwd ++ "semanticErr" ) 
 
  
