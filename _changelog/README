@@ -1,0 +1,6 @@
+The provided #temp.change# is to be used for writing down major updates. Please
+copy and edit. Naming convention is [#change_number#_dd-mm].change .
+
+Please write down the bugs you find and fix in #bugs# .
+
+Please add a new changelog at each major push to master .

@@ -1,16 +1,15 @@
-module WaccDataTypes where -- TODO rename into WaccTypes ?
-
-import Data.Map ( Map (..) )
-
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: 1. WACC Data Types :::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
+module Wacc.WaccDataTypes where
+
+import Data.Map ( Map (..) )
+
 -- TODO fit each comment into 80 chars
 data Program                                     -- <program> ::=
   = Program [ Func ] Stat                        -- 'begin' <func>* <stat> 'end'   
-  deriving ( Eq , Ord )   
- 
+  deriving ( Eq , Ord )    
 
 data Func                                         -- <func> ::= 
   = Func                                          -- <type> <ident> '(' <param-list>? ')' 'is' <stat> 'end'  
@@ -22,7 +21,6 @@ data Func                                         -- <func> ::=
   } deriving ( Eq , Ord )
  
 type ParamList = [ Param ]                       -- <param-list> ::= <param> (';' <param>)*   
-   
  
 -- TODO make into a type synonym ?
 -- type Param = ( Type , IdentName )
@@ -31,7 +29,6 @@ data Param                                       -- <param> ::=
   { ptypeOf :: Type                                
   , pnameOf :: IdentName
   } deriving ( Eq , Ord )  
-
 
 data Stat                                        -- <stat> ::=
   = SkipStat                                     -- 'skip' 
@@ -49,13 +46,11 @@ data Stat                                        -- <stat> ::=
   | DeclareStat Type      IdentName AssignRhs It -- <type> <ident> '=' <assign-rhs>
   deriving ( Eq , Ord )  
 
-
 data AssignLhs                                   -- <assign-lhs> ::=
   = LhsIdent     IdentName                       -- <ident>
   | LhsPairElem  PairElem                        -- <pair-elem>
   | LhsArrayElem ArrayElem                       -- <array-elem>
   deriving ( Eq , Ord )                             
- 
  
 data AssignRhs                                   -- <assign-rghs> ::=
   = RhsExpr       Expr                           -- <expr>
@@ -65,21 +60,17 @@ data AssignRhs                                   -- <assign-rghs> ::=
   | RhsCall       IdentName  ArgList             -- 'call' <ident> '(' <arg-list>? ')'
   deriving ( Eq , Ord )         
  
- 
 type ArgList = [ Expr ]                          -- <arg-list> ::= <expr> (',' <expr> )             
    
- 
 data PairElem                                    -- <pair-elem> ::=
   = Fst Expr                                     -- 'fst' <expr>
   | Snd Expr                                     -- 'snd' <expr>
   deriving ( Eq , Ord )           
- 
 
 -- TODO make into a type synonym
 data ArrayElem                                   -- <array-elem> ::=
   = ArrayElem IdentName [ Expr ]                 -- <ident> '[' <expr> ']'
   deriving ( Eq , Ord )   
- 
 
 -- TODO remove EmptyType?
 data Type                                        -- <type> ::=
@@ -92,7 +83,6 @@ data Type                                        -- <type> ::=
   | NullType                                     -- 'null'
   | EmptyType                                    -- <empty-array>
   deriving ( Eq , Ord )                         
-   
  
 data Expr                                        -- <expr> ::=
   = BoolLiterExpr     BoolLiter                  -- <bool-liter>
@@ -107,7 +97,6 @@ data Expr                                        -- <expr> ::=
   | BinaryOperExpr    BinaryOper Expr Expr       -- <expr> <binary-oper> <expr>
   deriving ( Eq , Ord )    
  
- 
 data UnaryOper                                   -- <unary-oper> ::=
   = NotUnOp                                      -- '!'
   | LenUnOp                                      -- 'len'
@@ -115,7 +104,6 @@ data UnaryOper                                   -- <unary-oper> ::=
   | ChrUnOp                                      -- 'chr'
   | NegUnOp                                      -- '-'
   deriving ( Eq , Ord , Enum )   
- 
  
 data BinaryOper                                  -- <binary-oper> ::=
   = AddBinOp                                     -- '+'
@@ -132,13 +120,10 @@ data BinaryOper                                  -- <binary-oper> ::=
   | EqBinOp                                      -- '=='
   | NEBinOp                                      -- '!='
   deriving ( Eq , Ord , Enum )       
- 
 
-type ArrayLiter = [ Expr ]                       -- <array-liter> ::= '[' ( <expr> (',' <expr>)* )? ']'                     
+type IdentName  = [ Char ]                            -- <ident> ::= (' '|'a'-'z'|'A'-'Z')(' '|'a'-'z'|'A'-'Z'|'0'-'9')*  
   
-type IdentName  = [ Char ]                       -- <ident> ::= (' '|'a'-'z'|'A'-'Z')(' '|'a'-'z'|'A'-'Z'|'0'-'9')*  
-
-type IntLiter   = Integer                        -- TODO add BNF description
+type IntLiter   = Integer                        -- <int-liter> ::= <int-sign>? <digit>+ 
 
 type BoolLiter  = Bool                           -- <bool-liter> ::= 'true' | 'false'   
   
@@ -148,6 +133,7 @@ type StrLiter   = [ Character ]                  -- <str-liter> ::= '"' <charact
   
 type Character  = Char                           -- <character> ::= any-ASCII-character-except-'\'-'''-'"' | '\' <escaped-char>   
 
+type ArrayLiter = [ Expr ]                       -- <array-liter> ::= '[' ( <expr> (',' <expr>)* )? ']'                     
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: 2. Symbol Table ::::::::::::::::::::::::::::::::::::::::::::::::::::::: --

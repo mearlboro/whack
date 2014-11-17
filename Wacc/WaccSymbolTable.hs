@@ -1,8 +1,11 @@
-module WaccSymbolTable
-( emptyTable
-, encloseIn
-, addParams
-, addFuncs
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: 4.1 Symbol Table :::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+module Wacc.WaccSymbolTable
+( SymbolTable (..)
+, Scope
+, newScope
+, addParam
 , addFunc
 , addVariable
 , isDefined
@@ -23,6 +26,9 @@ module WaccSymbolTable
 , nonFunction
 ) where
 
+import Wacc.WaccDataTypes
+import Wacc.WaccShowInstances
+
 import Data.Map            ( findWithDefault , Map (..) , insertWith   
                            , lookup , toList , empty    , insert        )
 import Control.Applicative ( (<$>)                                      )
@@ -31,8 +37,6 @@ import Data.Maybe          ( fromMaybe , fromJust , Maybe (..) , isJust
 import Data.Tuple          ( swap                                       )
 import Prelude hiding      ( lookup , empty                             )
 
-import WaccDataTypes
-import WaccShowInstances
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: Creation :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -165,9 +169,6 @@ isFunc'          :: IdentName -> It -> Bool
 isFunc' name it  =  findContext' name it == Just Function {} 
 
 
---isFuncCtx                 :: Context -> Bool 
---isFuncCtx ( Function _ )  =  True 
---isFuncCtx            _    =  False
 
 -- | Does the identifier name exist AND refer to a Variable object?
 isVariable          :: IdentName -> It -> Bool 
@@ -205,6 +206,4 @@ f `onEncl` ST    encl _  =  f encl
 nonFunction  :: [ Context ]
 nonFunction  =  [ Variable , Parameter ]
 
---isMainFunc  :: It -> Bool 
---isMainFunc  =  isNothing . findEnclFunc 
 
