@@ -67,7 +67,6 @@ parse source = do
 check programAST = do
   -- Takes a program AST and gets a list of error
   let errs = checkProgram programAST
-  putStrLn "errs"
 
   -- If list is empty, exit with success
   if ( length errs > 0 )
