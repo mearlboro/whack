@@ -77,19 +77,22 @@ checkStat
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
--- Skip statement
-checkStat SkipStat  =  error "TODO"
+-- Skip statement, nothing to do here
+checkStat SkipStat  =  []
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- A Free statement can only free a *variable* that points to a *pair* or to an
 -- *array* type. So we pattern match to capture an IdentExpr and check that it
 -- is a Variable or a Paramteer and that it is of type array or pair
-checkStat s@( FreeStat expr@( IdentExpr _ ) it )  =  error "TODO"
+checkStat s@( FreeStat expr@( IdentExpr _ ) it )  =  
+checkStat s@( FreeStat expr@( IdentExpr _ ) it )  = 
+    onStat s $ checkExpr expr it nonFunction [ PairType {} , ArrayType {} ]
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Any attempt to free another kind of expression is invalid
-checkStat s@( FreeStat _ _ )  =  error "TODO"
+checkStat s@( FreeStat _ _ )  = 
+    onStat s [ "Cannot Free A Non-Identifier Expression" ]
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
