@@ -80,6 +80,7 @@ parseOne shouldPass ( name , path ) = do
       putStrLn $ "FAILED (" ++ path ++ ")\n" ++ show r
       -- "Parser was supposed to fail but it parsed this: " ++ show r 
   
+
   -- Parser failed to parse something it was supposed to be able to parse
   let handleFail e = do 
       putStrLn $ replicate 80 '~' ++ "\nFAILED (" ++ path ++ ")\n" ++ show e
@@ -135,10 +136,10 @@ main = do
   -- ../WaccCompiler.hs_directory/wacc_examples
   pwd <- flip (++) "/wacc_examples/" <$> getCurrentDirectory 
   -- Check valid programs
-  --parseBunch True ( pwd ++ "valid" ) 
+  parseBunch True ( pwd ++ "valid" ) 
   -- Check invalid programs
-  --parseBunch False ( pwd ++ "invalid" )
+  parseBunch False ( pwd ++ "syntaxErr" )
   
-  parseBunch True ( pwd ++ "semanticErr" ) 
+  parseBunch False ( pwd ++ "semanticErr" ) 
 
  

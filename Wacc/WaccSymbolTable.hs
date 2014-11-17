@@ -1,11 +1,8 @@
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: 4.1 Symbol Table :::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 module Wacc.WaccSymbolTable
-( SymbolTable (..)
-, Scope
-, newScope
-, addParam
+( emptyTable
+, encloseIn
+, addParams
+, addFuncs
 , addFunc
 , addVariable
 , isDefined
@@ -36,7 +33,6 @@ import Data.Maybe          ( fromMaybe , fromJust , Maybe (..) , isJust
                            , isNothing                                  )
 import Data.Tuple          ( swap                                       )
 import Prelude hiding      ( lookup , empty                             )
-
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: Creation :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -169,7 +165,6 @@ isFunc'          :: IdentName -> It -> Bool
 isFunc' name it  =  findContext' name it == Just Function {} 
 
 
-
 -- | Does the identifier name exist AND refer to a Variable object?
 isVariable          :: IdentName -> It -> Bool 
 isVariable name it  =  findContext name it == Just Variable
@@ -205,5 +200,4 @@ f `onEncl` ST    encl _  =  f encl
 -- | Matches any context except a Function
 nonFunction  :: [ Context ]
 nonFunction  =  [ Variable , Parameter ]
-
 

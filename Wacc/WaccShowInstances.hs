@@ -1,6 +1,6 @@
-module WaccShowInstances where
+module Wacc.WaccShowInstances where
 
-import WaccDataTypes
+import Wacc.WaccDataTypes
 
 import Data.List  ( intersperse )
 import Data.Maybe ( fromJust    )
@@ -36,7 +36,7 @@ instance Show Context where
 
 show' :: [ Char ] -> Stat -> [ Char ]
 show' indent stat = case stat of 
-  SkipStat            -> indent ++ "skip"                            
+  SkipStat              -> indent ++ "skip"                            
   FreeStat    e it      -> indent ++ "free "     ++ show e ++ "  " ++ showTable it                       
   ReturnStat  e it      -> indent ++ "return "   ++ show e ++ "  " ++ showTable it                       
   ExitStat    e it      -> indent ++ "exit "     ++ show e ++ "  " ++ showTable it                 
