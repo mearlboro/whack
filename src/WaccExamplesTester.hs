@@ -1,9 +1,5 @@
 module WaccExamplesTester where
 
-import WaccParser
-import WaccLanguageDef
-import WaccDataTypes
-
 import Text.Parsec.Token
 import Text.ParserCombinators.Parsec
 import Control.Monad.IO.Class ( liftIO )
@@ -13,6 +9,11 @@ import Control.Applicative
 import Control.Monad
 import System.FilePath ( (</>) )
 
+import WaccParser
+import WaccLanguageDef
+import WaccDataTypes
+import WaccSemAugmenter
+import WaccSemChecker
 
 --------------------------------------------------------------------------------
 
@@ -39,17 +40,22 @@ getRecursiveContents dir = do
 
 --------------------------------------------------------------------------------
 
-parseOne' :: FilePath -> IO Program 
-parseOne' path = do 
+
+testOne :: FilePath -> IO ()
+testOne path = do 
   -- Read source file 
-  source <- readFile path -- putStrLn $ source
+  source <- readFile $ "wacc_examples/" ++ path -- putStrLn $ source
   -- Parse source file
   let result = parseWithEof pProgram source
-  case result of 
-    Right r -> return r 
-    Left  e -> error "Not parsed" 
 
-  
+  putStrLn $ replicate 80 '@'
+  putStrLn $ "Compiling " ++ show path ++ "\n"
+
+  case result of 
+    Right r -> do 
+        putStrLn $ show r 
+        putStrLn ( show $ checkProgram r )
+    Left  e -> error $ "Not parsed: " ++ show e 
 
 
 -- | Parses one wacc file and returns true if it was parsed correctly
@@ -71,6 +77,7 @@ parseOne shouldPass ( name , path ) = do
       putStrLn $ "FAILED (" ++ path ++ ")\n" ++ show r
       -- "Parser was supposed to fail but it parsed this: " ++ show r 
   
+
   -- Parser failed to parse something it was supposed to be able to parse
   let handleFail e = do 
       putStrLn $ replicate 80 '~' ++ "\nFAILED (" ++ path ++ ")\n" ++ show e
@@ -78,7 +85,22 @@ parseOne shouldPass ( name , path ) = do
   -- Get the result and act accordingly
   case result of -- putStrLn $ show result
       Right r -> if   shouldPass 
-                 then putStrLn ( show r ) >> return True 
+                 then do 
+
+                  let errs = unlines ( checkProgram r )
+                  when ( length errs > 0 ) ( do  
+                      putStrLn ( replicate 80 '*' ++ "\n*..." ++ 
+                                 drop ( length path - 74 ) path ++ " *" )
+                      putStrLn $ replicate 80 '*'
+    
+                      putStrLn $ show r ++ "\n"
+                      putStrLn $ concat ( replicate 10 "~@" )
+                      putStrLn ("Semantic Errors: " )
+                      putStrLn ( errs ) )
+
+                  --putStrLn ( show $ augmentProgram r ) >> 
+                  --putStrLn ( replicate 80 '#') >> 
+                  return True 
                  else handlePhantomParse r >> return False
 
       Left  e -> if   shouldPass 
@@ -111,8 +133,10 @@ main = do
   -- ../WaccCompiler.hs_directory/wacc_examples
   pwd <- flip (++) "/wacc_examples/" <$> getCurrentDirectory 
   -- Check valid programs
-  parseBunch True ( pwd ++ "valid" ) 
+  --parseBunch True ( pwd ++ "valid" ) 
   -- Check invalid programs
-  parseBunch False ( pwd ++ "invalid" ) 
+  --parseBunch False ( pwd ++ "invalid" )
+  
+  parseBunch True ( pwd ++ "semanticErr" ) 
 
  
