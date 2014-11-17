@@ -40,8 +40,14 @@ augmentFunc
 --      functionScope.
 augmentFunc globalScope func@( Func ftype name params body _ )  =  func'
   where
-    funcScope      =  addParams params . addFunc func $ encloseIn globalScope
-    ( _ , body' )  =  augmentStat body funcScope
+    -- Function scope contains only function name
+    funcScope      =  addFunc func $ encloseIn globalScope
+
+    -- Parameter scope contains the func args and is enclosed by func scope
+    paramsScope    =  addParams params $ encloseIn funcScope
+
+    ( _ , body' )  =  augmentStat body paramsScope
+    
     func'          =  Func ftype name params body' funcScope
 
  -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -110,6 +116,3 @@ augmentStat stat prevIt  =
       let ( nextIt  , first'  )  =  augmentStat first  prevIt
           ( nextIt' , second' )  =  augmentStat second nextIt
       in  ( nextIt' , SeqStat first' second' )
-
-
-
