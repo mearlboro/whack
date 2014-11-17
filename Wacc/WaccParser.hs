@@ -7,9 +7,11 @@ module WaccParser where
 import WaccDataTypes
 import WaccLanguageDef
 
+import Text.Parsec.Token ( integer )
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Token
+
 import Control.Applicative hiding ( (<|>) , many   )
 import Control.Monad              ( liftM , liftM2 )
 import Control.Monad.Fix          ( fix            )
@@ -261,29 +263,53 @@ pExpr = buildExpressionParser waccOperators pExpr'
         pExpr' = choice 
             [ waccParens pExpr
             , try $ liftM ArrayElemExpr pArrayElem      
+            ,       liftM IdentExpr     waccIdentifier
             ,       liftM BoolLiterExpr pBoolLiter
-            ,       liftM IntLiterExpr  pIntLiter
             ,       liftM CharLiterExpr pCharLiter
             ,       liftM StrLiterExpr  pStrLiter
-            ,       liftM IdentExpr     waccIdentifier
             ,       pWaccWord "null"    PairLiterExpr 
-            , pBinaryOperExpr
-            , pUnaryOperExpr 
+            ,       pBinaryOperExpr
+            ,       pUnaryOperExpr 
+            ,       liftM IntLiterExpr  pPosIntLiter
             ] <?> "pExpr"
 
         pUnaryOperExpr = choice
-            [ pUnOp "!"   NotUnOp
-            , pUnOp "len" LenUnOp
-            , pUnOp "ord" OrdUnOp
-            , pUnOp "chr" ChrUnOp
-            , pUnOp "-"   NegUnOp ]
+            [ pUnOp    "!"   NotUnOp
+            , pUnOp    "len" LenUnOp
+            , pUnOp    "ord" OrdUnOp
+            , pUnOp    "chr" ChrUnOp
+            , pNegUnOp "-"   NegUnOp ]
         
-            where
+                  
+        pPosIntLiter :: Parser IntLiter
+        pPosIntLiter = do
+          int <- waccInteger
+          if   int > 2^31
+          then fail $ "Positive Integer Overflow @" ++ show int 
+          else return int
         
-                pUnOp string op = do 
-                    waccReservedOp string
-                    liftM ( UnaryOperExpr op ) pExpr
         
+        pNegIntLiter :: Parser IntLiter
+        pNegIntLiter = do
+          int <- waccInteger
+          return int 
+
+        pNegUnOp str op = do 
+            waccReservedOp str
+            expr <- pExpr
+
+            case expr of 
+                IntLiterExpr int -> if int > 2^31 
+                                    then fail $ "Negative Integer Overflow @" ++ show int 
+                                    else return $ UnaryOperExpr op expr 
+                _                -> return $ UnaryOperExpr op expr 
+
+
+        pUnOp string op = do 
+            waccReservedOp string
+            liftM ( UnaryOperExpr op ) pExpr
+        
+
         pBinaryOperExpr = choice 
             [ pBinOp "+"  AddBinOp
             , pBinOp "-"  SubBinOp
@@ -299,7 +325,7 @@ pExpr = buildExpressionParser waccOperators pExpr'
             , pBinOp "==" EqBinOp
             , pBinOp "!=" NEBinOp ]
             
-            where
+            where 
                 
                 pBinOp str op = do 
                     waccReservedOp str 
@@ -319,14 +345,17 @@ pArrayElem = do
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <int-liter> ::= <int-sign>? <digit>+ :::::::::::::::::::::::::::::::::: --
-pIntLiter :: Parser IntLiter
-pIntLiter = do
-  -- −2^31 to 2^31 − 1 inclusive.
-  int <- waccInteger
-  if   int >= -2^31 && int <= 2^31-1
-  then return int
-  else fail "Integer Out Of Bounds" 
 
+
+  --if   int > 2^31-1
+  --then fail $ "Positive Integer Overflow @" ++ show int 
+  --else return int 
+
+  -- −2^31 to 2^31 − 1 inclusive.
+  --_int <- waccInteger
+  --if   _int >= ( -2^31 ) && _int <= ( 2^31-1 )
+  --then return _int
+  --else 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: <bool-liter> ::= 'true' | 'false' ::::::::::::::::::::::::::::::::::::: --
