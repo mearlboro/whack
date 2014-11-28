@@ -6,11 +6,7 @@ module Wacc.WaccDataTypes where -- TODO rename into WaccTypes ?
 
 import Data.Map ( Map (..) )
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: 1. WACC Data Types :::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
--- TODO fit each comment into 80 chars
 data Program                                     -- <program> ::=
   = Program [ Func ] Stat                        -- 'begin' <func>* <stat> 'end'   
   deriving ( Eq , Ord )   
