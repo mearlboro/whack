@@ -31,15 +31,14 @@ isHidden  =  not . isPrefixOf "."
 
 -- | Returns all non-hidden files in dir and in all its sub dirs if any
 getRecursiveContents :: FilePath -> IO [ File ] 
-getRecursiveContents dir = do    
+getRecursiveContents dir = do
     children <- filter isHidden <$> getDirectoryContents dir
-    let extract name = do {
-      let path = dir </> name 
-    ; isDirectory <- doesDirectoryExist path
-    ; if   isDirectory 
-      then getRecursiveContents path 
-      else return [( name , path )]
-    }
+    let extract name = do 
+        let path = dir </> name 
+        isDirectory <- doesDirectoryExist path
+        if isDirectory 
+            then getRecursiveContents path 
+            else return [( name , path )]
     concat <$> forM children extract
 
 --------------------------------------------------------------------------------
@@ -83,27 +82,24 @@ parseOne shouldPass ( name , path ) = do
     -- Get the result and act accordingly 
     case result of 
         -- Performs semantic check
-        Right r -> if shouldPass 
+        Right r -> if shouldPass
             then do 
                 let errs = unlines ( checkProgram r )
-                -- If there are semantic errors
                 when ( length errs > 0 ) ( do  
-                    putStrLn ( replicate 80 '*' ++ "\n*..." ++ 
-                               drop ( length path - 74 ) path ++ " *" )
-                    putStrLn $ replicate 80 '*'
-            
-                    putStrLn $ show r ++ "\n"
-                    putStrLn $ concat ( replicate 10 "~@" )
-                    putStrLn ("Semantic Errors: " )
+                --    putStrLn ( replicate 80 '*' ++ "\n*..." ++ 
+                --               drop ( length path - 74 ) path ++ " *" )
+                --    putStrLn $ replicate 80 '*'
+  
+                --    putStrLn $ show r ++ "\n"
+                --    putStrLn $ concat ( replicate 10 "~@" )
+                    putStrLn ("Exit: 200\nSemantic Errors: " )
                     putStrLn ( errs ) )
-                if length errs > 0
-                    then return False
-                    else return True
+
+                return True 
             else handlePhantomParse r >> return False
 
         Left e -> if shouldPass 
-            -- then handleFail e >> return False
-            then return False 
+            then handleFail e >> return False 
             else putStr "Exit: 100\n" >> return True
 
 --------------------------------------------------------------------------------
@@ -136,4 +132,4 @@ main = do
 
   -- Check invalid programs
   parseGroup False ( pwd ++ "syntaxErr"   ) 
-  parseGroup False ( pwd ++ "semanticErr" ) 
+  parseGroup True  ( pwd ++ "semanticErr" ) 
