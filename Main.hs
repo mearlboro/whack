@@ -70,5 +70,7 @@ check programAST = do
 
   -- If list is empty, exit with success
   if ( length errs > 0 )
-    then exitWith $ ExitFailure 200
+    then do
+        putStrLn $ unlines errs
+        exitWith $ ExitFailure 200
     else exitWith   ExitSuccess
