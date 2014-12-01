@@ -1,4 +1,4 @@
-module ARM11Instructions where
+module Wacc.ARM11Instructions where
 
 import Data.List (intersperse)
 
@@ -10,10 +10,10 @@ data Register
   | PC -- R15 | Program Counter
 
 -- Data synonyms
-data Rd = Register 
-data Rn = Register 
-data Rm = Register 
-data Rs = Register 
+type Rd = Register 
+type Rn = Register 
+type Rm = Register 
+type Rs = Register 
 
 -- This is used as an operand in many instructions
 data Operand2
@@ -71,6 +71,8 @@ data Instr
   | ORN Rd Rn Operand2  -- ORN              | ORN Rd, Rn, <Operand2> | Rd := Rn OR NOT Operand2
   | BIC Rd Rn Operand2  -- Bit Clear        | BIC Rd, Rn, <Operand2> | Rd := Rn AND NOT Operand2
   
+  -- TODO Add jump intructions
+  -- TODO push and pop  
 
 instance Show Register where
   show R0  = "r0"   
@@ -92,48 +94,49 @@ instance Show Register where
 
 
 instance Show Operand2 where
-    show Op2'ImmVal imm8m = "#" ++ show imm8m   -- #<imm8m>                  
-    show Op2'Reg    rm    = show  rm            -- Rm  
-    show Op2'LSL    rm rs = show' rm "LSL "  rs -- Rm, LSL Rs    
-    show Op2'LSR    rm rs = show' rm "LSR "  rs -- Rm, LSR Rs    
-    show Op2'ASR    rm rs = show' rm "ASR "  rs -- Rm, ASR Rs    
-    show Op2'ROR    rm rs = show' rm "ROR "  rs -- Rm, ROR Rs  
-    show Op2'LSL'Sh rm sh = show' rm "LSL #" sh -- Rm, LSL #<shift> | Allowed shifts 0-31
-    show Op2'LSR'Sh rm sh = show' rm "LSR #" sh -- Rm, LSR #<shift> | Allowed shifts 1-32
-    show Op2'ASR'Sh rm sh = show' rm "ASR #" sh -- Rm, ASR #<shift> | Allowed shifts 1-32
-    show Op2'ROR'Sh rm sh = show' rm "ROR #" sh -- Rm, ROR #<shift> | Allowed shifts 1-31
-  where
-    show' :: Show a => a -> String -> a -> String 
-    show' op mne op' = show op ++ ", " ++ mne ++ show op'
+  show (Op2'ImmVal imm8m) = "#" ++ show imm8m   -- #<imm8m>                  
+  show (Op2'Reg    rm   ) = show rm            -- Rm  
+  show (Op2'LSL    rm rs) = showOp2 rm "LSL "  rs -- Rm, LSL Rs    
+  show (Op2'LSR    rm rs) = showOp2 rm "LSR "  rs -- Rm, LSR Rs    
+  show (Op2'ASR    rm rs) = showOp2 rm "ASR "  rs -- Rm, ASR Rs    
+  show (Op2'ROR    rm rs) = showOp2 rm "ROR "  rs -- Rm, ROR Rs  
+  show (Op2'LSL'Sh rm sh) = showOp2 rm "LSL #" sh -- Rm, LSL #<shift> | Allowed shifts 0-31
+  show (Op2'LSR'Sh rm sh) = showOp2 rm "LSR #" sh -- Rm, LSR #<shift> | Allowed shifts 1-32
+  show (Op2'ASR'Sh rm sh) = showOp2 rm "ASR #" sh -- Rm, ASR #<shift> | Allowed shifts 1-32
+  show (Op2'ROR'Sh rm sh) = showOp2 rm "ROR #" sh -- Rm, ROR #<shift> | Allowed shifts 1-31
+
+showOp2             :: (Show a, Show b) => a -> String -> b -> String 
+showOp2 op mne op'  =  show op ++ ", " ++ mne ++ show op'
+
 
 instance Show Instr where
-    show ADD    rd rn  op2    = show' "ADD" [ rd, rn,  op2     ] -- ADD{S} Rd, Rn,        <Operand2>
-    show SUB    rd rn  op2    = show' "SUB" [ rd, rn,  op2     ] -- SUB{S} Rd, Rn,        <Operand2>
-    show MUL    rd rm  rs     = show' "MUL" [ rd, rm,  rs      ] -- MUL{S} Rd, Rm,        Rs        
-    show MLA    rd rm  rs  rn = show' "MLA" [ rd, rm,  rs,  rn ] -- MLA{S} Rd, Rm,        Rs,         Rn    
-    show SDIV   rd rn  rm     = show' "SDI" [ rd, rn,  rm      ] -- SDIV   Rd, Rn,        Rm        
-    show UDIV   rd rn  rm     = show' "UDI" [ rd, rn,  rm      ] -- UDIV   Rd, Rn,        Rm        
-    show MOV    rd op2        = show' "MOV" [ rd, op2,         ] -- MOV{S} Rd, <Operand2>
-    show ASR    rd rm  rs     = show' "ASR" [ rd, rm,  rs      ] -- ASR{S} Rd, Rm,        Rs  
-    show LSL    rd rm  rs     = show' "LSL" [ rd, rm,  rs      ] -- LSL{S} Rd, Rm,        Rs  
-    show LSR    rd rm  rs     = show' "LSR" [ rd, rm,  rs      ] -- LSR{S} Rd, Rm,        Rs  
-    show ROR    rd rm  rs     = show' "ROR" [ rd, rm,  rs      ] -- ROR{S} Rd, Rm,        Rs  
-    show ASR'Sh rd rm  sh     = show' "ASR" [ rd, rm,  sh      ] -- ASR{S} Rd, Rm,        sh  
-    show LSL'Sh rd rm  sh     = show' "LSL" [ rd, rm,  sh      ] -- LSL{S} Rd, Rm,        sh  
-    show LSR'Sh rd rm  sh     = show' "LSR" [ rd, rm,  sh      ] -- LSR{S} Rd, Rm,        sh  
-    show ROR'Sh rd rm  sh     = show' "ROR" [ rd, rm,  sh      ] -- ROR{S} Rd, Rm,        sh  
-    show CMP    rn op2        = show' "CMP" [ rn, op2,         ] -- CMP    Rn, <Operand2>  
-    show CMN    rn op2        = show' "CMN" [ rn, op2,         ] -- CMN    Rn, <Operand2>  
-    show TST    rn op2        = show' "TST" [ rn, op2,         ] -- TST    Rn, <Operand2>
-    show TEQ    rn op2        = show' "TEQ" [ rn, op2,         ] -- TEQ    Rn, <Operand2>
-    show AND    rd rn  op2    = show' "AND" [ rd, rn,  op2     ] -- AND    Rd, Rn,        <Operand2>
-    show EOR    rd rn  op2    = show' "EOR" [ rd, rn,  op2     ] -- EOR    Rd, Rn,        <Operand2>
-    show ORR    rd rn  op2    = show' "ORR" [ rd, rn,  op2     ] -- ORR    Rd, Rn,        <Operand2>
-    show ORN    rd rn  op2    = show' "ORN" [ rd, rn,  op2     ] -- ORN    Rd, Rn,        <Operand2>
-    show BIC    rd rn  op2    = show' "BIC" [ rd, rn,  op2     ] -- BIC    Rd, Rn,        <Operand2>
-  where
-    show'          :: Show a => String -> [a] -> String    
-    show' mne ops  =  mne ++ " " ++ intersperse ", " (map show ops)
+    show (ADD    rd rn  op2   ) = "ADD " ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- ADD{S} Rd, Rn,        <Operand2>
+    show (SUB    rd rn  op2   ) = "SUB " ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- SUB{S} Rd, Rn,        <Operand2>
+    show (MUL    rd rm  rs    ) = "MUL " ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    -- MUL{S} Rd, Rm,        Rs        
+    show (MLA    rd rm  rs  rn) = "MLA " ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs ++ ", " ++ show rn -- MLA{S} Rd, Rm,        Rs,         Rn    
+    show (SDIV   rd rn  rm    ) = "SDI " ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rm                    -- SDIV   Rd, Rn,        Rm        
+    show (UDIV   rd rn  rm    ) = "UDI " ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rm                    -- UDIV   Rd, Rn,        Rm        
+    show (MOV    rd op2       ) = "MOV " ++ show rd ++ ", " ++ show op2                                       -- MOV{S} Rd, <Operand2>
+    show (ASR    rd rm  rs    ) = "ASR " ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    -- ASR{S} Rd, Rm,        Rs  
+    show (LSL    rd rm  rs    ) = "LSL " ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    -- LSL{S} Rd, Rm,        Rs  
+    show (LSR    rd rm  rs    ) = "LSR " ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    -- LSR{S} Rd, Rm,        Rs  
+    show (ROR    rd rm  rs    ) = "ROR " ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    -- ROR{S} Rd, Rm,        Rs  
+    show (ASR'Sh rd rm  sh    ) = "ASR " ++ show rd ++ ", " ++ show rm  ++ ", " ++ show sh                    -- ASR{S} Rd, Rm,        sh  
+    show (LSL'Sh rd rm  sh    ) = "LSL " ++ show rd ++ ", " ++ show rm  ++ ", " ++ show sh                    -- LSL{S} Rd, Rm,        sh  
+    show (LSR'Sh rd rm  sh    ) = "LSR " ++ show rd ++ ", " ++ show rm  ++ ", " ++ show sh                    -- LSR{S} Rd, Rm,        sh  
+    show (ROR'Sh rd rm  sh    ) = "ROR " ++ show rd ++ ", " ++ show rm  ++ ", " ++ show sh                    -- ROR{S} Rd, Rm,        sh  
+    show (CMP    rn op2       ) = "CMP " ++ show rn ++ ", " ++ show op2                                       -- CMP    Rn, <Operand2>  
+    show (CMN    rn op2       ) = "CMN " ++ show rn ++ ", " ++ show op2                                       -- CMN    Rn, <Operand2>  
+    show (TST    rn op2       ) = "TST " ++ show rn ++ ", " ++ show op2                                       -- TST    Rn, <Operand2>
+    show (TEQ    rn op2       ) = "TEQ " ++ show rn ++ ", " ++ show op2                                       -- TEQ    Rn, <Operand2>
+    show (AND    rd rn  op2   ) = "AND " ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- AND    Rd, Rn,        <Operand2>
+    show (EOR    rd rn  op2   ) = "EOR " ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- EOR    Rd, Rn,        <Operand2>
+    show (ORR    rd rn  op2   ) = "ORR " ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- ORR    Rd, Rn,        <Operand2>
+    show (ORN    rd rn  op2   ) = "ORN " ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- ORN    Rd, Rn,        <Operand2>
+    show (BIC    rd rn  op2   ) = "BIC " ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- BIC    Rd, Rn,        <Operand2>
+
+--showInstr             :: (Show a, Show b) => String -> [a] -> [b] -> String    
+--showInstr mne rs ops  =  mne ++ " " ++ concat (intersperse ", " $ map show ops)
 
 -- All test
 -- modules
