@@ -71,13 +71,18 @@ parseOne shouldPass ( name , path ) = do
     -- Parse source file
     let result = parseWithEof pProgram source
     
+    -- Prints filename and separators 
+    let putTestDetails name = putStrLn ( replicate 80 '-' ++ "\n" ++ name )
+
     -- Invalid program yet the parser parsed something... 
     let handlePhantomParse r = do 
-        putStrLn $ replicate 80 '~' ++ "\nFAILED (" ++ path ++ ")\n" ++ show r 
+        putTestDetails name
+        putStrLn $ "FAILED!\n" ++ show r 
     
     -- Parser failed to parse something it was supposed to be able to parse
     let handleFail e = do 
-        putStrLn $ replicate 80 '~' ++ "\nFAILED (" ++ path ++ ")\n" ++ show e
+        putTestDetails name
+        putStrLn $ "FAILED!\n" ++ show e 
 
     -- Get the result and act accordingly 
     case result of 
@@ -85,22 +90,22 @@ parseOne shouldPass ( name , path ) = do
         Right r -> if shouldPass
             then do 
                 let errs = unlines ( checkProgram r )
-                when ( length errs > 0 ) ( do  
-                --    putStrLn ( replicate 80 '*' ++ "\n*..." ++ 
-                --               drop ( length path - 74 ) path ++ " *" )
-                --    putStrLn $ replicate 80 '*'
-  
-                --    putStrLn $ show r ++ "\n"
-                --    putStrLn $ concat ( replicate 10 "~@" )
-                    putStrLn ("Exit: 200\nSemantic Errors: " )
-                    putStrLn ( errs ) )
+                -- when ( length errs > 0 ) ( do  
+                --     putTestDetails name
+                --     putStrLn ("Exit: 200\nSemantic Errors: " )
+                --     putStrLn ( errs ) )
 
                 return True 
             else handlePhantomParse r >> return False
 
         Left e -> if shouldPass 
             then handleFail e >> return False 
-            else putStr "Exit: 100\n" >> return True
+            else do
+                -- putTestDetails name
+                -- putStrLn $ show e
+                -- putStr "Exit: 100\n"
+                return True
+
 
 --------------------------------------------------------------------------------
 
