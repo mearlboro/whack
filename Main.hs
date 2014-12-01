@@ -14,7 +14,7 @@ import Wacc.Semantics.Checker
 main = do
     args       <- getArgs
     (valid, f) <- verifyArgs args
-    if valid 
+    if valid
         then do
             program <- readFile f
             parse program
@@ -25,11 +25,11 @@ main = do
 -- |Verifies whether the program arguments are compatible with the compiler and
 -- returns True or False, and the file name or an error message respectively.
 verifyArgs :: [String] -> IO (Bool, String)
-verifyArgs args = do 
+verifyArgs args = do
     -- error message to print to the console.
     let msg = "Expecting a .wacc file."
 
-    if length args < 1 
+    if length args < 1
         then return (False, msg )
         else do
             -- .wacc file is first argument.
@@ -54,11 +54,11 @@ verifyArgs args = do
 -- exit 200 : #semantic_error#
 
 parse :: FilePath -> IO ()
-parse source = do 
-  
+parse source = do
+
   -- Parse source file
   let result = parseWithEof pProgram source
-  
+
   -- Get the result and act accordingly
   case result of
       Right r -> check r

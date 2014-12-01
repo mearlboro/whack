@@ -1,4 +1,4 @@
-module Wacc.Data.DataTypes where 
+module Wacc.Data.DataTypes where
 
 import Data.Map   ( Map (..)  )
 
@@ -6,7 +6,7 @@ import Data.Map   ( Map (..)  )
 -- **************************                  ****************************** --
 -- **************************   WACC Grammar   ****************************** --
 -- **************************    Data Types    ****************************** --
--- **************************                  ****************************** -- 
+-- **************************                  ****************************** --
 -- ************************************************************************** --
 
 
@@ -16,32 +16,32 @@ import Data.Map   ( Map (..)  )
 --   The lateral comments describe the Backus-Naur form syntax of WACC. -- -- --
 
 data Program                                     -- <program> ::=
-  = Program [ Func ] Stat                        -- 'begin' <func>* <stat> 'end'   
-  deriving ( Eq , Ord )   
+  = Program [ Func ] Stat                        -- 'begin' <func>* <stat> 'end'
+  deriving ( Eq , Ord )
 
-data Func                                         -- <func> ::= 
-  = Func                                          -- <type> <ident> '(' <param-list>? ')' 'is' <stat> 'end'  
-  { typeOf   :: Type 
+data Func                                         -- <func> ::=
+  = Func                                          -- <type> <ident> '(' <param-list>? ')' 'is' <stat> 'end'
+  { typeOf   :: Type
   , nameOf   :: IdentName
   , paramsOf :: ParamList
-  , bodyOf   :: Stat 
-  , scopeOf  :: It 
+  , bodyOf   :: Stat
+  , scopeOf  :: It
   } deriving ( Eq , Ord )
- 
-type ParamList = [ Param ]                       -- <param-list> ::= <param> (';' <param>)*   
-   
+
+type ParamList = [ Param ]                       -- <param-list> ::= <param> (';' <param>)*
+
 data Param                                       -- <param> ::=
-  = Param                                        -- <type> <ident> 
-  { ptypeOf :: Type                                
+  = Param                                        -- <type> <ident>
+  { ptypeOf :: Type
   , pnameOf :: IdentName
-  } deriving ( Eq , Ord )  
+  } deriving ( Eq , Ord )
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- | Each statement is initialised with an empty identifier table. During the --
 --   process of semantic analysis, this table It will be augmented with the   --
 --   set of variables enclosed in the statement's scope. -- -- -- -- -- -- -- --
 data Stat                                        -- <stat> ::=
-  = SkipStat                                     -- 'skip' 
+  = SkipStat                                     -- 'skip'
   | FreeStat    Expr                          It -- 'free' <expr>
   | ReturnStat  Expr                          It -- 'return' <expr>
   | ExitStat    Expr                          It -- 'exit' <expr>
@@ -54,32 +54,32 @@ data Stat                                        -- <stat> ::=
   | AssignStat  AssignLhs AssignRhs           It -- <assign-lhs> '=' <assign-rhs>
   | IfStat      Expr      Stat      Stat      It -- 'if' <expr> 'then' <stat> 'else' <stat> 'fi'
   | DeclareStat Type      IdentName AssignRhs It -- <type> <ident> '=' <assign-rhs>
-  deriving ( Eq , Ord )  
+  deriving ( Eq , Ord )
 
 data AssignLhs                                   -- <assign-lhs> ::=
   = LhsIdent     IdentName                       -- <ident>
   | LhsPairElem  PairElem                        -- <pair-elem>
   | LhsArrayElem ArrayElem                       -- <array-elem>
-  deriving ( Eq , Ord )                             
- 
+  deriving ( Eq , Ord )
+
 data AssignRhs                                   -- <assign-rghs> ::=
   = RhsExpr       Expr                           -- <expr>
   | RhsPairElem   PairElem                       -- <pair-elem>
   | RhsArrayLiter ArrayLiter                     -- <array-liter>
   | RhsNewPair    Expr       Expr                -- 'newpair' '(' <expr> ',' <expr> ')'
   | RhsCall       IdentName  ArgList             -- 'call' <ident> '(' <arg-list>? ')'
-  deriving ( Eq , Ord )         
- 
-type ArgList = [ Expr ]                          -- <arg-list> ::= <expr> (',' <expr> )             
- 
+  deriving ( Eq , Ord )
+
+type ArgList = [ Expr ]                          -- <arg-list> ::= <expr> (',' <expr> )
+
 data PairElem                                    -- <pair-elem> ::=
   = Fst Expr                                     -- 'fst' <expr>
   | Snd Expr                                     -- 'snd' <expr>
-  deriving ( Eq , Ord )           
- 
+  deriving ( Eq , Ord )
+
 data ArrayElem                                   -- <array-elem> ::=
   = ArrayElem IdentName [ Expr ]                 -- <ident> '[' <expr> ']'
-  deriving ( Eq , Ord )   
+  deriving ( Eq , Ord )
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- | WACC's language specification defines a nested type system. In order to  --
@@ -88,16 +88,16 @@ data ArrayElem                                   -- <array-elem> ::=
 --   EmptyType for the wildcard type of the empty array. -- -- -- -- -- -- -- --
 -- | For more details, see WaccParser. -- -- -- -- -- -- -- -- -- -- -- -- -- --
 data Type                                        -- <type> ::=
-  = IntType                                      -- 'int' 
+  = IntType                                      -- 'int'
   | BoolType                                     -- 'bool'
   | CharType                                     -- 'char'
   | StringType                                   -- 'string'
-  | PairType ( Maybe ( Type , Type ) )           -- <pair-type> ::= 'pair' '(' <pair-elem-type> ',' <pair-elem-type> ')'    
+  | PairType ( Maybe ( Type , Type ) )           -- <pair-type> ::= 'pair' '(' <pair-elem-type> ',' <pair-elem-type> ')'
   | ArrayType Type                               -- <array-type>
   | NullType                                     -- 'null'
   | EmptyType                                    -- <empty-array>
-  deriving ( Eq , Ord )                         
-   
+  deriving ( Eq , Ord )
+
 data Expr                                        -- <expr> ::=
   = BoolLiterExpr     BoolLiter                  -- <bool-liter>
   | CharLiterExpr     CharLiter                  -- <char-liter>
@@ -109,16 +109,16 @@ data Expr                                        -- <expr> ::=
   | PairLiterExpr                                -- <pair-liter>
   | ArrayElemExpr     ArrayElem                  -- <array-elem>
   | BinaryOperExpr    BinaryOper Expr Expr       -- <expr> <binary-oper> <expr>
-  deriving ( Eq , Ord )    
- 
+  deriving ( Eq , Ord )
+
 data UnaryOper                                   -- <unary-oper> ::=
   = NotUnOp                                      -- '!'
   | LenUnOp                                      -- 'len'
   | OrdUnOp                                      -- 'ord'
   | ChrUnOp                                      -- 'chr'
   | NegUnOp                                      -- '-'
-  deriving ( Eq , Ord , Enum )   
- 
+  deriving ( Eq , Ord , Enum )
+
 data BinaryOper                                  -- <binary-oper> ::=
   = AddBinOp                                     -- '+'
   | SubBinOp                                     -- '-'
@@ -133,21 +133,21 @@ data BinaryOper                                  -- <binary-oper> ::=
   | GEBinOp                                      -- '>='
   | EqBinOp                                      -- '=='
   | NEBinOp                                      -- '!='
-  deriving ( Eq , Ord , Enum )       
+  deriving ( Eq , Ord , Enum )
 
-type ArrayLiter = [ Expr ]                       -- <array-liter> ::= '[' ( <expr> (',' <expr>)* )? ']'                     
-  
-type IdentName  = [ Char ]                       -- <ident> ::= (' '|'a'-'z'|'A'-'Z')(' '|'a'-'z'|'A'-'Z'|'0'-'9')*  
+type ArrayLiter = [ Expr ]                       -- <array-liter> ::= '[' ( <expr> (',' <expr>)* )? ']'
+
+type IdentName  = [ Char ]                       -- <ident> ::= (' '|'a'-'z'|'A'-'Z')(' '|'a'-'z'|'A'-'Z'|'0'-'9')*
 
 type IntLiter   = Integer                        -- <int-sign>? <digit>+
 
-type BoolLiter  = Bool                           -- <bool-liter> ::= 'true' | 'false'   
-  
-type CharLiter  = Character                      -- <char-liter> ::= ''' <character> '''                  
-  
-type StrLiter   = [ Character ]                  -- <str-liter> ::= '"' <character>* '"'   
-  
-type Character  = Char                           -- <character> ::= any-ASCII-character-except-'\'-'''-'"' | '\' <escaped-char>   
+type BoolLiter  = Bool                           -- <bool-liter> ::= 'true' | 'false'
+
+type CharLiter  = Character                      -- <char-liter> ::= ''' <character> '''
+
+type StrLiter   = [ Character ]                  -- <str-liter> ::= '"' <character>* '"'
+
+type Character  = Char                           -- <character> ::= any-ASCII-character-except-'\'-'''-'"' | '\' <escaped-char>
 
 
 
@@ -155,7 +155,7 @@ type Character  = Char                           -- <character> ::= any-ASCII-ch
 -- :: Grammar Type Utils :::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
--- | Relaxed Eq class 
+-- | Relaxed Eq class
 class Eq a => Eq' a where
   (~==)    :: a -> a -> Bool
   (~/=)    :: a -> a -> Bool
@@ -169,14 +169,14 @@ class Eq a => Eq' a where
 --   An array of any type is always an ArrayType
 --   A string is also an array type
 instance Eq' Type where
-  PairType  _ ~== PairType  _  =  True 
+  PairType  _ ~== PairType  _  =  True
   NullType    ~== PairType  _  =  True
   PairType  _ ~== NullType     =  True
   PairType  _ ~== _            =  False
-  
+
   ArrayType _ ~== ArrayType _  =  True
   StringType  ~== ArrayType _  =  True
-  ArrayType _ ~== StringType   =  True 
+  ArrayType _ ~== StringType   =  True
   ArrayType _ ~== _            =  False
 
   t           ~== t'           =  t == t'
@@ -198,28 +198,28 @@ instance Eq' Context where
 -- **************************                  ****************************** --
 -- **************************   Symbol Table   ****************************** --
 -- **************************    Data  Type    ****************************** --
--- **************************                  ****************************** -- 
+-- **************************                  ****************************** --
 -- ************************************************************************** --
 
 -- | General purpose symbol table
-data SymbolTable k a 
-  = Empty 
-  | ST ( SymbolTable k a ) ( Map k a ) 
+data SymbolTable k a
+  = Empty
+  | ST ( SymbolTable k a ) ( Map k a )
   deriving ( Eq , Ord )
 
--- | An identifier table is a symbol table that maps identifier names to       
---   identifier objects. It may be empty or it may have: a dictionary (Map)   
---   that maps the names to the objects, as well as an enclosing identifier   
---   table. Identifier tables are usually linked with `scopes` in the program 
---   and contain the map of identifier names to identifier objects. 
+-- | An identifier table is a symbol table that maps identifier names to
+--   identifier objects. It may be empty or it may have: a dictionary (Map)
+--   that maps the names to the objects, as well as an enclosing identifier
+--   table. Identifier tables are usually linked with `scopes` in the program
+--   and contain the map of identifier names to identifier objects.
 type IdentTable = SymbolTable IdentName IdentObj
 
--- | An identifier may appear in a program as a Variable name, Function name 
+-- | An identifier may appear in a program as a Variable name, Function name
 --   or Parameter name. In case of a funcion we save the actual Func object
-data Context 
-  = Variable 
-  | Function Func 
-  | Parameter 
+data Context
+  = Variable
+  | Function Func
+  | Parameter
   deriving ( Eq , Ord )
 
 -- | An identifier object has a type and the context it appears in
