@@ -1,8 +1,4 @@
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: 2. WACC Language Definition ::::::::::::::::::::::::::::::::::::::::::: --
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
-
-module Wacc.WaccLanguageDef
+module Wacc.Syntax.LanguageDef
 ( waccIdentifier
 , waccReserved
 , waccReservedOp
@@ -24,7 +20,7 @@ module Wacc.WaccLanguageDef
 , waccLexeme
 ) where
 
-import Wacc.WaccDataTypes
+import Wacc.Data.DataTypes
 
 import Control.Monad.Identity
 import Text.ParserCombinators.Parsec
@@ -32,7 +28,16 @@ import Text.ParserCombinators.Parsec.Expr
 import Text.ParserCombinators.Parsec.Language ( emptyDef , haskellStyle )
 import qualified Text.ParserCombinators.Parsec.Token as Token
 
---------------------------------------------------------------------------------
+-- ************************************************************************** --
+-- *************************                    ***************************** --
+-- *************************   WACC  Language   ***************************** --
+-- *************************     Definition     ***************************** --
+-- *************************                    ***************************** -- 
+-- ************************************************************************** --
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- The set of reseved keywords/tokens in the WACC language
 reservedWords :: [ String ]
 reservedWords
   = [  "begin",     "end",   "is", "skip", "read", "free", "return",  "exit"
@@ -40,14 +45,15 @@ reservedWords
     ,   "done", "newpair", "call",  "fst",  "snd",  "int",   "bool",  "char"
     , "string",    "pair",  "len",  "ord",  "chr", "null",   "true", "false" ]
 
-
+-- The set of reseved operators in the WACC language
 reservedOps :: [ String ]
 reservedOps
   = [ "+" , "-",   "*",   "/",   "=", "=="
     , "!=", "<",   ">",  "<=",  ">=", "&&"
     , "||", "%", "len", "ord", "chr",  "!" ]
 
-
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- Create new language definition with WACC's properties.
 languageDef :: Token.LanguageDef sf
 languageDef
   = emptyDef
@@ -59,10 +65,10 @@ languageDef
   , Token.reservedOpNames = reservedOps
   , Token.caseSensitive   = True }
 
-
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- The lexer implementing different tokenisers provided by Parsec.
 lexer :: Token.GenTokenParser String st Identity
 lexer = Token.makeTokenParser languageDef
-
 
 waccIdentifier = Token.identifier    lexer
 waccReserved   = Token.reserved      lexer
@@ -83,7 +89,8 @@ waccCommaSep   = Token.commaSep      lexer
 waccCommaSep1  = Token.commaSep1     lexer
 waccLexeme     = Token.lexeme        lexer
 
-
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- The definition of operators, their arity and precedence.
 waccOperators :: [[Operator Char st Expr]]
 waccOperators
   -- |Unary operators have the same precedence, which is 0.

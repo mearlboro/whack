@@ -1,15 +1,14 @@
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: 1. WACC Data Types :::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+module Wacc.Data.DataTypes where 
 
-module Wacc.WaccDataTypes where 
+import Data.Map   ( Map (..)  )
 
-import Data.Map ( Map (..) )
+-- ************************************************************************** --
+-- **************************                  ****************************** --
+-- **************************   WACC Grammar   ****************************** --
+-- **************************    Data Types    ****************************** --
+-- **************************                  ****************************** -- 
+-- ************************************************************************** --
 
-
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: 1.1 BNF Language grammar type definition :::::::::::::::::::::::::::::: --
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- | The following data types are deined and structured based on the language --
@@ -41,7 +40,6 @@ data Param                                       -- <param> ::=
 -- | Each statement is initialised with an empty identifier table. During the --
 --   process of semantic analysis, this table It will be augmented with the   --
 --   set of variables enclosed in the statement's scope. -- -- -- -- -- -- -- --
-
 data Stat                                        -- <stat> ::=
   = SkipStat                                     -- 'skip' 
   | FreeStat    Expr                          It -- 'free' <expr>
@@ -89,7 +87,6 @@ data ArrayElem                                   -- <array-elem> ::=
 --   linear. Moreover, it features a NullType for the unallocated pair and an --
 --   EmptyType for the wildcard type of the empty array. -- -- -- -- -- -- -- --
 -- | For more details, see WaccParser. -- -- -- -- -- -- -- -- -- -- -- -- -- --
- 
 data Type                                        -- <type> ::=
   = IntType                                      -- 'int' 
   | BoolType                                     -- 'bool'
@@ -153,9 +150,56 @@ type StrLiter   = [ Character ]                  -- <str-liter> ::= '"' <charact
 type Character  = Char                           -- <character> ::= any-ASCII-character-except-'\'-'''-'"' | '\' <escaped-char>   
 
 
+
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: 1.2 Identifier Table Data Type Definition ::::::::::::::::::::::::::::: --
+-- :: Grammar Type Utils :::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+
+-- | Relaxed Eq class 
+class Eq a => Eq' a where
+  (~==)    :: a -> a -> Bool
+  (~/=)    :: a -> a -> Bool
+
+  (~==)    =  (==)
+  x ~/= y  =  not ( x ~== y )
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- | A NullType is always a PairType and viceversa
+--   A pair of any two types is always a PairType
+--   An array of any type is always an ArrayType
+--   A string is also an array type
+instance Eq' Type where
+  PairType  _ ~== PairType  _  =  True 
+  NullType    ~== PairType  _  =  True
+  PairType  _ ~== NullType     =  True
+  PairType  _ ~== _            =  False
+  
+  ArrayType _ ~== ArrayType _  =  True
+  StringType  ~== ArrayType _  =  True
+  ArrayType _ ~== StringType   =  True 
+  ArrayType _ ~== _            =  False
+
+  t           ~== t'           =  t == t'
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- | A Function identifier always appears in the context of a Function,
+--   regardless of the Func object it contains
+instance Eq' Context where
+  Function _  ~== Function _  =  True
+  Function _  ~== _           =  False
+  _           ~== Function _  =  False
+  c           ~== c'          =  c == c'
+
+
+-- For show instances, see GrammarShowInstances
+
+
+-- ************************************************************************** --
+-- **************************                  ****************************** --
+-- **************************   Symbol Table   ****************************** --
+-- **************************    Data  Type    ****************************** --
+-- **************************                  ****************************** -- 
+-- ************************************************************************** --
 
 -- | General purpose symbol table
 data SymbolTable k a 
@@ -186,45 +230,5 @@ type It = IdentTable
 
 -- | A Dictionary maps names to identifier objects
 type Dictionary = Map IdentName IdentObj
-
-
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: 3. Type Utils ::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
-
--- | Relaxed Eq class 
-class Eq a => Eq' a where
-  (~==)    :: a -> a -> Bool
-  (~/=)    :: a -> a -> Bool
-
-  (~==)    =  (==)
-  x ~/= y  =  not ( x ~== y )
-
-
--- | A NullType is always a PairType and viceversa
---   A pair of any two types is always a PairType
---   An array of any type is always an ArrayType
---   A string is also an array type
-instance Eq' Type where
-  PairType  _ ~== PairType  _  =  True 
-  NullType    ~== PairType  _  =  True
-  PairType  _ ~== NullType     =  True
-  PairType  _ ~== _            =  False
-  
-  ArrayType _ ~== ArrayType _  =  True
-  StringType  ~== ArrayType _  =  True
-  ArrayType _ ~== StringType   =  True 
-  ArrayType _ ~== _            =  False
-
-  t           ~== t'           =  t == t'
-
-
--- | A Function identifier always appears in the context of a Function,
---   regardless of the Func object it contains
-instance Eq' Context where
-  Function _  ~== Function _  =  True
-  Function _  ~== _           =  False
-  _           ~== Function _  =  False
-  c           ~== c'          =  c == c'
 
 

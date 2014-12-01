@@ -1,13 +1,15 @@
-module Wacc.WaccSemAugmenter 
+module Wacc.Semantics.Augmenter 
 ( augmentProgram
 ) where 
 
-import Wacc.WaccDataTypes
-import Wacc.WaccSymbolTable
+import Wacc.Data.DataTypes
+import Wacc.Data.SymbolTable
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: Semantic Augmentation ::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- ************************************************************************** --
+-- ********************                           *************************** --
+-- ********************   Semantic Augmentation   *************************** --
+-- ********************                           *************************** -- 
+-- ************************************************************************** --
 
 augmentProgram 
   :: Program -- | The Program AST
@@ -27,8 +29,8 @@ augmentProgram ( Program funcs main )  =  Program funcs' main'
     ( _ , main' )  =  augmentStat main globalScope
     funcs'         =  map ( augmentFunc globalScope ) funcs 
    
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 augmentFunc 
   :: It   -- | The globalScope
   -> Func -- | The Func AST with Empty identifier table
@@ -50,8 +52,8 @@ augmentFunc globalScope func@( Func ftype name params body _ )  =  func'
     
     func'          =  Func ftype name params body' funcScope
 
- -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
+ -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 augmentStat
   :: Stat          -- | The Stat AST with Empty identifier table
   -> It            -- | The identifier table of the *previous* statement, 
@@ -82,9 +84,9 @@ augmentStat stat prevIt  =
   
   where
 
-    -- We have the previous table and we need to return the table for the next 
-    -- statement. This is the only case where the table is updated, since we 
-    -- just introduced a new variable that can be used by subsequent statements
+    -- |We have the previous table and we need to return the table for the next 
+    --  statement. This is the only case where the table is updated, since we 
+    --  just introduced a new variable that can be used by subsequent statements
     augmentDeclare                                    :: Stat -> ( It , Stat )
     augmentDeclare ( DeclareStat itype name rhs _ )  = 
       let nextIt  =  addVariable name itype $ encloseIn prevIt 

@@ -2,22 +2,22 @@
 -- :: WACC file tester :::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
-module WaccTesting.WaccExamplesTester where
+module WaccTesting.ExamplesTester where
 
-import Wacc.WaccDataTypes
-import Wacc.WaccLanguageDef
-import Wacc.WaccParser
-import Wacc.WaccSemAugmenter
-import Wacc.WaccSemChecker
+import Wacc.Data.DataTypes
+import Wacc.Semantics.Augmenter
+import Wacc.Semantics.Checker
+import Wacc.Syntax.LanguageDef
+import Wacc.Syntax.Parser
 
-import Text.Parsec.Token
-import Text.ParserCombinators.Parsec
 import Control.Applicative
 import Control.Monad.IO.Class ( liftIO )
 import Control.Monad
 import Data.List 
 import System.Directory
 import System.FilePath ( (</>) )
+import Text.Parsec.Token
+import Text.ParserCombinators.Parsec
 
 --------------------------------------------------------------------------------
 
