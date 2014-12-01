@@ -5,8 +5,8 @@ import System.Environment
 import System.Exit
 import System.FilePath.Posix
 
-import Wacc.WaccParser
-import Wacc.WaccSemChecker
+import Wacc.Syntax.Parser
+import Wacc.Semantics.Checker
 
 -------------------------------------------------------------------------------
 

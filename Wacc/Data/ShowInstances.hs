@@ -1,11 +1,15 @@
-module Wacc.WaccShowInstances where
+module Wacc.Data.ShowInstances where
 
-import Wacc.WaccDataTypes
+import Wacc.Data.DataTypes
 
 import Data.List  ( intersperse )
-import Data.Maybe ( fromJust    )
 import Data.Map   ( toList      )
+import Data.Maybe ( fromJust    )
 
+
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: Grammar Types Show Instances :::::::::::::::::::::::::::::::::::::::::: --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
 showMany       :: Show a => [ a ] -> [ Char ] -> [ Char ]
 showMany xs i  =  concat . intersperse i . map show $ xs

@@ -1,13 +1,11 @@
-
-
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: 3.2.1 WACC Parser "unit" tester  :::::::::::::::::::::::::::::::::::::: --
+-- :: WACC Parser "unit" tester  :::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
-module WaccTesting.WaccParsersTest where
+module WaccTesting.ParsersTest where
 
-import Wacc.WaccParser
-import Wacc.WaccShowInstances
+import Wacc.Data.ShowInstances
+import Wacc.Syntax.Parser
 
 import Text.ParserCombinators.Parsec
 

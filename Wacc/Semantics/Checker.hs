@@ -1,31 +1,36 @@
-module Wacc.WaccSemChecker where
+module Wacc.Semantics.Checker where
 
-import Data.Maybe                 ( isNothing , fromMaybe , fromJust , isJust )
-import Data.Map                   ( empty                                     )
+import Wacc.Data.DataTypes
+import Wacc.Data.ShowInstances
+import Wacc.Data.SymbolTable
+import Wacc.Semantics.Augmenter
+
 import Control.Applicative hiding ( empty                                     )
+import Control.Monad              ( when                                      )
 import Data.Char                  ( isSpace                                   )
 import Data.List                  ( group , sort                              )
-import Control.Monad              ( when                                      )
+import Data.Map                   ( empty                                     )
+import Data.Maybe                 ( isNothing , fromMaybe , fromJust , isJust )
 
-import Wacc.WaccDataTypes
-import Wacc.WaccSymbolTable
-import Wacc.WaccSemAugmenter
-import Wacc.WaccShowInstances
 
 -- ************************************************************************** --
 -- *************************                       ************************** --
--- *************************   Program Semantics   ************************** --
+-- *************************   Semantic Checking   ************************** --
 -- *************************                       ************************** -- 
 -- ************************************************************************** --
 
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
--- Check for semantic errors in a program. Check for duplicate functions, and 
--- for each function check for duplicate parameter names and parameter-function
--- name clashes. If there are errors we stop here. Reason being that agumenting 
--- the program when there are duplicate identifiers will overwrite existing 
--- identifiers in the tables resulting in inaccurate semantic error messages.
--- If there are no errors we proceed and augment the program and check each 
--- function body and the main body for semantic errors. 
+
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: Program Semantics ::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+
+-- |Check for semantic errors in a program. Check for duplicate functions, and 
+--  for each function check for duplicate parameter names and parameter-function
+--  name clashes. If there are errors we stop here. Reason being that agumenting 
+--  the program when there are duplicate identifiers will overwrite existing 
+--  identifiers in the tables resulting in inaccurate semantic error messages.
+--  If there are no errors we proceed and augment the program and check each 
+--  function body and the main body for semantic errors. 
 checkProgram                           :: Program -> [ SemanticErr ]
 checkProgram prog@( Program funcs _ )  = 
     if null duplicateErrs then statementErrs else duplicateErrs
@@ -37,39 +42,31 @@ checkProgram prog@( Program funcs _ )  =
                             concatMap checkParams funcs
                             --concatMap checkClash  funcs
 
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- Check that there is no parameter that shares its function name
 checkClash                             :: Func -> [ SemanticErr ]
 checkClash ( Func _ name params _ _ )  =
     checkDupl "Parameter Clash @" $ [ name ] ++ map pnameOf params 
 
-
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Check for duplicate parameter names in a function parameter list
 checkParams  :: Func -> [ SemanticErr ]
 checkParams  =  checkDupl "Duplicate Parameter @" . map pnameOf . paramsOf  
-  
 
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Check for duplicate function names in a program
 checkFuncs  :: [ Func ] -> [ SemanticErr ] 
 checkFuncs  =  checkDupl "Duplicate Function @" . map nameOf  
-  
 
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Check for duplicate elements in a list and output a semantic error message
 checkDupl      :: String -> [ String ] -> [ SemanticErr ]
 checkDupl msg  =  map ( (++) msg. head ). filter ( (<) 1. length ). group. sort
 
 
--- ************************************************************************** --
--- ************************                         ************************* --
--- ************************   Statement Semantics   ************************* --
--- ************************                         ************************* -- 
--- ************************************************************************** --
 
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
--- Semantic check for a Stat
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: Statement Semantics ::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+
+-- Semantic check for a Statement
 checkStat 
   :: Stat            -- Given an augmented statement
   -> [ SemanticErr ] -- Return a bunch of SemanticErr's (or none)
@@ -79,7 +76,6 @@ checkStat
 -- Skip statement, nothing to do here
 checkStat SkipStat  =  []
 
-
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- A Free statement can only free a *variable* that points to a *pair* or to an
 -- *array* type. So we pattern match to capture an IdentExpr and check that it
@@ -87,11 +83,9 @@ checkStat SkipStat  =  []
 checkStat s@( FreeStat expr@( IdentExpr _ ) it )  = 
     onStat s $ checkExpr expr it nonFunction [ PairType {} , ArrayType {} ]
 
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Any attempt to free another kind of expression is invalid
 checkStat s@( FreeStat _ _ )  = 
     onStat s [ "Cannot Free A Non-Identifier Expression" ]
-
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- A Return statement must not appear inside the main function body and it must 
@@ -109,23 +103,19 @@ checkStat s@( ReturnStat expr it )  =
 checkStat s@( ExitStat expr it )  =
     onStat s $ checkExpr expr it nonFunction [ IntType ]
 
-
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- A Print statement is legal as long as it doesn't use undefined identifiers
 checkStat s@( PrintStat expr it )  = 
     onStat s $ checkExpr expr it nonFunction []
-
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Semantic rules identical to those of PrintStat
 checkStat s@( PrintlnStat expr it )  = 
     onStat s $ checkExpr expr it nonFunction []
 
-
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For a Scoped statement we check the enclosed statement
 checkStat ( ScopedStat stat )  =  checkStat stat
-
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For a Read statement we check semantic errors in its lhs expression
@@ -135,18 +125,15 @@ checkStat s@( ReadStat lhs it )  =
     -- Read is allowed only on int, char, string types
     readLhsTypes = [ IntType, CharType, StringType ]  
 
-
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- A While statement requires the condition expression to be of BoolType
 checkStat ( WhileStat cond body it )  = 
     onExpr cond $ checkExpr cond it nonFunction [ BoolType ] ++ checkStat body
 
-
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Sequential checking of statements
 checkStat ( SeqStat stat stat' )  = 
     checkStat stat ++ checkStat stat'
-
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For an If statement the condition must be bool
@@ -154,7 +141,6 @@ checkStat ( IfStat cond sThen sElse it )  =
     onExpr cond $ checkExpr cond it nonFunction [ BoolType ] ++ 
     checkStat sThen ++
     checkStat sElse
-
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Not an easy one
@@ -164,7 +150,6 @@ checkStat s@( AssignStat lhs rhs it )  =
     lhsErr   =  checkAssignLhs lhs it nonFunction [] 
     lhsType  =  fromJust ( getLhsType lhs it )
     rhsErr   =  checkAssignRhs rhs it nonFunction [ lhsType ]
-
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Check for redeclarations in the same scope
@@ -176,18 +161,16 @@ checkStat s@( DeclareStat vtype name rhs it )  =
     definedErrMsg  =  "Variable Already Defined @" ++ name
 
 
--- ************************************************************************** --
--- ***************************                   **************************** --
--- ***************************   LHS Semantics   **************************** --
--- ***************************                   **************************** -- 
--- ************************************************************************** --
+
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: LHS Semantics ::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
 checkAssignLhs :: AssignLhs -> It -> [ Context ] -> [ Type ] -> [ SemanticErr ]
 checkAssignLhs lhs it ctxs types  =  case lhs of 
     LhsIdent     ident    -> checkExpr      ( IdentExpr ident ) it ctxs types           
     LhsPairElem  pElem    -> checkPairElem    pElem             it ctxs types                 
     LhsArrayElem arrElem  -> checkArrayElem   arrElem           it ctxs types
-
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- A PairElem is either `fst` or `snd` of some expression. The only valid 
@@ -202,8 +185,6 @@ checkPairElem pElem it _ctxs types  =
     pElemType  =  getPairElemType pElem it 
     typeErr    =  checkType ( fromJust pElemType ) types 
 
-
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For an ArrayElem we first check that the identifier has been declared, then
 -- we count the number of dimensions on exprs and check that the obtained type
 -- matches one of the expected types. We also check that all exprs representing
@@ -219,11 +200,9 @@ checkArrayElem aElem@( ArrayElem ident exprs ) it ctxs types  =
     exprsErr   =  concatMap (\e -> checkExpr e it ctxs [ IntType ] ) exprs
 
 
--- ************************************************************************** --
--- ******************************               ***************************** --
--- ******************************   LHS Types   ***************************** --
--- ******************************               ***************************** -- 
--- ************************************************************************** --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: LHS Semantics :: Types :::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Get the type of a lhs assignment
@@ -276,8 +255,6 @@ getPairElemType pElem it  =
 
         obtainType            =  Just $ getType which pairType
 
-
-
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Get the type of an array element. 
 getArrayElemType                               :: ArrayElem -> It -> Maybe Type
@@ -299,11 +276,10 @@ getArrayElemType ( ArrayElem ident exprs ) it  =
     deepen _   t              =  t
 
 
--- ************************************************************************** --
--- ***************************                   **************************** --
--- ***************************   RHS Semantics   **************************** --
--- ***************************                   **************************** -- 
--- ************************************************************************** --
+
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: RHS Semantics ::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
 checkAssignRhs 
   :: AssignRhs       -- Similar to checkExpr, this is the rhs to check
@@ -312,18 +288,15 @@ checkAssignRhs
   -> [ Type ]        -- The expected types
   -> [ SemanticErr ] -- Return a bunch of SemanticErr's (or none)
 
-
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Simple expression check here
 checkAssignRhs ( RhsExpr expr ) it ctxs types  = 
     checkExpr expr it ctxs types 
 
-
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Delegate the check to checkPairElem
 checkAssignRhs ( RhsPairElem pelem ) it ctxs types  =  
     checkPairElem pelem it ctxs types   
-
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- ArrayLiter only ever appears in AssignRhs, no need to create a separate
@@ -339,7 +312,6 @@ checkAssignRhs ( RhsArrayLiter exprs ) it ctxs types  =
                       ArrayType t -> t 
                       _           -> error "Weird"
 
-
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Once again, since AssignRhs only occurs in AssignStat and DeclareStat we are 
 -- certain that `types` is a singleton list containing a PairType. So we can 
@@ -349,7 +321,7 @@ checkAssignRhs ( RhsNewPair efst esnd ) it ctxs types  =
     checkExpr esnd it ctxs [ stype ]
   where 
     PairType ( Just ( ftype , stype ) )  =  head types
-  
+
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Here we are calling a function so we need to check that the name provided
@@ -360,16 +332,13 @@ checkAssignRhs ( RhsNewPair efst esnd ) it ctxs types  =
 -- So first we check that the identifier is in scope and that is is a function.
 -- Once we are sure it is a Function we pattern match to expose the Func object.
 checkAssignRhs rhs@( RhsCall fname args ) it@( ST encl _ ) ctxs types  =
-  
   -- I look for fname in current table
   case findIdent' fname it of 
-
-    -- Not found? Not found!
+    -- Not found!
     Nothing       -> [ "Function Not Found @" ++ fname ]
 
     Just identObj -> case snd identObj of 
                         Function func -> proceed func
-
                         -- Keep looking one layer up
                         _ -> case findIdent' fname encl of
                                Nothing -> [ "Function Not Found @" ++ fname ]
@@ -382,21 +351,17 @@ checkAssignRhs rhs@( RhsCall fname args ) it@( ST encl _ ) ctxs types  =
     proceed  ( Func ftype _ params _ _ )  =   retTypeErr ++ concat argsErrs ++ lengthErr 
       where 
           retTypeErr     =  checkType ftype types  
-      
           -- Args
           argsErrs       =  zipWith ( \e t -> checkExpr e it ctxs [ t ] ) args ( map ptypeOf params )
-      
           -- Lenght
           lengthErrMsg   =  "Invalid Number Of Arguments In Function Call"
           lengthErr      =  toSemErr lengthErrMsg ( length params == length args )
 
 
 
--- ************************************************************************** --
--- **************************                    **************************** --
--- **************************   Expr Semantics   **************************** --
--- **************************                    **************************** -- 
--- ************************************************************************** --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: Expression Semantics :::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
 checkExpr 
   :: Expr            -- Given an expression
@@ -417,12 +382,10 @@ checkExpr ( IntLiterExpr  _ ) _ _ types  =  checkType IntType    types
 checkExpr ( StrLiterExpr  _ ) _ _ types  =  checkType StringType types
 checkExpr   PairLiterExpr     _ _ types  =  checkType NullType   types
 
-
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -e- -- -- 
 -- For a ParenthesisedExpr we check the expression contained therein
 checkExpr ( ParenthesisedExpr expr ) it ctxs types  = 
     checkExpr expr it ctxs types
-
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For an IdentExpr we check that the identifier has beed declared and is 
@@ -437,12 +400,10 @@ checkExpr ( IdentExpr ident ) it ctxs types  =
     notFoundErr    =  checkFound ident identObj
     (,) itype ctx  =  fromJust identObj
 
-
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Let checkArrayElem do the job 
 checkExpr ( ArrayElemExpr arr ) it ctxs types  =  
     checkArrayElem arr it ctxs types
-
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For a UnaryOperExpr we make sure the unary operation returns one of the 
@@ -462,8 +423,6 @@ checkExpr unop@( UnaryOperExpr op expr ) it ctxs types  =
       -> [ SemanticErr ] -- Return a bunch of SemanticErr's (or none)
     checkUnOpExpr inType outType  =  
         checkExpr expr it ctxs [ inType ] ++ checkType outType types 
-
-
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For a BinaryOperExpr we make sure the binary operator returns one of the 
@@ -498,6 +457,8 @@ checkExpr binop@( BinaryOperExpr op expr expr' ) it ctxs types  =
         checkExpr expr' it ctxs inTypes ++
         checkType outType types 
 
+
+
 -- ************************************************************************** --
 -- *************************                      *************************** --
 -- *************************   Error Generation   *************************** --
@@ -517,19 +478,16 @@ toSemErr msg True   =  []
 toSemErr msg False  =  [ msg ]
 
 
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Appends a statement to the error messages 
 onStat            :: Stat -> [ SemanticErr ] -> [ SemanticErr ]
 onStat stat errs  =  map ( \err -> show' "" stat ++ " -> " ++ err ) errs
 
 
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Appends an expression to the error messages 
 onExpr            :: Expr -> [ SemanticErr ] -> [ SemanticErr ]
 onExpr expr errs  =  map ( \err -> show expr ++ " -> " ++ err ) errs
 
 
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Given an input type and a list of expected types, will produce a single 
 -- semantic error in case of a type mismatch 
 checkType       :: Type -> [ Type ] -> [ SemanticErr ]
@@ -538,20 +496,18 @@ checkType t ts  =  toSemErr errMsg ( null ts || any ( ~== t ) ts )
     errMsg  =  "Expecting Types: " ++ show ts ++ " | Found Type: " ++ show t
 
 
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Given an input context and a list of expected contexts, will produce a single 
 -- semantic error in case of a context mismatch 
 checkCtx      :: Context -> [ Context ] -> [ SemanticErr ]
 checkCtx c cs =  toSemErr errMsg ( null cs || any ( ~== c ) cs )
   where
-    errMsg  =  "Expecting Ctxs: " ++ show cs ++ " | Found Ctx: " ++ str c
+    errMsg  =  "Expecting Contexts: " ++ show cs ++ " | Found Context: " ++ str c
 
     str   Variable      =  "Variable"  -- TODO eventually remove and derive Show
     str   Parameter     =  "Parameter"
     str ( Function _ )  =  "Function"
 
 
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Given an identifier name and Maybe its associated identifier objcet, will
 -- produce a single semantic error in case the identifier object is Nothing
 checkFound           :: IdentName -> Maybe IdentObj -> [ SemanticErr ]

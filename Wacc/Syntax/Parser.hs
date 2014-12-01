@@ -1,11 +1,7 @@
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: 3.1. WACC Parsers ::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+module Wacc.Syntax.Parser where
 
-module Wacc.WaccParser where
-
-import Wacc.WaccDataTypes
-import Wacc.WaccLanguageDef
+import Wacc.Data.DataTypes
+import Wacc.Syntax.LanguageDef
 
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Expr
@@ -15,32 +11,41 @@ import Control.Monad              ( liftM , liftM2 )
 import Control.Monad.Fix          ( fix            )
 
 
--- |3.1.1 Program .......................................................  28 --    
--- |3.1.2 Statements ....................................................  85 -- 
--- |3.1.3 Types ......................................................... 206 -- 
--- |3.1.4 Expressions ................................................... 246 -- 
--- |3.1.5 Identifiers, literals ......................................... 312 -- 
+-- ************************************************************************** --
+-- **************************                   ***************************** --
+-- **************************    WACC Parser    ***************************** --
+-- **************************                   ***************************** -- 
+-- ************************************************************************** --
+-- A set of Parsec lexers and parsers to construct the AST of a WACC program. --
 
--- | Utils .............................................................. 365 --
--- | Test parser ........................................................ 392 --
 
--- |3.1.1 Program 
+-- | Program ............................................................  31 --    
+-- | Statements .........................................................  88 -- 
+-- | Types .............................................................. 217 -- 
+-- | Expressions ........................................................ 256 -- 
+-- | Identifiers, literals .............................................. 312 -- 
+
+-- | Utils .............................................................. 377 --
+-- | Final parser function .............................................. 405 --
+
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <program> ::= 'begin' <func>* <stat> 'end' :::::::::::::::::::::::::::: --
+-- :: Program ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+
+-- <program> ::= 'begin' <func>* <stat> 'end'
 pProgram :: Parser Program
 pProgram = do
     waccWhiteSpace
     waccReserved "begin"
-    funcs <- many ( try pFunc <?> "func" ) 
+    funcs <- many ( try pFunc <?> "function" ) 
     waccWhiteSpace
     body  <- pStat
     waccReserved "end"
     return $ Program funcs body -- Empty
 
-
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <func> ::= <type> <ident> '(' <param-list>? ')' 'is' <stat> 'end' ::::: --
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- <func> ::= <type> <ident> '(' <param-list>? ')' 'is' <stat> 'end'
 pFunc :: Parser Func
 pFunc = do
     ftype  <- pType <?> "type"
@@ -51,7 +56,7 @@ pFunc = do
     body   <- pStat
     waccReserved "end"
 
-    -- Control flow in functions must eventually reach a return or exit stat
+    -- | Control flow in functions must eventually reach a return or exit stat
     let returnsOrExits x = case x of                
             ReturnStat  _ _      -> True  
             ExitStat    _ _      -> True   
@@ -65,14 +70,13 @@ pFunc = do
         then return $ Func ftype name params body Empty
         else fail "No Reachable Return/Exit Statement" 
     
-
--- :: <param-list> ::= <param> (',' <param>)* ::::::::::::::::::::::::::::::: --
+-- <param-list> ::= <param> (',' <param>)* 
 pParamList :: Parser ParamList
 pParamList = waccCommaSep pParam
 
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <param> ::= <type> <ident> :::::::::::::::::::::::::::::::::::::::::::: --
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- <param> ::= <type> <ident> 
 pParam :: Parser Param
 pParam = do
     ptype <- pType
@@ -81,17 +85,18 @@ pParam = do
     return $ Param ptype pname
 
 
--- 3.2. Statement
-
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <stat> :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: Statements :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+
+-- <stat> 
 pStat :: Parser Stat
 pStat = pStat' >>= \stat -> 
-    -- First parse a statement `stat` with `pStat'`.
-    -- Then `option` will try to parse a `waccSemicolon` and if it 
-    -- finds one then it will go on and parse a second statement with `pStat`
-    -- and place it inside a `SeqStat` together with `stat`.
-    -- If it can't parse a `waccSemicolon` it will fail and return `stat`.
+    -- | First parse a statement `stat` with `pStat'`.
+    --   Then `option` will try to parse a `waccSemicolon` and if it 
+    --   finds one then it will go on and parse a second statement with `pStat`
+    --   and place it inside a `SeqStat` together with `stat`.
+    --   If it can't parse a `waccSemicolon` it will fail and return `stat`.
     option stat $ waccSemicolon >> liftM ( SeqStat stat ) pStat 
 
     where
@@ -163,8 +168,8 @@ pStat = pStat' >>= \stat ->
             return $ ScopedStat stat
 
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <assign-lhs> ::= <ident> | <pair-elem> | <array-elem> ::::::::::::::::: --
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- <assign-lhs> ::= <ident> | <pair-elem> | <array-elem> 
 pAssignLhs :: Parser AssignLhs
 pAssignLhs = choice 
     [ try $ liftM LhsArrayElem pArrayElem
@@ -172,8 +177,8 @@ pAssignLhs = choice
     ,       liftM LhsPairElem  pPairElem ]
 
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <assign-rhs> :::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- <assign-rhs>
 pAssignRhs :: Parser AssignRhs
 pAssignRhs = choice 
     [ liftM RhsArrayLiter pArrayLiter 
@@ -198,24 +203,25 @@ pAssignRhs = choice
           args  <- waccParens pArgList
           return $ RhsCall fname args
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
--- :: <arg-list> ::= <expr> (',' <expr>)* ::::::::::::::::::::::::::::::::::: --
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- <arg-list> ::= <expr> (',' <expr>)*
 pArgList :: Parser ArgList
 pArgList = waccCommaSep pExpr
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <pair-elem> ::= 'fst' <expr> | 'snd' <expr' ::::::::::::::::::::::::::: --
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- <pair-elem> ::= 'fst' <expr> | 'snd' <expr'
 pPairElem :: Parser PairElem
 pPairElem
     =  pWaccLift "fst" Fst pExpr
    <|> pWaccLift "snd" Snd pExpr 
 
 
--- 3.3. Types
-
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <type> ::= <base-type> | <array-type> | <pair-type> ::::::::::::::::::: --
--- |For easier management of datatypes, they are represented linearly.
+-- :: Types ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+
+-- <type> ::= <base-type> | <array-type> | <pair-type>
+-- | For easier management of datatypes, they are represented linearly.
 
 pType :: Parser Type
 pType = do 
@@ -227,13 +233,13 @@ pType = do
             -- <base-type> ::= 'int' | 'bool' | 'char' | 'string'
             pBaseType :: Parser Type
             pBaseType = choice 
-                [ pWaccWord "int"    IntType    
-                , pWaccWord "bool"   BoolType   
-                , pWaccWord "char"   CharType   
-                , pWaccWord "string" StringType ]
+                [ try $ pWaccWord "int"    IntType    
+                      , pWaccWord "bool"   BoolType   
+                      , pWaccWord "char"   CharType   
+                      , pWaccWord "string" StringType ]
 
             -- 'pair' '(' <type> ',' <type> ')'
-            -- |For easier management of the nested pair case, we chose a Maybe
+            -- | For easier management of the nested pair case, we chose a Maybe
             -- approach on the pair type, thus considering the nested pair just
             -- another graphical form of the same type.
             pPairType :: Parser Type
@@ -249,10 +255,11 @@ pType = do
             pPairElemType = pWaccWord "pair" ( PairType Nothing ) <|> pType
 
 
--- 3.4. Expressions
-
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <expr> :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :: Expressions ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+
+-- <expr>
 pExpr :: Parser Expr
 pExpr = buildExpressionParser waccOperators pExpr'
 
@@ -277,7 +284,6 @@ pExpr = buildExpressionParser waccOperators pExpr'
             , pUnOp    "ord" OrdUnOp
             , pUnOp    "chr" ChrUnOp
             , pNegUnOp "-"   NegUnOp ]
-        
                   
         pPosIntLiter :: Parser IntLiter
         pPosIntLiter = do
@@ -285,7 +291,6 @@ pExpr = buildExpressionParser waccOperators pExpr'
           if   int > 2^31
               then fail $ "Positive Integer Overflow @" ++ show int 
               else return int
-        
 
         pNegUnOp str op = do 
             waccReservedOp str
@@ -297,8 +302,6 @@ pExpr = buildExpressionParser waccOperators pExpr'
                         then fail   $ "Negative Integer Overflow @" ++ show int 
                         else return $ UnaryOperExpr op expr 
                 _                ->  return $ UnaryOperExpr op expr 
-
-
 
         pUnOp string op = do 
             waccReservedOp string
@@ -327,8 +330,8 @@ pExpr = buildExpressionParser waccOperators pExpr'
                     liftM2 ( BinaryOperExpr op ) pExpr pExpr
 
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <array-elem> ::= <ident> '[' <expr> ']' ::::::::::::::::::::::::::::::: --
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- :: <array-elem> ::= <ident> '[' <expr> ']'
 pArrayElem :: Parser ArrayElem
 pArrayElem = do 
   ident <- waccIdentifier
@@ -336,37 +339,23 @@ pArrayElem = do
   return $ ArrayElem ident dims
 
 
--- 3.5. Literals
-
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <int-liter> ::= <int-sign>? <digit>+ :::::::::::::::::::::::::::::::::: --
-
-
-  --if   int > 2^31-1
-  --then fail $ "Positive Integer Overflow @" ++ show int 
-  --else return int 
-
-  -- −2^31 to 2^31 − 1 inclusive.
-  --_int <- waccInteger
-  --if   _int >= ( -2^31 ) && _int <= ( 2^31-1 )
-  --then return _int
-  --else 
-
+-- :: Literals :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <bool-liter> ::= 'true' | 'false' ::::::::::::::::::::::::::::::::::::: --
+
+-- <bool-liter> ::= 'true' | 'false' 
 pBoolLiter :: Parser BoolLiter
 pBoolLiter 
 	  =  pWaccWord "true" True 
    <|> pWaccWord "false" False 
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <char-liter> ::= ''' <char> ''' ::::::::::::::::::::::::::::::::::::::: --
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- <char-liter> ::= ''' <char> ''' 
 pCharLiter :: Parser CharLiter
 pCharLiter = do
   c <- lookAhead waccCharLiter
-
   if      c `elem` "\\\"\'" -- If char was one of "\' 
-      then do char  '\''        -- Then make sure it was escaped correctly
+      then do char  '\''    -- Then make sure it was escaped correctly
               char  '\\'
               oneOf "\\\"\'"
               char  '\''
@@ -374,67 +363,64 @@ pCharLiter = do
               return c
       else do waccCharLiter >>= return 
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <str-liter> ::= ''' <char>* ''' ::::::::::::::::::::::::::::::::::::::: --
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- <str-liter> ::= ''' <char>* '''
 pStrLiter :: Parser StrLiter
 pStrLiter = waccStrLiter
 
--- :: <array-liter> ::= '[' ( <expr> (',' <expr>)* )? ']' ::::::::::::::::::: --
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- <array-liter> ::= '[' ( <expr> (',' <expr>)* )? ']' 
 pArrayLiter :: Parser ArrayLiter
 pArrayLiter = waccBrackets $ waccCommaSep pExpr 
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: <pair-liter> ::= 'null' ::::::::::::::::::::::::::::::::::::::::::::::: --
---pPairLiter :: Parser PairLiter
---pPairLiter = pWaccWord "null" Null
+
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: Utils ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
--- If the word provided is a reserved word of the wacc language then its 
--- representation in the AST is just the value provided
--- This function is used to simplify expressions of the sort:
--- pData key value = do
---   waccReserved key
---   return value
+-- | If the word provided is a reserved word of the wacc language then its 
+--   representation in the AST is just the value provided
+--   This function is used to simplify expressions of the sort:
+--   pData key value = do
+--     waccReserved key
+--     return value
 pWaccWord :: String -> a -> Parser a
 pWaccWord word value = waccReserved word >> return value
 
--- Similar to pWaccWord except it uses waccReservedOp
+-- | Similar to pWaccWord except it uses waccReservedOp
 pWaccOp :: String -> a -> Parser a
 pWaccOp op value = waccReservedOp op >> return value
 
--- Matches the reserved word and perfrorms liftM
--- This function is used to simplify expressions of the sort:
--- pData = do
---   waccReserved word
---   value <- parser
---   return $ Data value
+-- | Matches the reserved word and perfrorms liftM
+--   This function is used to simplify expressions of the sort:
+--   pData = do
+--     waccReserved word
+--     value <- parser
+--     return $ Data value
 pWaccLift :: String -> ( a -> b ) -> Parser a -> Parser b
 pWaccLift word f p = waccReserved word >> liftM f p
 
---   return $ Data value
---pWaccLift2 :: String -> ( a -> b -> c ) -> Parser a -> Parser b
---pWaccLift2 word f p t = waccReserved word >> liftM2 f p t
 
 
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :: TEST PARSER ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
--- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+-- ************************************************************************** --
+-- **************************                   ***************************** --
+-- **************************   Final Parsers   ***************************** --
+-- **************************                   ***************************** -- 
+-- ************************************************************************** --
 
 regularParse :: Parser a -> String -> Either ParseError a
 regularParse p = parse p ""
 
 
--- |This function will run the parser, but additionally fail if it doesn't
+-- | This function will run the parser, but additionally fail if it doesn't
 -- consume all the input.
 parseWithEof :: Parser a -> String -> Either ParseError a
 parseWithEof p = parse ( p <* eof ) ""
 
 
--- |This function will apply the parser, then also return any left over
+-- | This function will apply the parser, then also return any left over
 -- input which wasn't parsed.
 parseWithLeftOver :: Parser a -> String -> Either ParseError (a,String)
 parseWithLeftOver p = parse ( (,) <$> p <*> leftOver ) ""
