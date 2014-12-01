@@ -62,7 +62,9 @@ parse source = do
   -- Get the result and act accordingly
   case result of
       Right r -> check r
-      Left  e -> exitWith $ ExitFailure 100
+      Left  e -> do
+        putStrLn $ show e
+        exitWith $ ExitFailure 100
 
 -- TODO: type signature
 check programAST = do
