@@ -9,6 +9,7 @@ import Wacc.WaccParser
 import Wacc.WaccSemChecker
 
 -------------------------------------------------------------------------------
+
 -- |Runs the wacc compiler after checking argument validity.
 main = do
     args       <- getArgs

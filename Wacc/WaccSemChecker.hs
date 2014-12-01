@@ -34,9 +34,8 @@ checkProgram prog@( Program funcs _ )  =
     statementErrs        =  concatMap checkStat ( map bodyOf funcs' ) ++
                             checkStat main 
     duplicateErrs        =  checkFuncs            funcs ++ 
-                            concatMap checkParams funcs  
+                            concatMap checkParams funcs
                             --concatMap checkClash  funcs
-
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Check that there is no parameter that shares its function name
@@ -131,7 +130,10 @@ checkStat ( ScopedStat stat )  =  checkStat stat
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For a Read statement we check semantic errors in its lhs expression
 checkStat s@( ReadStat lhs it )  = 
-    onStat s $ checkAssignLhs lhs it nonFunction []
+    onStat s $ checkAssignLhs lhs it nonFunction readLhsTypes
+  where
+    -- Read is allowed only on int, char, string types
+    readLhsTypes = [ IntType, CharType, StringType ]  
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
@@ -148,10 +150,10 @@ checkStat ( SeqStat stat stat' )  =
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- For an If statement the condition must be bool
-checkStat ( IfStat cond sthen selse it )  = 
+checkStat ( IfStat cond sThen sElse it )  = 
     onExpr cond $ checkExpr cond it nonFunction [ BoolType ] ++ 
-    checkStat sthen ++
-    checkStat selse
+    checkStat sThen ++
+    checkStat sElse
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
@@ -173,6 +175,7 @@ checkStat s@( DeclareStat vtype name rhs it )  =
     definedErr     =  toSemErr definedErrMsg ( isDefined' name it )
     definedErrMsg  =  "Variable Already Defined @" ++ name
 
+
 -- ************************************************************************** --
 -- ***************************                   **************************** --
 -- ***************************   LHS Semantics   **************************** --
@@ -182,8 +185,8 @@ checkStat s@( DeclareStat vtype name rhs it )  =
 checkAssignLhs :: AssignLhs -> It -> [ Context ] -> [ Type ] -> [ SemanticErr ]
 checkAssignLhs lhs it ctxs types  =  case lhs of 
     LhsIdent     ident    -> checkExpr      ( IdentExpr ident ) it ctxs types           
-    LhsPairElem  pelem    -> checkPairElem    pelem             it ctxs types                 
-    LhsArrayElem arrelem  -> checkArrayElem   arrelem           it ctxs types
+    LhsPairElem  pElem    -> checkPairElem    pElem             it ctxs types                 
+    LhsArrayElem arrElem  -> checkArrayElem   arrElem           it ctxs types
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
@@ -191,13 +194,13 @@ checkAssignLhs lhs it ctxs types  =  case lhs of
 -- expressions are identifier expressions and array element expressions.
 -- In both cases they must point to an identifier of PairType
 checkPairElem :: PairElem -> It -> [ Context ] -> [ Type ] -> [ SemanticErr ]
-checkPairElem pelem it _ctxs types  =  
-    if   isJust pelemType
+checkPairElem pElem it _ctxs types  =  
+    if   isJust pElemType
     then typeErr 
     else [ "Could Not Retrieve Pair Type" ]
   where
-    pelemType  =  getPairElemType pelem it 
-    typeErr    =  checkType ( fromJust pelemType ) types 
+    pElemType  =  getPairElemType pElem it 
+    typeErr    =  checkType ( fromJust pElemType ) types 
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
@@ -206,13 +209,13 @@ checkPairElem pelem it _ctxs types  =
 -- matches one of the expected types. We also check that all exprs representing
 -- the indices, evaluate to integers
 checkArrayElem  :: ArrayElem -> It -> [ Context ] -> [ Type ] -> [ SemanticErr ]
-checkArrayElem aelem@( ArrayElem ident exprs ) it ctxs types  = 
-    if   isJust aelemType
+checkArrayElem aElem@( ArrayElem ident exprs ) it ctxs types  = 
+    if   isJust aElemType
     then typeErr ++ exprsErr
     else [ "Could Not Retrieve Array Type @" ++ ident ]
   where
-    aelemType  =  getArrayElemType aelem it 
-    typeErr    =  checkType ( fromJust aelemType ) types 
+    aElemType  =  getArrayElemType aElem it 
+    typeErr    =  checkType ( fromJust aElemType ) types 
     exprsErr   =  concatMap (\e -> checkExpr e it ctxs [ IntType ] ) exprs
 
 
@@ -227,8 +230,8 @@ checkArrayElem aelem@( ArrayElem ident exprs ) it ctxs types  =
 getLhsType         :: AssignLhs -> It -> Maybe Type
 getLhsType lhs it  =  case lhs of
     LhsIdent     ident -> findType'        ident it
-    LhsPairElem  pelem -> getPairElemType  pelem it
-    LhsArrayElem aelem -> getArrayElemType aelem it
+    LhsPairElem  pElem -> getPairElemType  pElem it
+    LhsArrayElem aElem -> getArrayElemType aElem it
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
 -- Get the type of a pair element. We try to check the containing expression
@@ -236,8 +239,8 @@ getLhsType lhs it  =  case lhs of
 -- Otherwise we can safely pattermatch on PairType and retrieve the pair 
 -- element type
 getPairElemType           :: PairElem -> It -> Maybe Type
-getPairElemType pelem it  =  
-  case pelem of
+getPairElemType pElem it  =  
+  case pElem of
     
     Fst expr -> getPairElemType' expr fst 
     Snd expr -> getPairElemType' expr snd
@@ -289,17 +292,17 @@ getArrayElemType ( ArrayElem ident exprs ) it  =
     arrElemType               =  Just $ 
                                    if   arrayType == StringType 
                                    then CharType 
-                                   else deepen ( length exprs +1 ) arrayType
+                                   else deepen ( length exprs + 1 ) arrayType
 
     deepen 0   t              =  t
-    deepen n ( ArrayType t )  =  deepen ( n-1 ) t   
+    deepen n ( ArrayType t )  =  deepen ( n - 1 ) t   
     deepen _   t              =  t
 
 
 -- ************************************************************************** --
--- ************************                         ************************* --
--- ************************   AssignRhs Semantics   ************************* --
--- ************************                         ************************* -- 
+-- ***************************                   **************************** --
+-- ***************************   RHS Semantics   **************************** --
+-- ***************************                   **************************** -- 
 -- ************************************************************************** --
 
 checkAssignRhs 
@@ -387,7 +390,7 @@ checkAssignRhs rhs@( RhsCall fname args ) it@( ST encl _ ) ctxs types  =
           lengthErrMsg   =  "Invalid Number Of Arguments In Function Call"
           lengthErr      =  toSemErr lengthErrMsg ( length params == length args )
 
----- 
+
 
 -- ************************************************************************** --
 -- **************************                    **************************** --
