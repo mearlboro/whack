@@ -6,80 +6,25 @@ import qualified Data.Map as Map
 import Data.Array
 import Data.Maybe
 import Data.Char
-{-
 
-CANNOT FIND MODULES... WHY??????
-
--}
 
 --------------------------------------------------------------------------------
---  HEAP  ----------------------------------------------------------------------
+--  REGISTER MAP  --------------------------------------------------------------
 --------------------------------------------------------------------------------
 
--- | One word of information yey, 32 bits
-type Word = Int   
--- | Address on the heap
-type Address = Word 
+type RegMap = Map.Map IdentName Reg
 
--- | The address of the first free memory word on the heap
-type HeapPtr = Address 
--- | The heap maps addresses to values in memory 
-type Heap = (HeapPtr, Array Address Word)  
+findReg       :: IdentName -> RegMap -> Reg 
+findReg m id  =  fromJust $ Map.lookup m id 
 
--- | RAM memory on the Raspberry Pi
-mAX_MEMORY = 256 * 2^20 - 1 -- 256 Megabytes
+type LabelNum = Int -- [ Label ]
 
--- | Contructrs a new empyt heap
-emptyHeap = (0, array (0, mAX_MEMORY) [ (i, 0) | i <- [0..mAX_MEMORY] ])
+nextLabel    :: LabelNum -> Label 
+nextLabel l  =  "label" ++ show l
 
--- | Frees @n@ consecutive words from memory starting from @adr@ 
---   Pre: n > 0
-heapFree          
-  :: Heap    -- Starting heap
-  -> Address -- First address to free
-  -> Int     -- How many consecutive memory words to free
-  -> Heap    -- The new heap
-heapFree h adr n  =  error "GOOD LUCK!"  
+type AvailRegs = [ Register ]
 
--- | Writes the words starting from the heap pointer onwards
-heapWrite               
- :: Heap     -- Starting heap
- -> [ Word ] -- Values to write in consecutive memory
- -> Heap     -- The new heap
-heapWrite (prt, mem) xs  =  error "GOOD LUCK"
-
--- | Reads @n@ words of data from the heap starting from @adr@
---   Pre: n > 0
-heapRead 
-  :: Heap     -- Given a heap
-  -> Address  -- The addresss to start reading from
-  -> Int      -- How many words to read
-  -> [ Word ] -- The memory raed from the heap
-heapRead h adr n  =  error "GOOD LUCK"
-
---------------------------------------------------------------------------------
---  STORE  ---------------------------------------------------------------------
---------------------------------------------------------------------------------
-
-type Length = Int 
-
-type Store = [ (IdentName, Word) ]
-
-lookUpStore       :: Store -> IdentName -> Word 
-lookUpStore id s  =  fromJust $ lookup id s 
-
-data Variable  
-  = V'Prim  IdentName             
-  | V'Pair  IdentName Type Type   
-  | V'Array IdentName Type Length  -- Address 
-
-lookupStore :: Store -> IdentName -> Variable 
-lookupStore s name = head . filter ((==) name . varNameOf) $ s
-
-varNameOf                     :: Variable -> IdentName
-varNameOf V'Prim  name _      =  name             
-varNameOf V'Pair  name _ _ _  =  name
-varNameOf V'Array name _ _ _  =  name
+type ArmState = (RegMap, LabelNum, AvailRegs)
 
 --------------------------------------------------------------------------------
 --  PROGRAM  -------------------------------------------------------------------
@@ -87,15 +32,32 @@ varNameOf V'Array name _ _ _  =  name
 
 -- | 
 transProgram :: Program -> [ Instr ]
-transProgram p = error "TODO"
+transProgram (Program funcs body) =
+
+    [ DEFINE "main:"           ] ++ -- Define main function label
+    [ PUSH [ LR ]              ] ++ -- Pushes the current return address onto the stack
+    snd (transStat body state)   ++ -- 
+    [ LDR R0 0                 ] ++ -- 
+    [ POP  [ PC ]              ]    -- 
+  where
+    state = (Map.empty, 0, [R4 .. R10])
 
 --------------------------------------------------------------------------------
 --  FUNC  ----------------------------------------------------------------------
 --------------------------------------------------------------------------------
 
 -- | 
-transFunc :: Func -> Heap -> Store -> [ Instr ]
-transFunc p = error "TODO"
+transFunc :: Func -> ArmState -> (ArmState, [ Instr ])
+transFunc (Func ftype fname args body it) arm = (arm', functInstr)
+  where
+    (arm', bodyInstr) = transStat body arm
+    functInstr        = [ DEFINE fname ] ++ -- Define label with function name which we know is unique
+                        [ PUSH [ LR ]  ] ++ -- Pushes the current return address onto the stack
+                        bodyInstr        ++ 
+                        [ POP  [ PC ]  ]    -- Restore program counter from the stack
+  
+  
+
 
 --------------------------------------------------------------------------------
 --  STAT  ----------------------------------------------------------------------
@@ -104,196 +66,215 @@ transFunc p = error "TODO"
 -- | 
 transStat 
   :: Stat 
-  -> Heap
-  -> Store 
-  -> [ Register ] 
-  -> (Heap, Store, [ Register ], [ Instr ])
+  -> ArmState 
+  -> (ArmState, [ Instr ])
 
 -- |
-transStat SkipStat h s rs = (h, s, rs, [])
+transStat SkipStat s@(m, l, rs)  =  (s, [])
 
 -- |
-transStat (FreeStat e it) h s rs = error "TODO"
+--transStat (FreeStat e it) s@(m, l, rs)s = error "TODO"
+--  where
+--    is = transExpr e rs s ++  [{- Special instructions to free expression? -}]
+
+---- | 
+transStat (ExitStat e _) s@(m, l, rs)  =  (s', exitInstr)
   where
-    is = transExpr e rs s ++  [{- Special instructions to free expression? -}]
+    (s', exprInstr) = transExpr e s
+    exitInstr       = exprInstr ++ [ BL "exit" ]
 
 -- | 
-transStat (ExitStat e it) h s rs = error "TODO"
-  where
-    is = transExpr e rs h ++ [{- Special instructions to exit program? -}]
+--transStat (ReturnStat e _) s@(m, l, rs)  =  ((m, l', rs), instr)
+--  where
+--    (exprInstr, l') = transExpr e rs m l 
+--    instr           = [ BL "exit" ]
 
--- | 
-transStat (ReturnStat e it) h s rs = error "TODO"
-  where
-    is = transExpr e rs h ++ []
 
--- | 
-transStat (PrintStat e it) h s rs = error "TODO" 
+---- | 
+--transStat (PrintStat e _) s@(m, l, rs)  =  ((m, l', rs), instr)
+--  where
+--    (exprInstr, l') = transExpr e rs m l 
+--    instr           = exprInstr ++ [{- Special instructions to print? -}]
 
--- |                
-transStat (PrintlnStat e it) h s rs = error "TODO" 
+
+---- |                
+--transStat (PrintlnStat e it) s@(m, l, rs)  =  ((m, l', rs), instr)
+--  where
+--    (exprInstr, l') = transExpr e rs m l 
+--    instr           = exprInstr ++ [{- Special instructions to print? -}]
+
 
 -- |                 
-transStat (ScopedStat stat) h s rs = error "TODO"  
+transStat (ScopedStat stat) s  =  transStat stat s  
 
--- |                               
-transStat (ReadStat lhs it) h s rs = error "TODO" 
+
+---- |                               
+--transStat (ReadStat lhs it) h s rs = error "TODO" 
+
 
 -- |                    
-transStat (WhileStat cond body it) h s rs = error "TODO"   
+transStat (WhileStat cond body it) s@(m, l, rs@(dst:_))  = (s'', whileInstr)
+  where
+    label0           = nextLabel l 
+    label1           = nextLabel (l+1)
+    (s'', condInstr) = transExpr cond s'
+    (s',  bodyInstr) = transStat body (m, l+2, rs)
+    whileInstr       = [ B label0       ] ++ 
+                       [ DEFINE label1  ] ++
+                       bodyInstr ++
+                       [ DEFINE label0  ] ++
+                       condInstr ++
+                       [ CMP dst $ Op2'ImmVal 0 ] ++
+                       [ BEQ label1 ] 
+
 
 -- |             
-transStat (SeqStat stat stat') h s rs = error "TODO"       
+transStat (SeqStat stat stat') s = 
+    (s'', stat0Instr ++ stat1Instr)
+  where
+    (s',  stat0Instr) = transStat stat  s
+    (s'', stat1Instr) = transStat stat' s'
+
 
 -- |        
-transStat (DeclareStat vtype vname rhs it) h s rs = error "TODO"  
+transStat (DeclareStat vtype vname rhs it) s = (s', declInstr)
+  where
+    instrSTR :: Type -> (Rd -> Int -> Instr)
+    instrSTR t = if sizeOfType t == 1 then STRB else STR
+
+    size                         = sizeOfType vtype
+    (s'@(_, _, dst:_), rhsInstr) = transRHS s 
+    declInstr                    = [ SUB SP SP $ Op2'ImmVal size ] ++ -- Reserve space on the stack
+                                   rhsInstr ++
+                                   [ instrSTR vtype SP dst ] ++ 
+                                   [ ADD SP SP $ Op2'ImmVal size ]
+
     -- Check type of varialbe. If primitive save its value into register
 
--- |                  
-transStat (AssignStat lhs rhs it) h s rs =  error "TODO" 
+---- |                  
+--transStat (AssignStat lhs rhs it) h s rs =  error "TODO" 
 
--- |              
-transStat (IfStat cond sthen selse it) h s rs = error "TODO" 
+---- |              
+--transStat (IfStat cond sthen selse it) h s rs = error "TODO" 
+
+---- |
+--transLHS :: AssignLhs -> [ Instr ] 
+--transLHS (LhsIdent id) = error "TODO"              
+--transLHS (LhsPairElem pelem) = error "TODO"                 
+--transLHS (LhsArrayElem (ArrayElem id exprs)) = error "TODO" 
+
+transRHS = error "TODO"
+
+-- ************************************************************************** --
+-- ***********************                            *********************** --
+-- ***********************   Expression Translation   *********************** --
+-- ***********************                            *********************** -- 
+-- ************************************************************************** --
 
 -- |
-transLHS :: AssignLhs -> [ Instr ] 
-transLHS (LhsIdent id) = error "TODO"              
-transLHS (LhsPairElem pelem) = error "TODO"                 
-transLHS (LhsArrayElem (ArrayElem id exprs)) = error "TODO" 
+transExpr 
+  :: Expr                  -- *                
+  -> ArmState              -- *  
+  -> (ArmState, [ Instr ]) -- *               
 
---------------------------------------------------------------------------------
 
-transExpr :: Expr -> [ Register ] -> Store -> [ Instr ] 
+-- | Put the value of boolean @b@ into the first avaialble register @dst@
+transExpr (BoolLiterExpr b) s@(_, _, (dst:_))  = 
+  (s, [ MOV dst (Op2'ImmVal $ if b then 1 else 0) ])
 
--- | Put the value of boolean b into the first avaialble register r 
-transExpr (BoolLiterExpr b) (r:_) _ = [ MOV r (Op2'ImmVal $ if b then 1 else 0) ] 
 
--- | Put the corresponding integer value of c into the first avaialble register r 
-transExpr (CharLiterExpr c) (r:_) _ = [ MOV r (Op2'ImmVal $ ord c) ]   
+-- | Put the corresponding integer value of @c@ into the destination reg @dst@
+transExpr (CharLiterExpr c) s@(_, _, (dst:_))  = 
+  (s, [ MOV dst (Op2'ImmVal $ ord c) ])  -- todO use LDR
 
--- | 
-transExpr (IdentExpr id) (r:_) s = [ MOV r (Op2'ImmVal value) ]
+
+-- | Lookup what register variable @id@ is in, and copy its content in @dst@ reg
+transExpr (IdentExpr id) s@(m, _, (dst:_)) = 
+    (s, [ MOV dst (Op2'Reg src) ]) -- TODO LOL
   where
-    -- TODO can we just put a constant into it?
-    value = asImm8m (lookUpStore id s)
+    src = findReg id m 
 
- 
+
 -- | Evaluates the expression and places it in the dest reg(dst) , performs the unary operation on that reg 
---transExpr (UnaryOperExpr unaryOper e) (dst:rs) = 
---	transExpr e (dst:rs) ++ transUnOp unaryOper dst
-
---transUnOp :: UnaryOper -> Reg -> [Instr]
---transUnOp (UnaryOperExpr NotUnOp) dst = error "TODO"
-
-transExpr (UnaryOperExpr NotUnOp e) rs@(r:r':_) s = error "TODO"
+transExpr (UnaryOperExpr op e) s@(m, _, (dst:_)) = 
+    (s'', exprInstr ++ unopInstr)
   where
-    is = transExpr e rs ++ [ CMP r (Op2'ImmVal 0) ] ++ []
-
--- | 
-transExpr (UnaryOperExpr LenUnOp e) rs s = error "TODO"
-
--- |   
-transExpr (UnaryOperExpr OrdUnOp e) rs s = error "TODO" 
-
--- |                                   
-transExpr (UnaryOperExpr ChrUnOp e) rs s = error "TODO" 
-
--- |                                   
-transExpr (UnaryOperExpr NegUnOp e) rs s = error "TODO"
+    (s',  exprInstr)  =  transExpr e s
+    (s'', unopInstr)  =  transUnOp op s'
 
 -- |
-transExpr (ParenthesisedExpr e) rs s = transExpr e rs s
+transExpr (ParenthesisedExpr e) s = transExpr e s
 
 -- |
-transExpr (IntLiterExpr i) rs s = error "TODO"  
+transExpr (IntLiterExpr i) s@(m, l, rs@(dst:_)) = error "TODO"  
 
 -- |
-transExpr (StrLiterExpr str) rs s = error "TODO"  
+transExpr (StrLiterExpr str) s@(m, l, rs@(dst:_)) = error "TODO"  
 
 -- |
-transExpr PairLiterExpr rs s = error "TODO" 
+transExpr PairLiterExpr s@(m, l, rs@(dst:_)) = error "TODO" 
 
 -- | TODO make ArrayElem a type synonym PLSSSSSSS
-transExpr (ArrayElemExpr (ArrayElem ident exprs)) rs = error "TODO"  
+transExpr (ArrayElemExpr (ArrayElem ident exprs)) s@(m, l, rs@(dst:_)) = error "TODO"  
 
 -- |
-transExpr (BinaryOperExpr op e e') rs = error "TODO"  
+transExpr (BinaryOperExpr op e e') s@(m, l, rs@(dst:_)) = error "TODO"  
+ 
 
--- | 
-transExpr (BinaryOperExpr AddBinOp e e') rs = error "TODO" 
-
--- |   
-transExpr (BinaryOperExpr SubBinOp e e') rs = error "TODO" 
-
--- |   
-transExpr (BinaryOperExpr MulBinOp e e') rs = error "TODO"
-
--- |   
-transExpr (BinaryOperExpr DivBinOp e e') rs = error "TODO" 
-
--- |   
-transExpr (BinaryOperExpr ModBinOp e e') rs = error "TODO" 
-
--- |   
-transExpr (BinaryOperExpr AndBinOp e e') rs = error "TODO" 
-
--- |   
-transExpr (BinaryOperExpr OrrBinOp e e') rs = error "TODO" 
-
--- |   
-transExpr (BinaryOperExpr LsBinOp e e') rs = error "TODO" 
-
--- |   
-transExpr (BinaryOperExpr GtBinOp e e') rs = error "TODO" 
-
--- |   
-transExpr (BinaryOperExpr LEBinOp e e') rs = error "TODO" 
-
--- |   
-transExpr (BinaryOperExpr GEBinOp e e') rs = error "TODO" 
-
--- |   
-transExpr (BinaryOperExpr EqBinOp e e') rs = error "TODO" 
-
--- |   
-transExpr (BinaryOperExpr NEBinOp e e') rs = error "TODO"  
-
---------------------------------------------------------------------------------
-
--- | Converts integer constant @n@ so that it can be used as operand2 #<imm8m>
-asImm8m :: Int -> Int 
-asImm8m n = error "TODO"
-
---------------------------------------------------------------------------------
+-- | Generate instructions for a unary operator
+transUnOp :: UnaryOper -> ArmState -> (ArmState, [Instr])
+transUnOp NotUnOp s@(m, l, rs@(dst:_)) = ((m, l+1, rs), unopInstr)
+  where
+    label      =  nextLabel l 
+    unopInstr  =  [ CBZ dst label ]          ++
+                  [ MOV dst $ Op2'ImmVal 0 ] ++
+                  [ DEFINE label ]           ++
+                  [ MOV dst $ Op2'ImmVal 1 ]
 
 
-extractVar                       :: Expr -> Store -> Variable 
-extractVar (IdentExpr ident) s   =  lookupStore s ident
-extractVar _                 _   =  error "extractIdent: Expecting IdentExpr"
+transUnOp LenUnOp s@(m, l, rs@(dst:_)) = error "TODO"
+transUnOp OrdUnOp s@(m, l, rs@(dst:_)) = error "TODO"
+transUnOp ChrUnOp s@(m, l, rs@(dst:_)) = error "TODO"
+transUnOp NegUnOp s@(m, l, rs@(dst:_)) = error "TODO"
 
 
 
-sizeof :: Expr -> Word -- How many consecutive addresses does it take 
-sizeof (BoolLiterExpr     _    ) = 1            
-sizeof (CharLiterExpr     _    ) = 1            
-sizeof (IdentExpr         name ) = error "WHHHHHHHAT"
-sizeof (UnaryOperExpr _ _      ) = 1
-sizeof (ParenthesisedExpr e    ) = sizeof e               
-sizeof (IntLiterExpr           ) = 1               
-sizeof (StrLiterExpr      str  ) = length str              
-sizeof (PairLiterExpr          ) = 0  -- ?                
-sizeof (ArrayElemExpr (ArrayElem arrName exprs)) = error "TODO"           
-sizeof (BinaryOperExpr  _ e1 e2) = error "TODO"  
+----------------------------------------------------------------------------------
 
---sizeOfType :: Type -> Word 
---sizeOfType IntType  = 1                                 
---sizeOfType BoolType = 1                             
---sizeOfType CharType = 1                             
---sizeOfType StringType                               
---sizeOfType PairType ( Maybe ( Type , Type ) ) =    
---sizeOfType ArrayType Type =                          
---sizeOfType NullType  = 0 -- ?                                
---sizeOfType EmptyType = 0 -- ?                             
+---- | Converts integer constant @n@ so that it can be used as operand2 #<imm8m>
+--asImm8m :: Int -> Int 
+--asImm8m n = error "TODO"
+
+----------------------------------------------------------------------------------
+
+
+--extractVar                       :: Expr -> Store -> Variable 
+--extractVar (IdentExpr ident) s   =  lookupStore s ident
+--extractVar _                 _   =  error "extractIdent: Expecting IdentExpr"
+
+
+
+--sizeof :: Expr -> Word -- How many consecutive addresses does it take 
+--sizeof (BoolLiterExpr     _    ) = 1            
+--sizeof (CharLiterExpr     _    ) = 1            
+--sizeof (IdentExpr         name ) = error "WHHHHHHHAT"
+--sizeof (UnaryOperExpr _ _      ) = 1
+--sizeof (ParenthesisedExpr e    ) = sizeof e               
+--sizeof (IntLiterExpr           ) = 1               
+--sizeof (StrLiterExpr      str  ) = length str              
+--sizeof (PairLiterExpr          ) = 0  -- ?                
+--sizeof (ArrayElemExpr (ArrayElem arrName exprs)) = error "TODO"           
+--sizeof (BinaryOperExpr  _ e1 e2) = error "TODO"  
+
+sizeOfType              :: Type -> Int  -- In bytes 
+sizeOfType IntType      = 4                                 
+sizeOfType BoolType     = 1                             
+sizeOfType CharType     = 1                             
+sizeOfType StringType   = 4 -- Addresss                              
+sizeOfType (PairType  _) = 4 -- Address   
+sizeOfType (ArrayType _) = 4 -- Address                         
+sizeOfType NullType     = 0 -- ?                                
+sizeOfType EmptyType    = 0 -- ?                             
 
 
 

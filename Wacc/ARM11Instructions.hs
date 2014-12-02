@@ -2,14 +2,28 @@ module Wacc.ARM11Instructions where
 
 import Data.List (intersperse)
 
+
+data Directive 
+  = Text
+  | Global Label
+  | Ltorg
+
+instance Show Directive where
+  show Text       = ".text"
+  show (Global l) = ".global " ++ l
+  show Ltorg      = ".ltorg"
+
 -- The available registers of ARM11
 data Register 
   = R0 | R1 | R2 | R3 | R4 | R5 | R6 | R7 | R8 | R9 | R10 | R11 | R12 
   | SP -- R13 | Stack Pointer
   | LR -- R14 | Link Register (which holds return addresses)
   | PC -- R15 | Program Counter
+  deriving (Enum)
 
 -- Data synonyms
+type Reg = Register
+
 type Rd = Register 
 type Rn = Register 
 type Rm = Register 
@@ -79,14 +93,22 @@ data Instr
 
   -- Branching (jump)
   | B       Label  -- Branch                       | B        <label> | PC := label. label is this instruction ±32MB (T2: ±16MB, T: –252 - +256B)                 
-  | BL      Label  -- Branch with link             | BL       <label> | LR := address of next instruction, PC := label. label is this instruction ±32MB (T2: ±16MB).    
+  | BL      Label  -- Branch with link             | BL       <label> | LR := address of next instruction, PC := label. label is this instruction ±32MB (T2: ±16MB).   
+  | BEQ     Label
   | CBZ  Rn Label  -- Compare, branch if zero      | CBZ  Rn, <label> | If Rn == 0 then PC := label. label is (this instruction + 4-130).  
   | CBNZ Rn Label  -- Compare, branch if non-zero  | CBNZ Rn, <label> | If Rn != 0 then PC := label. label is (this instruction + 4-130).  
   | DEFINE  Label  -- This is NOT an ARM instruction -- It is just to tell where a label is defined 
-
   -- Push & Pop
   | PUSH RegList  --  Push | POP  <reglist> | <reglist> = {Ri, Rj, Rn,...}
   | POP  RegList  --  Pop  | PUSH <reglist> | <reglist> = {Ri, Rj, Rn,...}  
+
+  -- Load and Store
+  | LDR Rd Int    -- | LDR rd, =numeric constant
+  | STR Rd Int    -- | 
+  | STRB Rd Int   -- | 
+
+  -- Directive
+  | Instr'Dir Directive
 
 instance Show Register where
   show R0  = "r0"   
