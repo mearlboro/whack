@@ -1,0 +1,33 @@
+module ARM11CodeGen where
+
+import Wacc.ARM11Instructions
+import Wacc.WaccDataTypes
+
+
+
+transStat :: Stat -> [ Instr ]
+
+transStat SkipStat = [] 
+
+transStat FreeStat expr = 
+
+FreeStat    Expr                          It -- 'free' <expr>
+  | ReturnStat  Expr                          It -- 'return' <expr>
+  | ExitStat    Expr                          It -- 'exit' <expr>
+  | PrintStat   Expr                          It -- 'print' <expr>
+  | PrintlnStat Expr                          It -- 'println' <expr>
+  | ScopedStat  Stat                             -- 'begin' <stat> 'end'
+  | ReadStat    AssignLhs                     It -- 'read' <assign-lhs>
+  | WhileStat   Expr      Stat                It -- 'while' <expr> 'do' <stat> 'done'
+  | SeqStat     Stat      Stat                   -- <stat> ';' <stat>
+  | AssignStat  AssignLhs AssignRhs           It -- <assign-lhs> '=' <assign-rhs>
+  | IfStat      Expr      Stat      Stat      It -- 'if' <expr> 'then' <stat> 'else' <stat> 'fi'
+  | DeclareStat Type      IdentName AssignRhs It -- <type> <ident> '=' <assign-rhs>
+
+
+transExpr :: Expr -> [ Register ] -> [ Instr ]
+
+-- Expression is a BoolLiter : True|False --TODO
+transExpr ( BoolLiterExpr boolLiter ) ( dst : regs ) = case boolLiter of 
+	True  -> [ Mov dst ( Op2'ImmVal 1 ) ] -- 1 = True
+  | False -> [ Mov dst ( Op2'ImmVal 0 ) ] -- 0 = False 
