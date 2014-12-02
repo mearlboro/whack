@@ -170,6 +170,16 @@ instance Show Instr where
     show (ORR    rd rn  op2   ) = "ORR " ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- ORR    Rd, Rn,        <Operand2>
     show (ORN    rd rn  op2   ) = "ORN " ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- ORN    Rd, Rn,        <Operand2>
     show (BIC    rd rn  op2   ) = "BIC " ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- BIC    Rd, Rn,        <Operand2>
+    show (PUSH   regs         ) = "PUSH" ++ showRegs regs
+    show (POP    regs         ) = "POP " ++ showRegs regs
+    show (LDR    rd  n        ) = "LDR " ++ show rd ++ ", " ++ show  n
+    show (STR    rd  n        ) = "STR " ++ show rd ++ ", " ++ show  n
+    show (STRB   rd  n        ) = "STRB" ++ show rd ++ ", " ++ show  n
+    show (Instr'Dir  dir      ) = show dir
+
+showRegs :: (Show a) => [a] -> String
+showRegs [] = ""
+showRegs (reg:regs) = (show reg) ++ ", " ++ showRegs regs
 
 --showInstr             :: (Show a, Show b) => String -> [a] -> [b] -> String    
 --showInstr mne rs ops  =  mne ++ " " ++ concat (intersperse ", " $ map show ops)
