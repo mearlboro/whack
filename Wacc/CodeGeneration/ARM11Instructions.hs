@@ -118,9 +118,9 @@ data Instr
   | POP  RegList  --  Pop  | PUSH <reglist> | <reglist> = {Ri, Rj, Rn,...}
 
   -- Load and Store
-  | LDR Rd Int    -- | LDR rd, =numeric constant
-  | STR Rd Int    -- |
-  | STRB Rd Int   -- |
+  | LDR  Rd Integer    -- | LDR rd, =numeric constant
+  | STR  Rd Integer    -- |
+  | STRB Rd Integer    -- |
 
   -- Directive
   | INDIR Directive
@@ -193,9 +193,9 @@ instance Show Instr where
     show (DEFINE l            ) = show l 
     show (PUSH   regs         ) = "PUSH " ++ showRegs regs
     show (POP    regs         ) = "POP "  ++ showRegs regs
-    show (LDR    rd n         ) = "LDR "  ++ show rd ++ ", " ++ show n
-    show (STR    rd n         ) = "STR "  ++ show rd ++ ", " ++ show n
-    show (STRB   rd n         ) = "STRB " ++ show rd ++ ", " ++ show n
+    show (LDR    rd n         ) = "LDR "  ++ show rd ++ ", =" ++ show n
+    show (STR    rd n         ) = "STR "  ++ show rd ++ ", =" ++ show n
+    show (STRB   rd n         ) = "STRB " ++ show rd ++ ", =" ++ show n
     show (INDIR  dir          ) = show dir    
 
 
