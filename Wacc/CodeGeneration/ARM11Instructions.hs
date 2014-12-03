@@ -81,8 +81,8 @@ data Instr
   | UDIV Rd Rn Rm       -- Divide unsigned  | UDIV   Rd, Rn, Rm         | Rd := Rn / Rm
 
   -- Moving
-  | MOV Rd Operand2     -- Move | MOV{S} Rd, <Operand2> | Rd := Operand2
-
+  | MOV     Rd Operand2     -- Move | MOV{S} Rd, <Operand2> | Rd := Operand2
+  | MOV'Reg Rd Rs           -- ... TODO:
   -- Shifting
   | ASR    Rd Rm Rs     -- Arithmetic shift right by register | ASR{S} Rd, Rm, Rs | Rd := ASR(Rm, Rs)
   | LSL    Rd Rm Rs     -- Logical    shift left  by register | LSL{S} Rd, Rm, Rs | Rd := LSL(Rm, Rs)
@@ -177,6 +177,7 @@ instance Show Instr where
     show (SDIV   rd rn  rm    ) = "\tSDI "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rm                    -- SDIV   Rd, Rn,        Rm
     show (UDIV   rd rn  rm    ) = "\tUDI "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rm                    -- UDIV   Rd, Rn,        Rm
     show (MOV    rd op2       ) = "\tMOV "  ++ show rd ++ ", " ++ show op2                                       -- MOV{S} Rd, <Operand2>
+    show (MOV'Reg   rd  rs    ) = "\tMOV "  ++ show rd ++ ", " ++ show rs                                        -- MOV{S} Rd, <Operand2>
     show (ASR    rd rm  rs    ) = "\tASR "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    -- ASR{S} Rd, Rm,        Rs
     show (LSL    rd rm  rs    ) = "\tLSL "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    -- LSL{S} Rd, Rm,        Rs
     show (LSR    rd rm  rs    ) = "\tLSR "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    -- LSR{S} Rd, Rm,        Rs
