@@ -31,7 +31,7 @@ import Data.Map            ( findWithDefault , Map (..) , insertWith
 import Data.Maybe          ( fromMaybe , fromJust , Maybe (..) , isJust
                            , isNothing                                  )
 import Data.Tuple          ( swap                                       )
-import Prelude hiding      ( lookup , empty                             )
+import Prelude hiding      ( lookup )--, empty                             )
 
 
 -- ************************************************************************** --

@@ -22,14 +22,15 @@ type Rs = Register
 
 -- Labels 
 data Label 
-  = JumpLabel   String          -- Name of a label in ARM
-  | StringLabel String String   -- msg_i: label for strings
+  = JumpLabel   String        -- Name of a label in ARM
+  | StringLabel String String -- msg_i: label for strings
 
 instance Show Label where
   show ( JumpLabel   l     ) 
-      = l
+      =  l
   show ( StringLabel l str ) 
-      =  "msg_" ++ l ++ "\n\t.word " ++ show ( length str )
+      =  l
+      ++ "\n\t.word " ++ show ( length str )
       ++ "\n\t.ascii \"" ++ str  ++ "\"\n"
 
 
@@ -118,9 +119,17 @@ data Instr
   | POP  RegList  --  Pop  | PUSH <reglist> | <reglist> = {Ri, Rj, Rn,...}
 
   -- Load and Store
-  | LDR Rd Int    -- | LDR rd, =numeric constant
-  | STR Rd Int    -- |
-  | STRB Rd Int   -- |
+  | LDR  Rd Integer    -- | LDR rd, =numeric constant
+  | STR  Rd Integer    -- |
+  | STRB Rd Integer    -- |
+
+  | LDR'Lbl  Rd Label  -- | LDR rd, =label
+  | STR'Lbl  Rd Label  -- |
+  | STRB'Lbl Rd Label  -- |
+
+  | STR'Reg  Rd Rd  -- |
+  | STRB'Reg Rd Rd  -- |
+
 
   -- Directive
   | INDIR Directive
@@ -161,42 +170,47 @@ showOp2 op mne op'  =  show op ++ ", " ++ mne ++ show op'
 
 
 instance Show Instr where
-    show (ADD    rd rn  op2   ) = "ADD "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- ADD{S} Rd, Rn,        <Operand2>
-    show (SUB    rd rn  op2   ) = "SUB "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- SUB{S} Rd, Rn,        <Operand2>
-    show (MUL    rd rm  rs    ) = "MUL "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    -- MUL{S} Rd, Rm,        Rs
-    show (MLA    rd rm  rs rn ) = "MLA "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs ++ ", " ++ show rn -- MLA{S} Rd, Rm,        Rs,         Rn
-    show (SDIV   rd rn  rm    ) = "SDI "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rm                    -- SDIV   Rd, Rn,        Rm
-    show (UDIV   rd rn  rm    ) = "UDI "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rm                    -- UDIV   Rd, Rn,        Rm
-    show (MOV    rd op2       ) = "MOV "  ++ show rd ++ ", " ++ show op2                                       -- MOV{S} Rd, <Operand2>
-    show (ASR    rd rm  rs    ) = "ASR "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    -- ASR{S} Rd, Rm,        Rs
-    show (LSL    rd rm  rs    ) = "LSL "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    -- LSL{S} Rd, Rm,        Rs
-    show (LSR    rd rm  rs    ) = "LSR "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    -- LSR{S} Rd, Rm,        Rs
-    show (ROR    rd rm  rs    ) = "ROR "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    -- ROR{S} Rd, Rm,        Rs
-    show (ASR'Sh rd rm  sh    ) = "ASR "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show sh                    -- ASR{S} Rd, Rm,        sh
-    show (LSL'Sh rd rm  sh    ) = "LSL "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show sh                    -- LSL{S} Rd, Rm,        sh
-    show (LSR'Sh rd rm  sh    ) = "LSR "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show sh                    -- LSR{S} Rd, Rm,        sh
-    show (ROR'Sh rd rm  sh    ) = "ROR "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show sh                    -- ROR{S} Rd, Rm,        sh
-    show (CMP    rn op2       ) = "CMP "  ++ show rn ++ ", " ++ show op2                                       -- CMP    Rn, <Operand2>
-    show (CMN    rn op2       ) = "CMN "  ++ show rn ++ ", " ++ show op2                                       -- CMN    Rn, <Operand2>
-    show (TST    rn op2       ) = "TST "  ++ show rn ++ ", " ++ show op2                                       -- TST    Rn, <Operand2>
-    show (TEQ    rn op2       ) = "TEQ "  ++ show rn ++ ", " ++ show op2                                       -- TEQ    Rn, <Operand2>
-    show (AND    rd rn  op2   ) = "AND "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- AND    Rd, Rn,        <Operand2>
-    show (EOR    rd rn  op2   ) = "EOR "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- EOR    Rd, Rn,        <Operand2>
-    show (ORR    rd rn  op2   ) = "ORR "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- ORR    Rd, Rn,        <Operand2>
-    show (ORN    rd rn  op2   ) = "ORN "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- ORN    Rd, Rn,        <Operand2>
-    show (BIC    rd rn  op2   ) = "BIC "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- BIC    Rd, Rn,        <Operand2>
-    show (B      l            ) = "B "    ++ show l
-    show (BL     l            ) = "BL "   ++ show l
-    show (BEQ    l            ) = "BEQ "  ++ show l
-    show (CBZ    rn l         ) = "CBZ "  ++ show rn ++ ", " ++ show l
-    show (CBNZ   rn l         ) = "CBNZ " ++ show rn ++ ", " ++ show l
-    show (DEFINE l            ) = show l 
-    show (PUSH   regs         ) = "PUSH " ++ showRegs regs
-    show (POP    regs         ) = "POP "  ++ showRegs regs
-    show (LDR    rd n         ) = "LDR "  ++ show rd ++ ", " ++ show n
-    show (STR    rd n         ) = "STR "  ++ show rd ++ ", " ++ show n
-    show (STRB   rd n         ) = "STRB " ++ show rd ++ ", " ++ show n
-    show (INDIR  dir          ) = show dir    
+    show (ADD    rd rn  op2   ) = "\tADD "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- ADD{S} Rd, Rn,        <Operand2>
+    show (SUB    rd rn  op2   ) = "\tSUB "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- SUB{S} Rd, Rn,        <Operand2>
+    show (MUL    rd rm  rs    ) = "\tMUL "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    -- MUL{S} Rd, Rm,        Rs
+    show (MLA    rd rm  rs rn ) = "\tMLA "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs ++ ", " ++ show rn -- MLA{S} Rd, Rm,        Rs,         Rn
+    show (SDIV   rd rn  rm    ) = "\tSDI "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rm                    -- SDIV   Rd, Rn,        Rm
+    show (UDIV   rd rn  rm    ) = "\tUDI "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rm                    -- UDIV   Rd, Rn,        Rm
+    show (MOV    rd op2       ) = "\tMOV "  ++ show rd ++ ", " ++ show op2                                       -- MOV{S} Rd, <Operand2>
+    show (ASR    rd rm  rs    ) = "\tASR "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    -- ASR{S} Rd, Rm,        Rs
+    show (LSL    rd rm  rs    ) = "\tLSL "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    -- LSL{S} Rd, Rm,        Rs
+    show (LSR    rd rm  rs    ) = "\tLSR "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    -- LSR{S} Rd, Rm,        Rs
+    show (ROR    rd rm  rs    ) = "\tROR "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    -- ROR{S} Rd, Rm,        Rs
+    show (ASR'Sh rd rm  sh    ) = "\tASR "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show sh                    -- ASR{S} Rd, Rm,        sh
+    show (LSL'Sh rd rm  sh    ) = "\tLSL "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show sh                    -- LSL{S} Rd, Rm,        sh
+    show (LSR'Sh rd rm  sh    ) = "\tLSR "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show sh                    -- LSR{S} Rd, Rm,        sh
+    show (ROR'Sh rd rm  sh    ) = "\tROR "  ++ show rd ++ ", " ++ show rm  ++ ", " ++ show sh                    -- ROR{S} Rd, Rm,        sh
+    show (CMP    rn op2       ) = "\tCMP "  ++ show rn ++ ", " ++ show op2                                       -- CMP    Rn, <Operand2>
+    show (CMN    rn op2       ) = "\tCMN "  ++ show rn ++ ", " ++ show op2                                       -- CMN    Rn, <Operand2>
+    show (TST    rn op2       ) = "\tTST "  ++ show rn ++ ", " ++ show op2                                       -- TST    Rn, <Operand2>
+    show (TEQ    rn op2       ) = "\tTEQ "  ++ show rn ++ ", " ++ show op2                                       -- TEQ    Rn, <Operand2>
+    show (AND    rd rn  op2   ) = "\tAND "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- AND    Rd, Rn,        <Operand2>
+    show (EOR    rd rn  op2   ) = "\tEOR "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- EOR    Rd, Rn,        <Operand2>
+    show (ORR    rd rn  op2   ) = "\tORR "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- ORR    Rd, Rn,        <Operand2>
+    show (ORN    rd rn  op2   ) = "\tORN "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- ORN    Rd, Rn,        <Operand2>
+    show (BIC    rd rn  op2   ) = "\tBIC "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   -- BIC    Rd, Rn,        <Operand2>
+    show (B      l            ) = "\tB "    ++ show l
+    show (BL     l            ) = "\tBL "   ++ show l
+    show (BEQ    l            ) = "\tBEQ "  ++ show l
+    show (CBZ    rn l         ) = "\tCBZ "  ++ show rn ++ ", " ++ show l
+    show (CBNZ   rn l         ) = "\tCBNZ " ++ show rn ++ ", " ++ show l
+    show (DEFINE l            ) = "\t" ++ show l 
+    show (PUSH   regs         ) = "\tPUSH " ++ showRegs regs
+    show (POP    regs         ) = "\tPOP "  ++ showRegs regs
+    show (LDR    rd n         ) = "\tLDR "  ++ show rd ++ ", =" ++ show n
+    show (STR    rd n         ) = "\tSTR "  ++ show rd ++ ", =" ++ show n
+    show (STRB   rd n         ) = "\tSTRB " ++ show rd ++ ", =" ++ show n
+    show (LDR'Lbl   rd l      ) = "\tLDR "  ++ show rd ++ ", =" ++ show l
+    show (STR'Lbl   rd l      ) = "\tSTR "  ++ show rd ++ ", =" ++ show l
+    show (STRB'Lbl  rd l      ) = "\tSTRB " ++ show rd ++ ", =" ++ show l
+    show (STR'Reg   rd rs     ) = "\tSTR "  ++ show rd ++ ", = [" ++ show rs ++ " ]" 
+    show (STRB'Reg  rd rs     ) = "\tSTRB " ++ show rd ++ ", = [" ++ show rs ++ " ]" 
+    show (INDIR  dir          ) = "\t" ++ show dir    
 
 
 showRegs [] = ""
