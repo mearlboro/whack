@@ -10,6 +10,7 @@ import Data.Maybe
 import Data.Char
 -- import Data.Tuple.Select ( sel3 )
 
+import Debug.Trace
 
 -- ************************************************************************** --
 -- **************************                         *********************** --
@@ -115,9 +116,7 @@ transStat SkipStat s
   = ([], s)
 
 -- |
---transStat (FreeStat e it) s@(m, ls, rs)s = error "TODO"
---  where
---    is = transExpr e rs s ++  [{- Special instructions to free expression? -}]
+transStat (FreeStat e it) s = error "FreeStat"
 
 ---- | 
 transStat (ExitStat e _) s 
@@ -127,12 +126,14 @@ transStat (ExitStat e _) s
       exitInstrs       = exprInstrs ++ [ BL ( JumpLabel "exit" ) ]
 
 -- | 
---transStat (ReturnStat e _) s@(m, ls, rs) =  ((m, l', rs), instr)
+transStat (ReturnStat e _) s = error "ReturnStat" 
+-- = ((m, l', rs), instr)
 --  where
 --    (exprInstr, l') = transExpr e rs m l 
 --    instr           = [ BL "exit" ]
 
 
+transStat (PrintStat e it) s@(m, ls, i, rs) = error "PrintStat" 
 --transStat (PrintStat e it) s@(m, ls, i, rs) 
 --  = (instrs, (m, printStrLabel: ls', i, rs))
 --    where
@@ -154,7 +155,8 @@ transStat (ExitStat e _) s
 --             ++ [ POP [ PC ]  ] 
 --      printSetupInstrs = []
 
----- |                
+transStat (PrintlnStat e it) s  = error "PrintlnStat"
+-- |                
 --transStat (PrintlnStat e it) s@(m, ls, rs)  =  ((m, l', rs), instr)
 --  where
 --    (exprInstr, l') = transExpr e rs m l 
@@ -167,7 +169,7 @@ transStat (ScopedStat stat) s
 
 
 ---- |                               
---transStat (ReadStat lhs it) h s rs = error "TODO" 
+transStat (ReadStat lhs it) s = error "TODO" 
 
 
 -- |                    
@@ -194,6 +196,7 @@ transStat (SeqStat stat stat') s
       (stat0Instr, s' ) = transStat stat  s 
       (stat1Instr, s'') = transStat stat' s'
 
+transStat (DeclareStat vtype vname rhs it) s = error "DeclareStat" 
 
 -- |        
 -- transStat (DeclareStat vtype vname rhs it) s 
@@ -208,11 +211,11 @@ transStat (SeqStat stat stat') s
 --                                       ++ [ (STR' vtype) SP dst ]
 --                                       ++ [ ADD SP SP $ Op2'ImmVal size ]
 
----- |                  
---transStat (AssignStat lhs rhs it) h s rs =  error "TODO" 
+-- |                  
+transStat (AssignStat lhs rhs it) s =  error "AssignStat" 
 
----- |              
---transStat (IfStat cond sthen selse it) h s rs = error "TODO" 
+-- |              
+transStat (IfStat cond sthen selse it) s = error "IfStat" 
 
 ---- |
 --transLHS :: AssignLhs -> [ Instr ] 
@@ -253,7 +256,7 @@ transExpr (IdentExpr id) s@(m, _, _, (dst:_))
 
 -- | Evaluates the expression and places it in the dest reg(dst) , performs the unary operation on that reg 
 transExpr (UnaryOperExpr op e) s@(m, _, _, (dst:_))
-  = (exprInstr ++ unopInstr, s'')
+  = (trace "unaryop" (exprInstr ++ unopInstr, s''))
     where
       ( exprInstr, s' ) = transExpr e  s 
       ( unopInstr, s'') = transUnOp op s'
@@ -264,7 +267,7 @@ transExpr (ParenthesisedExpr e) s
 
 -- |
 transExpr (IntLiterExpr i) s@(_, _, _, rs@(dst:_)) = 
-   ( [ LDR dst i , MOV R0 (Op2'Reg dst) ], s )
+   ( [ LDR dst i ], s )
 
 -- |
 transExpr (StrLiterExpr str) s@(m, ls, i, rs@(dst:_)) = error "NEED A DIRECTIVE FIELD IN ARM STATE" 
@@ -283,14 +286,11 @@ transExpr (BinaryOperExpr op e e') s@(m, ls, i, rs@(dst:_)) = error "BinaryOperE
 -- | Generate instructions for a unary operator
 transUnOp :: UnaryOper -> ArmState
           -> ( [ Instr ], ArmState )
-transUnOp NotUnOp s@(m, ls, i, rs@(dst:_)) = (unopInstrs, (m, ls, i + 1, rs))
+transUnOp NotUnOp s@(m, ls, i, rs@(dst:_)) = (unopInstrs, s)
   where
-    label      =  nextLabel i
-    unopInstrs =  [ CBZ dst label ]          ++
-                  [ MOV dst $ Op2'ImmVal 0 ] ++
-                  [ DEFINE label ]           ++
-                  [ MOV dst $ Op2'ImmVal 1 ]
-
+    unopInstrs =  [ EOR R4 R4 $ Op2'ImmVal 1 ]
+               ++ [ MOV'Reg R0 R4 ]
+    
 
 transUnOp LenUnOp s@(m, ls, i, rs@(dst:_)) = error "LenUnop"
 transUnOp OrdUnOp s@(m, ls, i, rs@(dst:_)) = error "OrdUnop"
