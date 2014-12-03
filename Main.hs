@@ -7,7 +7,7 @@ import System.FilePath.Posix
 
 import Wacc.Syntax.Parser
 import Wacc.Semantics.Checker
-
+import Wacc.CodeGeneration.WaccCodeGen
 -------------------------------------------------------------------------------
 
 -- |Runs the wacc compiler after checking argument validity.
@@ -67,13 +67,15 @@ parse source = do
         exitWith $ ExitFailure 100
 
 -- TODO: type signature
-check programAST = do
+check program = do
   -- Takes a program AST and gets a list of error
-  let errs = checkProgram programAST
+  let errs = checkProgram program
 
   -- If list is empty, exit with success
   if ( length errs > 0 )
     then do
         putStrLn $ unlines errs
         exitWith $ ExitFailure 200
-    else exitWith   ExitSuccess
+    else do
+        putStrLn $ makePretty $ transProgram program
+        exitWith   ExitSuccess
