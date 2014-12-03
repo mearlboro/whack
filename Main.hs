@@ -77,5 +77,5 @@ check program = do
         putStrLn $ unlines errs
         exitWith $ ExitFailure 200
     else do
-        putStrLn $ makePretty $ transProgram program 
+        putStrLn $ makePretty $ transProgram program
         exitWith   ExitSuccess
