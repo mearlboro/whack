@@ -2,6 +2,8 @@ module Wacc.Data.DataTypes where
 
 import Data.Map   ( Map (..)  )
 
+import Wacc.CodeGeneration.ARM11Instructions
+
 -- ************************************************************************** --
 -- **************************                  ****************************** --
 -- **************************   WACC Grammar   ****************************** --
@@ -32,7 +34,7 @@ type ParamList = [ Param ]                       -- <param-list> ::= <param> (';
 
 data Param                                       -- <param> ::=
   = Param                                        -- <type> <ident>
-  { ptypeOf :: Type
+  { ptypeOf :: Type -- TODO
   , pnameOf :: IdentName
   } deriving ( Eq , Ord )
 
@@ -203,7 +205,7 @@ instance Eq' Context where
 data SymbolTable k a
   = Empty
   | ST ( SymbolTable k a ) ( Map k a )
-  deriving ( Eq , Ord )
+  deriving ( Eq , Ord , Show )
 
 -- | An identifier table is a symbol table that maps identifier names to
 --   identifier objects. It may be empty or it may have: a dictionary (Map)
@@ -218,10 +220,15 @@ data Context
   = Variable
   | Function Func
   | Parameter
-  deriving ( Eq , Ord )
+  deriving ( Eq , Ord)
 
 -- | An identifier object has a type and the context it appears in
-type IdentObj = ( Type , Context )
+data IdentObj 
+  = IdentObj
+  { objType :: Type 
+  , objCtx  :: Context
+  , objLoc  :: (Reg, Int) 
+  } deriving (Eq, Ord)
 
 -- | Type synonym
 type It = IdentTable
