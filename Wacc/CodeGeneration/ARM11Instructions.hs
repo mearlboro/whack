@@ -5,7 +5,6 @@ import qualified Data.Map as Map
  
 import Wacc.Data.SymbolTable
 import Wacc.Data.DataTypes
-  
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -54,10 +53,10 @@ showRegs rs = concat $ intersperse ", " $ map show rs
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
 -- The state
-data ARMState 
-  = ARMState { stackMap      :: Map.Map IdentName Int
+data ArmState 
+  = ArmState { stackMap      :: Map.Map IdentName Int
              , stackOffset   :: Int
-             , freeRegs      :: [ Reg ]
+             , availableRegs :: [ Reg ]
              , numJumpLabels :: Int
              , dataLabels    :: [ Label ]
              , predefLabels  :: [ Label ]

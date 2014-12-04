@@ -21,30 +21,11 @@ import Debug.Trace
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
--- Prerequisites                                                                
-
-type RegMap = Map.Map IdentName Reg
-
-findReg       :: IdentName -> RegMap -> Reg 
-findReg m id  =  fromJust $ Map.lookup m id 
-
-type AvailRegs = [ Register ]
-
-type ArmState = (RegMap, [Label], Int, AvailRegs) -- Int is number of labels used
-
-type ExitCode = Int
-
-nextLabel :: ExitCode -> Label
-nextLabel i = JumpLabel $ "L" ++ show i
-
-
-
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 transProgram :: Program        -- | The program Augmented AST
-             -> ( [ Instr ] ,  -- | Program state, to extract the string labels
-                  ArmState  )  -- | The instructions the program translates to
+             -> ( ArmState  ,  -- | Program state, to extract the string labels
+                  [ Instr ] )  -- | The instructions the program translates to
 transProgram (Program funcs body) 
-    = (instrs, s)
+    = (s, instrs)
       where
         instrs 
           =  [ DEFINE ( JumpLabel "main:" ) ]  -- Define main function label
@@ -53,16 +34,21 @@ transProgram (Program funcs body)
           ++ [ LDR R0 0                     ]  -- 
           ++ [ POP  [ PC ]                  ]  --
           ++ [ INDIR Ltorg                  ] 
-        (instrs', s) = transStat body state0 
-        state0       = (Map.empty, [], 0, [R4 .. R10])
-
+        (s, instrs') = transStat body state0 
+        state0       = ArmState { stackMap      = Map.empty
+                                , stackOffset   = 0 
+                                , availableRegs = [R4 .. R10]
+                                , numJumpLabels = 0
+                                , dataLabels    = [] 
+                                , predefLabels  = []
+                                }
 
 -- TODO rename lol
-makePretty :: ( [ Instr ], ArmState ) -- computed by transProgram
+makePretty :: ( ArmState, [ Instr ] ) -- computed by transProgram
            ->   String                -- printable compiled program
-makePretty (instrs, s@(_, ls, _, _)) 
+makePretty (s, instrs) 
     =  show ( INDIR Data )  ++ "\n"
-    ++ concatMap putDataLabel ls
+    ++ concatMap putDataLabel ( dataLabels s )
     ++ show ( INDIR Text )  ++ "\n"                  
     ++ show ( INDIR ( Global ( JumpLabel "main" ) ) ) ++ "\n"
     ++ ( concat $ intersperse "\n" $ map show instrs )
@@ -74,6 +60,12 @@ makePretty (instrs, s@(_, ls, _, _))
           ++ "\n\t.ascii \"" ++ str  ++ "\\0\"\n"
 
 
+nextLabel :: Int -> Label
+nextLabel i = JumpLabel $ "L" ++ show i
+
+
+
+
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- | The following transform functions will get the AST of a statement, expression,
 --   or function and an ARM state containing information about labels and registers
@@ -81,9 +73,9 @@ makePretty (instrs, s@(_, ls, _, _))
 --   an updated state wrapped in a tuple. 
 --
 -- trans____ :: *AST*      -- | Func, Stat, Expr to be compiled
---           -> ArmState   -- | Describing the state before transforming
---           -> ( [ Instr ], -- | The instructions compiled out of the input
---                ArmState ) -- | Describing the new state
+--           -> ARMState   -- | Describing the state before transforming
+--           -> ( ArmState  , -- | The instructions compiled out of the input
+--                [ Instr ] ) -- | Describing the new state
 
 -- properties of trans : normal, deterministic, total
 
@@ -95,17 +87,17 @@ makePretty (instrs, s@(_, ls, _, _))
 
 -- | 
 transFunc :: Func      -> ArmState
-          -> ( [ Instr ], ArmState )
+          -> ( ArmState, [ Instr ] )
               
 transFunc (Func ftype fname args body it) s 
-  = (functInstrs, s')
+  = (s', functInstrs)
     where
       functInstrs       
         =  [ DEFINE ( JumpLabel fname ) ]  -- Define label with unique function name 
         ++ [ PUSH [ LR ]                ]  -- Pushes current return address onto stack                       
         ++ bodyInstrs                      -- The instructions from the func body
         ++ [ POP  [ PC ]                ]  -- Restore program counter from the stack
-      (bodyInstrs, s') = transStat body s
+      (s', bodyInstrs) = transStat body s
 
 
 
@@ -115,39 +107,50 @@ transFunc (Func ftype fname args body it) s
 -- ***********************                            *********************** -- 
 -- ************************************************************************** --
 
-transStat :: Stat      -> ArmState
-          -> ( [ Instr ], ArmState )
+transStat :: Stat -> ArmState -> ( ArmState, [ Instr ] )
 
 transStat SkipStat s
-  = ([], s)
+  = (s, [])
 
 transStat (FreeStat e it) s = error "FreeStat"
 
 transStat (ExitStat e _) s 
-  = (exitInstrs, s')
+  = (s', exitInstrs)
     where
-      (exprInstrs, s') = transExpr e s
+      (s', exprInstrs) = transExpr e s
       exitInstrs       = exprInstrs ++ [ BL ( JumpLabel "exit" ) ]
 
 transStat (ReturnStat e _) s = error "ReturnStat" 
 
-transStat (PrintStat e it) s@(m, ls, i, rs@(dst:_))
-  = ( instrs', (m, ls'''', i, rs))
-    where
-        (instrs, (_, ls', _, _)) = transExpr e s 
-        instrs' = instrs ++ [ MOV'Reg R0 dst ] ++ label
-        label   = case typeOfExpr e it of
-                   BoolType   -> [ BL $ JumpLabel "p_print_bool"   ]
-                   CharType   -> [ BL $ JumpLabel "putchar"        ]
-                   IntType    -> [ BL $ JumpLabel "p_print_int"    ]
-                   StringType -> [ BL $ JumpLabel "p_print_string" ]  
 
-        ls''''  = if typeOfExpr e it == BoolType
-                      then 
-                          let (l,  ls'' ) = newDataLabel "true"  ls'  in
-                          let (l', ls''') = newDataLabel "false" ls'' in
-                          ls'''
-                      else ls'
+transStat (PrintStat e it) s
+  = ( s'', instrs')
+    where
+        -- The new state just updates the data labels
+        s''          = s' { dataLabels = ls'' }
+
+        -- First gets the instructions for the expr, then adds the print
+        instrs'      = instrs ++ [ MOV'Reg R0 dst ] ++ label
+        (s', instrs) = transExpr e s 
+        (dst:_)      = availableRegs s'
+        -- The print label/function called depends on the type
+        label        = case typeOfExpr e it of
+                          BoolType   -> [ BL $ JumpLabel "p_print_bool"   ]
+                          CharType   -> [ BL $ JumpLabel "putchar"        ]
+                          IntType    -> [ BL $ JumpLabel "p_print_int"    ]
+                          StringType -> [ BL $ JumpLabel "p_print_string" ]  
+
+        -- Updates the data labels with the strings to be printed
+        ls'  = dataLabels s'
+        ls'' = case typeOfExpr e it of
+                  BoolType -> boolDataLabels ls'
+                  _        -> ls'
+
+        -- Generates the proper data labels for each type of the print param
+        boolDataLabels ls = let (l,  ls' ) = newDataLabel "true"  ls  in
+                            let (l', ls'') = newDataLabel "false" ls' in
+                            ls''
+
 
 
 transStat (PrintlnStat e it) s  = error "PrintlnStat"
@@ -157,14 +160,15 @@ transStat (ScopedStat stat) s
 
 transStat (ReadStat lhs it) s = error "TODO" 
 
-transStat (WhileStat cond body it) s@(m, ls, i, rs@(dst:_)) 
-  = (whileInstrs, s'')
+transStat (WhileStat cond body it) s 
+  = (s'', whileInstrs)
     where
-      label0             = nextLabel i 
-      label1             = nextLabel (i + 1)
-      (condInstrs, s'')  = transExpr cond s'                
-      (bodyInstr,  s' )  = transStat body (m, ls, i + 2, rs)
-
+      label0             =  nextLabel i 
+      label1             =  nextLabel ( i + 1 )
+      i                  =  numJumpLabels s
+      (s'', condInstrs)  =  transExpr cond s'                
+      (s' , bodyInstr )  =  transStat body sBody
+      sBody              =  s { numJumpLabels = i + 2 }
       whileInstrs        =  [ B label0      ]          
                          ++ [ DEFINE label1 ]         
                          ++ bodyInstr                 
@@ -172,12 +176,12 @@ transStat (WhileStat cond body it) s@(m, ls, i, rs@(dst:_))
                          ++ condInstrs                 
                          ++ [ CMP dst $ Op2'ImmVal 0 ] 
                          ++ [ BEQ label1    ]
-
+      (dst:_)            =  availableRegs s 
 transStat (SeqStat stat stat') s
-  = (stat0Instr ++ stat1Instr, s'')
+  = (s'', stat1Instr ++ stat2Instr)
     where
-      (stat0Instr, s' ) = transStat stat  s 
-      (stat1Instr, s'') = transStat stat' s'
+      (s' , stat1Instr) = transStat stat  s 
+      (s'', stat2Instr) = transStat stat' s'
 
 transStat (DeclareStat vtype vname rhs it) s = error "DeclareStat" 
 
@@ -195,78 +199,89 @@ transRHS (RhsExpr e) s = transExpr e s
 -- ************************************************************************** --
 
 -- |
-transExpr :: Expr       -> ArmState
-          -> ( [ Instr ],  ArmState )
+transExpr :: Expr -> ArmState -> ( ArmState, [ Instr ] )
 
 
 -- | Put the value of boolean @b@ into the first avaialble register @dst@
-transExpr (BoolLiterExpr b) s@(_, _, _, (dst:_)) 
-  = ( [ MOV dst (Op2'ImmVal $ if b then 1 else 0) ], s )
-
+transExpr (BoolLiterExpr b) s
+  = (s, [ MOV dst (Op2'ImmVal $ if b then 1 else 0) ])
+    where
+        (dst:_) = availableRegs s
 
 -- | Put the corresponding integer value of @c@ into the destination reg @dst@
-transExpr (CharLiterExpr c) s@(_, _, _, (dst:_))
-  = ( [ MOV dst (Op2'ImmVal $ ord c) ], s )  -- todO use LDR
-
-
--- | Lookup what register variable @id@ is in, and copy its content in @dst@ reg
-transExpr (IdentExpr id) s@(m, _, _, (dst:_))
-  = ( [ MOV dst (Op2'Reg src) ], s ) -- TODO LOL
+transExpr (CharLiterExpr c) s
+  = (s, [ MOV dst (Op2'ImmVal $ ord c) ])  -- todO use LDR
     where
-      src = findReg id m 
+        (dst:_) = availableRegs s
 
-
--- | Evaluates the expression and places it in the dest reg(dst) , performs the unary operation on that reg 
-transExpr (UnaryOperExpr op e) s@(m, _, _, (dst:_))
-  = (trace "unaryop" (exprInstr ++ unopInstr, s''))
+-- | Lookup what register variable @id@ is in, and copy its content in @dst@
+transExpr (IdentExpr id) s
+  = (s, [ MOV dst (Op2'Reg src) ]) -- TODO LOL
     where
-      ( exprInstr, s' ) = transExpr e  s 
-      ( unopInstr, s'') = transUnOp op s'
+      src = R0 --findReg id m 
+      (dst:_) = availableRegs s
+
+
+-- | Evaluates the expression and places it in the destination regster @dst@,
+--   will perform  the unary operation on that reg 
+transExpr (UnaryOperExpr op e) s
+  = (s'', exprInstr ++ unopInstr)
+    where
+      (s' , exprInstr) = transExpr e  s 
+      (s'', unopInstr) = transUnOp op s'
 
 -- |
 transExpr (ParenthesisedExpr e) s 
   = transExpr e s 
 
 -- |
-transExpr (IntLiterExpr i) s@(_, _, _, rs@(dst:_)) = 
-   ( [ LDR dst i ], s )
+transExpr (IntLiterExpr i) s
+  = (s, [ LDR dst i ])
+    where 
+      (dst:_) = availableRegs s
 
 -- |
-transExpr (StrLiterExpr str) s@(m, ls, i, rs@(dst:_))
-  = ( [ LDR'Lbl dst l ], (m, ls', i, rs) )
+transExpr (StrLiterExpr str) s
+  = (s, [ LDR'Lbl dst l ])
     where
-        (l, ls') = newDataLabel str ls
+      (dst:_)  = availableRegs s
+      s'       = s { dataLabels = ls' }
+      (l, ls') = newDataLabel str $ dataLabels s
 
 -- |
-transExpr PairLiterExpr s@(m, ls, i, rs@(dst:_)) = error "PairLiterExpr" 
+transExpr PairLiterExpr s = error "PairLiterExpr" 
 
 -- | TODO make ArrayElem a type synonym PLSSSSSSS
-transExpr (ArrayElemExpr (ArrayElem ident exprs)) s@(m, ls, i, rs@(dst:_)) = error "ArrayElemExpr"  
+transExpr (ArrayElemExpr (ArrayElem ident exprs)) s = error "ArrayElemExpr"  
 
 -- |
-transExpr (BinaryOperExpr op e e') s@(m, ls, i, rs@(dst:_)) = error "BinaryOperExpr"  
+transExpr (BinaryOperExpr op e e') s = error "BinaryOperExpr"  
  
 
 --------------------------------------------------------------------------------
+-- | Create a new data label and return the list with the label added.
 newDataLabel str ls 
   = (l, ls ++ [l]) 
     where 
       l     = DataLabel lName str
       lName = "msg_" ++ ( show $ length ls )
 
+
+--------------------------------------------------------------------------------
 -- | Generate instructions for a unary operator
-transUnOp :: UnaryOper -> ArmState
-          -> ( [ Instr ], ArmState )
-transUnOp NotUnOp s@(m, ls, i, rs@(dst:_)) = (unopInstrs, s)
-  where
-    unopInstrs =  [ EOR R4 R4 $ Op2'ImmVal 1 ]
-               ++ [ MOV'Reg R0 R4 ]
+transUnOp :: UnaryOper -> ArmState -> ( ArmState, [ Instr ] )
+transUnOp NotUnOp s 
+  = (s, unopInstrs)
+    where
+      unopInstrs =  [ EOR     dst dst $ Op2'ImmVal 1 ]
+                 ++ [ MOV'Reg R0  dst ]
+      (dst:_)    =  availableRegs s
     
 
-transUnOp LenUnOp s@(m, ls, i, rs@(dst:_)) = error "LenUnop"
-transUnOp OrdUnOp s@(m, ls, i, rs@(dst:_)) = error "OrdUnop"
-transUnOp ChrUnOp s@(m, ls, i, rs@(dst:_)) = error "ChrUnop"
-transUnOp NegUnOp s@(m, ls, i, rs@(dst:_)) = error "NegUnop"
+transUnOp LenUnOp s = error "LenUnop"
+transUnOp OrdUnOp s = error "OrdUnop"
+transUnOp ChrUnOp s = error "ChrUnop"
+transUnOp NegUnOp s = error "NegUnop"
 
 
 ----------------------------------------------------------------------------------
