@@ -262,14 +262,14 @@ instance Show Instr where
     show (LDR'Lbl      rd l   ) = "\tLDR "   ++ show rd ++ ", =" ++ show l
     show (LDRNE'Lbl    rd l   ) = "\tLDRNE " ++ show rd ++ ", =" ++ show l
     show (LDRNQ'Lbl    rd l   ) = "\tLDRNQ " ++ show rd ++ ", =" ++ show l
-    show (LDR'Reg      rd rs  ) = "\tLDR "   ++ show rd ++ ", = [" ++ show rs ++ " ]" 
+    show (LDR'Reg      rd rs  ) = "\tLDR "   ++ show rd ++ ", [" ++ show rs ++ "]" 
 
     show (STR       rd n      ) = "\tSTR "   ++ show rd ++ ", =" ++ show n
     show (STRB      rd n      ) = "\tSTRB "  ++ show rd ++ ", =" ++ show n
     show (STR'Lbl   rd l      ) = "\tSTR "   ++ show rd ++ ", =" ++ show l
     show (STRB'Lbl  rd l      ) = "\tSTRB "  ++ show rd ++ ", =" ++ show l
-    show (STR'Reg   rd rs     ) = "\tSTR "   ++ show rd ++ ", = [" ++ show rs ++ " ]" 
-    show (STRB'Reg  rd rs     ) = "\tSTRB "  ++ show rd ++ ", = [" ++ show rs ++ " ]" 
+    show (STR'Reg   rd rs     ) = "\tSTR "   ++ show rd ++ ", [" ++ show rs ++ "]" 
+    show (STRB'Reg  rd rs     ) = "\tSTRB "  ++ show rd ++ ", [" ++ show rs ++ "]" 
 
     show (INDIR       dir     ) = show dir    
 
