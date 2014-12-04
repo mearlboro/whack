@@ -39,11 +39,11 @@ import Data.Maybe                 ( isNothing , fromMaybe , fromJust , isJust )
 --  identifiers in the tables resulting in inaccurate semantic error messages.
 --  If there are no errors we proceed and augment the program and check each
 --  function body and the main body for semantic errors.
-checkProgram                           :: Program -> [ SemanticErr ]
+checkProgram                           :: Program -> (Program, [ SemanticErr ])
 checkProgram prog@( Program funcs _ )  =
-    if null duplicateErrs then statementErrs else duplicateErrs
+    (aug, if null duplicateErrs then statementErrs else duplicateErrs)
   where
-    Program funcs' main  =  augmentProgram prog
+    aug@(Program funcs' main)  =  augmentProgram prog
     statementErrs        =  concatMap checkStat ( map bodyOf funcs' ) ++
                             checkStat main
     duplicateErrs        =  checkFuncs            funcs ++
@@ -254,7 +254,7 @@ getPairElemType pElem it  =
 
         pairObj               =  findIdent' ( fromJust pairIdent ) it
 
-        (,) pairType pairCtx  =  fromJust pairObj
+        IdentObj pairType pairCtx _ =  fromJust pairObj
 
         isValidPair           =  isJust pairObj          &&
                                  ( pairType ~== PairType {} ||
@@ -270,7 +270,7 @@ getArrayElemType ( ident , exprs ) it  =
     if isValidArray then arrElemType else Nothing
   where
     arrayObj                  =  findIdent' ident it
-    (,) arrayType arrayCtx    =  fromJust arrayObj
+    IdentObj arrayType arrayCtx _   =  fromJust arrayObj
     isValidArray              =  isJust arrayObj            &&
                                  arrayType ~== ArrayType {} &&
                                  arrayCtx ~/= Function {}
@@ -345,12 +345,12 @@ checkAssignRhs rhs@( RhsCall fname args ) it@( ST encl _ ) ctxs types  =
     -- Not found!
     Nothing       -> [ "Function Not Found @" ++ fname ]
 
-    Just identObj -> case snd identObj of
+    Just identObj -> case objCtx identObj of
                         Function func -> proceed func
                         -- Keep looking one layer up
                         _ -> case findIdent' fname encl of
                                Nothing -> [ "Function Not Found @" ++ fname ]
-                               Just identObj -> case snd identObj of
+                               Just identObj -> case objCtx identObj of
                                                    Function func -> proceed func
                                                    _             -> [ "Wrong Ctx @" ++ fname ]
 
@@ -406,7 +406,7 @@ checkExpr ( IdentExpr ident ) it ctxs types  =
   where
     identObj       =  findIdent' ident it
     notFoundErr    =  checkFound ident identObj
-    (,) itype ctx  =  fromJust identObj
+    IdentObj itype ctx _ =  fromJust identObj
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- Let checkArrayElem do the job
