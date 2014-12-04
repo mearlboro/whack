@@ -51,7 +51,8 @@ makePretty (s, instrs)
     ++ concatMap putDataLabel ( dataLabels s )
     ++ show ( INDIR Text )  ++ "\n"                  
     ++ show ( INDIR ( Global ( JumpLabel "main" ) ) ) ++ "\n"
-    ++ ( concat $ intersperse "\n" $ map show instrs )
+    ++ ( concat $ intersperse "\n" $ map show instrs ) ++ "\n"
+    ++ concatMap putPredefLabel ( predefLabels s )
 
       where
         putDataLabel ( DataLabel l str ) 
@@ -59,6 +60,8 @@ makePretty (s, instrs)
           ++ "\n\t.word " ++ show ( length str + 1 )
           ++ "\n\t.ascii \"" ++ str  ++ "\\0\"\n"
 
+        putPredefLabel ( PredefLabel l instrs )
+          = ( concat $ intersperse "\n\t" $ map show instrs ) ++ "\n"
 
 nextLabel :: Int -> Label
 nextLabel i = JumpLabel $ "L" ++ show i
@@ -123,11 +126,13 @@ transStat (ExitStat e _) s
 transStat (ReturnStat e _) s = error "ReturnStat" 
 
 
+-- TODO: to implement arrays, pairs (printing an address) 
 transStat (PrintStat e it) s
   = ( s'', instrs')
     where
         -- The new state just updates the data labels
-        s''          = s' { dataLabels = ls'' }
+        s''          = s' { dataLabels = ls', predefLabels = ps' }
+
 
         -- First gets the instructions for the expr, then adds the print
         instrs'      = instrs ++ [ MOV'Reg R0 dst ] ++ label
@@ -135,22 +140,36 @@ transStat (PrintStat e it) s
         (dst:_)      = availableRegs s'
         -- The print label/function called depends on the type
         label        = case typeOfExpr e it of
+                          IntType    -> [ BL $ JumpLabel "p_print_int"    ]
                           BoolType   -> [ BL $ JumpLabel "p_print_bool"   ]
                           CharType   -> [ BL $ JumpLabel "putchar"        ]
-                          IntType    -> [ BL $ JumpLabel "p_print_int"    ]
                           StringType -> [ BL $ JumpLabel "p_print_string" ]  
+                          _          -> error "unimplemented print function"
 
-        -- Updates the data labels with the strings to be printed
-        ls'  = dataLabels s'
-        ls'' = case typeOfExpr e it of
-                  BoolType -> boolDataLabels ls'
-                  _        -> ls'
+
+        ls  = dataLabels   s'
+        ps  = predefLabels s'
+        -- Updates the data and ppredef labels with the strings/instructions
+        (ls', ps') = case typeOfExpr e it of
+                       IntType    -> let ls''@(l:_)    = intDataLabels   ls      in 
+                                     let ps''          = intPrintPredef  l    ps in
+                                     (ls'', ps'')
+                       BoolType   -> let ls''@(l:l':_) = boolDataLabels  ls      in
+                                     let ps''          = boolPrintPredef l l' ps in
+                                     (ls'', ps'')
+                       StringType -> let ls''@(l:_)    = strDataLabels   ls      in
+                                     let ps''          = strPrintPredef  l    ps in 
+                                     (ls'', ps'')
+                       _          -> (ls, ps)        
 
         -- Generates the proper data labels for each type of the print param
+        intDataLabels  ls = let (l,  ls' ) = newDataLabel "%d"    ls  in
+                            ls'
         boolDataLabels ls = let (l,  ls' ) = newDataLabel "true"  ls  in
                             let (l', ls'') = newDataLabel "false" ls' in
                             ls''
-
+        strDataLabels  ls = let (l,  ls' ) = newDataLabel "%.*s"  ls  in
+                            ls'
 
 
 transStat (PrintlnStat e it) s  = error "PrintlnStat"
@@ -191,6 +210,56 @@ transStat (IfStat cond sthen selse it) s = error "IfStat"
 
 transRHS (RhsExpr e) s = transExpr e s
 
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- | These functions will create the so-called predefLabels for print. They consist
+--   of lists of instructions generated similarly to main and the other functions,
+--   but are defined as a sub-type of Label for logic convenience, and for easing 
+--   up their use in a BL instruction.
+intPrintPredef dataLabel ps
+  = ps ++ [ PredefLabel name instrs ]
+    where
+      name   =  "p_print_int"                         
+      instrs =  ( [ DEFINE $ PredefLabel name [] ] -- we don't need instructions here
+             ++ [ PUSH [ LR ] ]
+             ++ [ LDR'Lbl R0 dataLabel ]
+             ++ [ ADD R0 R0 $ Op2'ImmVal 4 ] 
+             ++ [ BL ( JumpLabel "printf" ) ]
+             ++ [ MOV R0 $ Op2'ImmVal 0 ]
+             ++ [ BL ( JumpLabel "fflush" ) ]
+             ++ [ POP [ PC ] ] )
+
+
+boolPrintPredef dataLabel1 dataLabel2 ps
+  = ps ++ [ PredefLabel name instrs ]
+    where
+      name   =  "p_print_bool"                         
+      instrs =  ( [ DEFINE $ PredefLabel name [] ]
+             ++ [ PUSH [ LR ] ]
+             ++ [ CMP R0 $ Op2'ImmVal 0 ]
+             ++ [ LDRNE'Lbl R0 dataLabel1 ]
+             ++ [ LDRNQ'Lbl R0 dataLabel2 ]
+             ++ [ ADD R0 R0 $ Op2'ImmVal 4  ]  -- How do we know it's 4?
+             ++ [ BL ( JumpLabel "printf" ) ]
+             ++ [ MOV R0 $ Op2'ImmVal 0 ]
+             ++ [ BL ( JumpLabel "fflush" ) ]
+             ++ [ POP [ PC ] ] )
+
+
+strPrintPredef dataLabel ps
+  = ps ++ [ PredefLabel name instrs ]
+    where
+      name = "p_print_string"
+      instrs =  ( [ DEFINE $ PredefLabel name [] ]
+             ++ [ PUSH [ LR ] ]
+             ++ [ LDR'Reg R1 R0 ]
+             ++ [ ADD R2 R0 $ Op2'ImmVal 4 ]
+             ++ [ LDR'Lbl R0 dataLabel ]
+             ++ [ ADD R0 R0$ Op2'ImmVal 4 ]
+             ++ [ BL ( JumpLabel "printf" ) ]
+             ++ [ MOV R0 $ Op2'ImmVal 0 ]
+             ++ [ BL ( JumpLabel "fflush" ) ]
+             ++ [ POP [ PC ] ] )
+
 
 -- ************************************************************************** --
 -- ***********************                            *********************** --
@@ -201,6 +270,11 @@ transRHS (RhsExpr e) s = transExpr e s
 -- |
 transExpr :: Expr -> ArmState -> ( ArmState, [ Instr ] )
 
+-- |
+transExpr (IntLiterExpr i) s
+  = (s, [ LDR dst i ])
+    where 
+      (dst:_) = availableRegs s
 
 -- | Put the value of boolean @b@ into the first avaialble register @dst@
 transExpr (BoolLiterExpr b) s
@@ -208,9 +282,18 @@ transExpr (BoolLiterExpr b) s
     where
         (dst:_) = availableRegs s
 
--- | Put the corresponding integer value of @c@ into the destination reg @dst@
+-- | Put the string into a dataLabel and the label into the first register @dst@
+transExpr (StrLiterExpr str) s
+  = (s', [ LDR'Lbl dst l ])
+    where
+      (dst:_)  = availableRegs s
+      s'       = s { dataLabels = ls' }
+      (l, ls') = newDataLabel str $ dataLabels s
+
+
+-- | Put the char @c@ into the destination reg @dst@
 transExpr (CharLiterExpr c) s
-  = (s, [ MOV dst (Op2'ImmVal $ ord c) ])  -- todO use LDR
+  = (s, [ MOV dst (Op2'ImmChr c) ])
     where
         (dst:_) = availableRegs s
 
@@ -233,20 +316,6 @@ transExpr (UnaryOperExpr op e) s
 -- |
 transExpr (ParenthesisedExpr e) s 
   = transExpr e s 
-
--- |
-transExpr (IntLiterExpr i) s
-  = (s, [ LDR dst i ])
-    where 
-      (dst:_) = availableRegs s
-
--- |
-transExpr (StrLiterExpr str) s
-  = (s', [ LDR'Lbl dst l ])
-    where
-      (dst:_)  = availableRegs s
-      s'       = s { dataLabels = ls' }
-      (l, ls') = newDataLabel str $ dataLabels s
 
 -- |
 transExpr PairLiterExpr s = error "PairLiterExpr" 
