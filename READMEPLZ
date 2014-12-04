@@ -1,0 +1,12 @@
+Dear Delicious Derelict Ducklings
+
+I have managed to implemennt a k% working print (I am aware of the bug in label names. I will fix that), some simple exprs, and more importantly, the record. It doesnt look that intuitive, but after a while, it makes sense. Sorry for the lack of comments. Also, Lorenzo, I have swapped state and instrs as you like. Added some instructions where needed, unfortunately I really wasn't able to stay awake enough to comment.. hope it will make sense.
+I have also merged with tudor's branch.
+I am pushing to master, but I do not posess the balls to actually run the tests. I want to be able to fall asleep, eventually. Disclaimer, they will probably fail miserably, the code still needs some cosmetics. I suggest we start testing at least after we have some sort of declare working. From what I've seen it shouldn't be too hard, but then again, what do I know? 
+I suggest we stop refactoring for now. I have made the mistake of losing a day for stupid shit. We can't afford that. Also, I am starting to get aware of what's going on.
+I hope you find what i've done useful.
+Happy merging!
+
+
+mrlbrrr
+
