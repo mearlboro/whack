@@ -140,7 +140,7 @@ transStat (ReturnStat expr _) s = (s', retInstrs)
     retInstrs = exprInstrs ++ moveResult
 
 
--- TODO: to implement arrays, pairs (printing an address), identifiers 
+-- TODO: to implement arrays, pairs (printing an address)
 transStat (PrintStat e it) s
   = ( s'', instrs')
     where
@@ -221,7 +221,7 @@ transStat (WhileStat cond body it) s = (s''', whileInstr)
 -- 
 transStat (SeqStat zun tak) s = (s'', zunInstrs ++ takInstrs)
   where
-    (s', zunInstrs) = transStat zun s 
+    (s',  zunInstrs) = transStat zun s 
     (s'', takInstrs) = transStat tak s'
 
 --
@@ -298,97 +298,6 @@ transStat (IfStat cond thens elses it) s = (s'''', ifInstrs)
 
 -- ************************************************************************** --
 -- ***********************                            *********************** --
--- ***********************    Predefined Functions    *********************** --
--- ***********************           Labels           *********************** -- 
--- ***********************                            *********************** --
--- ************************************************************************** -- 
-
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
--- | These functions will create the so-called predefLabels for print. They consist
---   of lists of instructions generated similarly to main and the other functions,
---   but are defined as a sub-type of Label for logic convenience, and for easing 
---   up their use in a BL instruction.
-
--- TODO: if is ident, add MOV r1 r0 after push
-intPrintPredef dataLabel ps
-  = ps ++ [ PredefLabel name instrs ]
-    where
-      name   =  "p_print_int"                         
-      instrs =  ( [ DEFINE $ PredefLabel name [] ] -- we don't need instructions here
-             ++ [ PUSH [ LR ] ]
-             ++ [ MOV'Reg R1 R0 ]
-             ++ [ LDR'Lbl R0 dataLabel ]
-             ++ [ ADD R0 R0 $ Op2'ImmVal 4 ] 
-             ++ [ BL ( JumpLabel "printf" ) ]
-             ++ [ MOV R0 $ Op2'ImmVal 0 ]
-             ++ [ BL ( JumpLabel "fflush" ) ]
-             ++ [ POP [ PC ] ] )
-
-
-boolPrintPredef dataLabel1 dataLabel2 ps
-  = ps ++ [ PredefLabel name instrs ]
-    where
-      name   =  "p_print_bool"                         
-      instrs =  ( [ DEFINE $ PredefLabel name [] ]
-             ++ [ PUSH [ LR ] ]
-             ++ [ CMP R0 $ Op2'ImmVal 0 ]
-             ++ [ LDRNE'Lbl R0 dataLabel1 ]
-             ++ [ LDRNQ'Lbl R0 dataLabel2 ]
-             ++ [ ADD R0 R0 $ Op2'ImmVal 4  ]  -- How do we know it's 4?
-             ++ [ BL ( JumpLabel "printf" ) ]
-             ++ [ MOV R0 $ Op2'ImmVal 0 ]
-             ++ [ BL ( JumpLabel "fflush" ) ]
-             ++ [ POP [ PC ] ] )
-
-
-strPrintPredef dataLabel ps
-  = ps ++ [ PredefLabel name instrs ]
-    where
-      name   = "p_print_string"
-      instrs =  ( [ DEFINE $ PredefLabel name [] ]
-             ++ [ PUSH [ LR ] ]
-             ++ [ LDR'Reg R1 R0 ]
-             ++ [ ADD R2 R0 $ Op2'ImmVal 4 ]
-             ++ [ LDR'Lbl R0 dataLabel ]
-             ++ [ ADD R0 R0$ Op2'ImmVal 4 ]
-             ++ [ BL ( JumpLabel "printf" ) ]
-             ++ [ MOV R0 $ Op2'ImmVal 0 ]
-             ++ [ BL ( JumpLabel "fflush" ) ]
-             ++ [ POP [ PC ] ] )
-
-
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
--- | These functions will create the so-called predefLabels for errors. These funcs
---   will print an error message and exit the program if necessary.
-
--- Integer overflow error 
-ovfErrPredef ls ps
-  = (ls', ps ++ [ PredefLabel name instrs ])
-    where
-      -- Creates a data label for printing an overflow error -- TODO \n \0 label issue
-      ls'@(ovfLbl:_) =  newDataLabel ( "OverflowError: the result is too small/large" ++ 
-                                       "to store in a 4-byte signed-integer."          )
-                                     ls 
-      name   =  "p_throw_overflow_error"
-      -- The set of instructions calls runtime error which exits the program
-      instrs =  ( [ DEFINE $ PredefLabel name [] ]
-             ++ [ LDR'Lbl R0 ovfLbl ]
-             ++ [ BL ( JumpLabel "p_throw_runtime_error" ) ] )
-
-
--- Runtime error
-runtErrPredef ps 
-  = ps ++ [ PredefLabel name instrs ]
-    where
-      name   = "p_throw_runtime_error"
-      instrs =  ( [ BL ( JumpLabel "p_print_string" ) ] 
-             ++ [ MOV R0 $ Op2'ImmVal (-1) ]
-             ++ [ BL ( JumpLabel "exit" )  ] )
-
-
-
--- ************************************************************************** --
--- ***********************                            *********************** --
 -- ***********************    RHS & LHS Translation   *********************** --
 -- ***********************                            *********************** -- 
 -- ************************************************************************** --
@@ -454,6 +363,7 @@ transArrayElem e it index arm = (arm' { availableRegs = r } , exprInstr ++ store
                         else [STR'Off  nxt dst offset]  
 
 
+
 -- ************************************************************************** --
 -- ***********************                            *********************** --
 -- ***********************   Expression Translation   *********************** --
@@ -490,6 +400,14 @@ transExpr (CharLiterExpr c) s
     where
       (dst:_) = availableRegs s
 
+-- |
+transExpr PairLiterExpr s 
+  = (s, [ LDR R0 8] ++ [ BL $ JumpLabel "malloc" ])
+
+
+-- | TODO make ArrayElem a type synonym PLSSSSSSS
+transExpr (ArrayElemExpr (ident, exprs)) s = error "ArrayElemExpr"  
+
 -- TODO! TEST!
 -- | Lookup what register variable @id@ is in, and copy its content in @dst@
 transExpr (IdentExpr id) s = (s, pushDst) -- TODO LOL
@@ -497,6 +415,10 @@ transExpr (IdentExpr id) s = (s, pushDst) -- TODO LOL
       (dst:_) = availableRegs s
       (src, off) = fromJust $ Map.lookup id (stackMap s) 
       pushDst = [ LDR'Off dst src off ] -- [sp, #<off>] where 
+
+-- |
+transExpr (ParenthesisedExpr e) s 
+  = transExpr e s 
 
 -- | Evaluates the expression and places it in the destination regster @dst@,
 --   will perform  the unary operation on that reg 
@@ -506,32 +428,18 @@ transExpr (UnaryOperExpr op e) s
       (s' , exprInstr) = transExpr e  s 
       (s'', unopInstr) = transUnOp op s'
 
--- |
-transExpr (ParenthesisedExpr e) s 
-  = transExpr e s 
 
 -- |
-transExpr PairLiterExpr s 
-  = (s, [ LDR R0 8] ++ [ BL $ JumpLabel "malloc" ])
+transExpr (BinaryOperExpr op e e') s
+  = (s''', chikiInstr ++ chakaInstr ++ binopInstr)
+    where
+      (s'  , chikiInstr) = transExpr  e  s
+      (_   , chakaInstr) = transExpr  e' s''
+      (s''', binopInstr) = transBinOp op s'
+      s''    = s' { availableRegs = rs }
+      (r:rs) = availableRegs s'
 
-
--- | TODO make ArrayElem a type synonym PLSSSSSSS
-transExpr (ArrayElemExpr (ident, exprs)) s = error "ArrayElemExpr"  
-
--- |
-transExpr (BinaryOperExpr op e e') s = error "BinaryOperExpr"  
- 
-
---------------------------------------------------------------------------------
--- | Create a new data label and return the list with the label added.
-newDataLabel str ls 
-  = (l:ls) 
-    where 
-      l     = DataLabel lName str
-      lName = "msg_" ++ ( show $ length ls )
-
-
---------------------------------------------------------------------------------
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- | Generate instructions for a unary operator
 transUnOp :: UnaryOper -> ArmState -> ( ArmState, [ Instr ] )
 transUnOp NotUnOp s 
@@ -565,6 +473,127 @@ transUnOp NegUnOp s
                                              -- |_Change this
       (l:_)      =  dataLabels    s
       (dst:_)    =  availableRegs s
+
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- | Generate instructions for a unary operator
+transBinOp :: BinaryOper -> ArmState -> ( ArmState, [ Instr ] )
+transBinOp AddBinOp s
+  = ( s', instrs )
+    where
+      s'       =  s { dataLabels = ls'', predefLabels = ps''' }
+
+      instrs   =  ( [ ADDS r r r' ] 
+               ++ [ BLVS ( JumpLabel "p_throw_overflow_error") ] )
+      (r:r':_) =  availableRegs s
+      
+      ps'''        = strPrintPredef l     ps''
+      ls''@(l:_)   = newDataLabel "%.*s"  ls' 
+      ps''         = runtErrPredef     ps'
+      (ls', ps' )  = ovfErrPredef  ls  ps
+      ls           = dataLabels    s
+      ps           = predefLabels  s
+
+-- ************************************************************************** --
+-- ***********************                            *********************** --
+-- ***********************           Labels           *********************** -- 
+-- ***********************                            *********************** --
+-- ************************************************************************** -- 
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- | These functions will create the so-called predefLabels for print. They consist
+--   of lists of instructions generated similarly to main and the other functions,
+--   but are defined as a sub-type of Label for logic convenience, and for easing 
+--   up their use in a BL instruction.
+
+intPrintPredef dataLabel ps
+  = ps ++ [ PredefLabel name instrs ]
+    where
+      name   =  "p_print_int"                         
+      instrs =  ( [ DEFINE $ JumpLabel name ] 
+             ++ [ PUSH [ LR ] ]
+             ++ [ MOV'Reg R1 R0 ]
+             ++ [ LDR'Lbl R0 dataLabel ]
+             ++ [ ADD R0 R0 $ Op2'ImmVal 4 ] 
+             ++ [ BL ( JumpLabel "printf" ) ]
+             ++ [ MOV R0 $ Op2'ImmVal 0 ]
+             ++ [ BL ( JumpLabel "fflush" ) ]
+             ++ [ POP [ PC ] ] )
+
+
+boolPrintPredef dataLabel1 dataLabel2 ps
+  = ps ++ [ PredefLabel name instrs ]
+    where
+      name   =  "p_print_bool"                         
+      instrs =  ( [ DEFINE $ JumpLabel name ]
+             ++ [ PUSH [ LR ] ]
+             ++ [ CMP R0 $ Op2'ImmVal 0 ]
+             ++ [ LDRNE'Lbl R0 dataLabel1 ]
+             ++ [ LDRNQ'Lbl R0 dataLabel2 ]
+             ++ [ ADD R0 R0 $ Op2'ImmVal 4  ]  -- How do we know it's 4?
+             ++ [ BL ( JumpLabel "printf" ) ]
+             ++ [ MOV R0 $ Op2'ImmVal 0 ]
+             ++ [ BL ( JumpLabel "fflush" ) ]
+             ++ [ POP [ PC ] ] )
+
+
+strPrintPredef dataLabel ps
+  = ps ++ [ PredefLabel name instrs ]
+    where
+      name   = "p_print_string"
+      instrs =  ( [ DEFINE $ JumpLabel name ]
+             ++ [ PUSH [ LR ] ]
+             ++ [ LDR'Reg R1 R0 ]
+             ++ [ ADD R2 R0 $ Op2'ImmVal 4 ]
+             ++ [ LDR'Lbl R0 dataLabel ]
+             ++ [ ADD R0 R0$ Op2'ImmVal 4 ]
+             ++ [ BL ( JumpLabel "printf" ) ]
+             ++ [ MOV R0 $ Op2'ImmVal 0 ]
+             ++ [ BL ( JumpLabel "fflush" ) ]
+             ++ [ POP [ PC ] ] )
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- | These functions will create the so-called predefLabels for errors. These funcs
+--   will print an error message and exit the program if necessary.
+
+-- Integer overflow error 
+ovfErrPredef ls ps
+  = (ls', ps ++ [ PredefLabel name instrs ])
+    where
+      -- Creates a data label for printing an overflow error -- TODO \n \0 label issue
+      ls'@(ovfLbl:_) =  newDataLabel ( "OverflowError: the result is too small/large" ++ 
+                                       "to store in a 4-byte signed-integer."          )
+                                     ls 
+      name   =  "p_throw_overflow_error"
+      -- The set of instructions calls runtime error which exits the program
+      instrs =  ( [ DEFINE $ PredefLabel name [] ]
+             ++ [ LDR'Lbl R0 ovfLbl ]
+             ++ [ BL ( JumpLabel "p_throw_runtime_error" ) ] )
+
+
+-- Runtime error
+runtErrPredef ps 
+  = ps ++ [ PredefLabel name instrs ]
+    where
+      name   = "p_throw_runtime_error"
+      instrs =  ( [ DEFINE $ JumpLabel name ] 
+             ++ [ BL $ JumpLabel "p_print_string" ] 
+             ++ [ MOV R0 $ Op2'ImmVal (-1) ]
+             ++ [ BL ( JumpLabel "exit" )  ] )
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- | Create a new data label and return the list with the label added.
+newDataLabel str ls 
+  = (l:ls) 
+    where 
+      l     = DataLabel lName str
+      lName = "msg_" ++ ( show $ length ls )
+
+
+
 
 -- ************************************************************************** --
 -- ***********************                            *********************** --
