@@ -1,9 +1,15 @@
 module Wacc.CodeGeneration.ARM11Instructions where
 
 import Data.List (intersperse)
-  
+import qualified Data.Map as Map
+ 
 import Wacc.Data.SymbolTable
+import Wacc.Data.DataTypes
   
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+
 -- The available registers of ARM11
 data Register
   = R0 | R1 | R2 | R3 | R4 | R5 | R6 | R7 | R8 | R9 | R10 | R11 | R12
@@ -19,30 +25,63 @@ type Rn = Register
 type Rm = Register
 type Rs = Register
 
+-- List of registers | <reglist> = {Ri, Rj, Rn,...}
+type RegList = [Register]
+
+
+instance Show Register where
+  show R0  = "r0"
+  show R1  = "r1"
+  show R2  = "r2"
+  show R3  = "r3"
+  show R4  = "r4"
+  show R5  = "r5"
+  show R6  = "r6"
+  show R7  = "r7"
+  show R8  = "r8"
+  show R9  = "r9"
+  show R10 = "r10"
+  show R11 = "r11"
+  show R12 = "r12"
+  show SP  = "{sp}" -- R13 | Stack Pointer
+  show LR  = "{lr}" -- R14 | Link Register (which holds return addresses)
+  show PC  = "{pc}" -- R15 | Program Counter
+
+showRegs [] = ""
+showRegs rs = concat $ intersperse ", " $ map show rs
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
 -- The state
--- data ARMState 
---   = ARMState { stackMap      :: Data.Map.Map IdentName Int
---              , stackOffset   :: Int
---              , freeRegs      :: [ Reg ]
---              , numJumpLabels :: Int
---              , dataLabels    :: [ Label ]
---              , predefLabels  :: [ Label ]
---              }
+data ARMState 
+  = ARMState { stackMap      :: Map.Map IdentName Int
+             , stackOffset   :: Int
+             , freeRegs      :: [ Reg ]
+             , numJumpLabels :: Int
+             , dataLabels    :: [ Label ]
+             , predefLabels  :: [ Label ]
+             }
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
 -- Labels 
-
 type LabelName = String
 data Label 
   = JumpLabel   LabelName           -- Name of a label in ARM
   | DataLabel   LabelName String    -- msg_i: label for strings
   | PredefLabel LabelName [ Instr ] 
 
+
 instance Show Label where
   show ( JumpLabel   l   ) = l 
   show ( DataLabel   l _ ) = l 
   show ( PredefLabel l _ ) = l
 
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
 -- Directives
 data Directive
@@ -51,14 +90,16 @@ data Directive
   | Global Label -- TODO: Should be just JumpLabel 
   | Ltorg
 
+
 instance Show Directive where
   show Text       = ".text"
   show Data       = ".data"
   show (Global l) = ".global " ++ show l
   show Ltorg      = "\t.ltorg"
 
--- List of registers | <reglist> = {Ri, Rj, Rn,...} | A comma separated list of regs enclosed by {}
-type RegList = [Register]
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
 -- This is used as an operand in many instructions
 data Operand2
@@ -79,7 +120,27 @@ type Imm8m = Int
 -- Shift constant, whose range depends on the instruction it appears in
 type Sh = Int
 
--- ARM11 instruction
+
+instance Show Operand2 where
+  show (Op2'ImmVal imm8m) = "#" ++ show imm8m     -- #<imm8m>
+  show (Op2'Reg    rm   ) = show rm               -- Rm
+  show (Op2'LSL    rm rs) = showOp2 rm "LSL "  rs -- Rm, LSL Rs
+  show (Op2'LSR    rm rs) = showOp2 rm "LSR "  rs -- Rm, LSR Rs
+  show (Op2'ASR    rm rs) = showOp2 rm "ASR "  rs -- Rm, ASR Rs
+  show (Op2'ROR    rm rs) = showOp2 rm "ROR "  rs -- Rm, ROR Rs
+  show (Op2'LSL'Sh rm sh) = showOp2 rm "LSL #" sh -- Rm, LSL #<shift> | Allowed shifts 0-31
+  show (Op2'LSR'Sh rm sh) = showOp2 rm "LSR #" sh -- Rm, LSR #<shift> | Allowed shifts 1-32
+  show (Op2'ASR'Sh rm sh) = showOp2 rm "ASR #" sh -- Rm, ASR #<shift> | Allowed shifts 1-32
+  show (Op2'ROR'Sh rm sh) = showOp2 rm "ROR #" sh -- Rm, ROR #<shift> | Allowed shifts 1-31
+
+showOp2             :: (Show a, Show b) => a -> String -> b -> String
+showOp2 op mne op'  =  show op ++ ", " ++ mne ++ show op'
+
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+
+-- ARM11 instructions
 data Instr
 
   -- Arithemtics
@@ -93,6 +154,7 @@ data Instr
   -- Moving
   | MOV     Rd Operand2     -- Move | MOV{S} Rd, <Operand2> | Rd := Operand2
   | MOV'Reg Rd Rs           -- ... TODO:
+
   -- Shifting
   | ASR    Rd Rm Rs     -- Arithmetic shift right by register | ASR{S} Rd, Rm, Rs | Rd := ASR(Rm, Rs)
   | LSL    Rd Rm Rs     -- Logical    shift left  by register | LSL{S} Rd, Rm, Rs | Rd := LSL(Rm, Rs)
@@ -140,43 +202,8 @@ data Instr
   | STR'Reg  Rd Rd     -- |
   | STRB'Reg Rd Rd     -- |
 
-
   -- Directive
   | INDIR Directive
-
-instance Show Register where
-  show R0  = "r0"
-  show R1  = "r1"
-  show R2  = "r2"
-  show R3  = "r3"
-  show R4  = "r4"
-  show R5  = "r5"
-  show R6  = "r6"
-  show R7  = "r7"
-  show R8  = "r8"
-  show R9  = "r9"
-  show R10 = "r10"
-  show R11 = "r11"
-  show R12 = "r12"
-  show SP  = "{sp}" -- R13 | Stack Pointer
-  show LR  = "{lr}" -- R14 | Link Register (which holds return addresses)
-  show PC  = "{pc}" -- R15 | Program Counter
-
-
-instance Show Operand2 where
-  show (Op2'ImmVal imm8m) = "#" ++ show imm8m     -- #<imm8m>
-  show (Op2'Reg    rm   ) = show rm               -- Rm
-  show (Op2'LSL    rm rs) = showOp2 rm "LSL "  rs -- Rm, LSL Rs
-  show (Op2'LSR    rm rs) = showOp2 rm "LSR "  rs -- Rm, LSR Rs
-  show (Op2'ASR    rm rs) = showOp2 rm "ASR "  rs -- Rm, ASR Rs
-  show (Op2'ROR    rm rs) = showOp2 rm "ROR "  rs -- Rm, ROR Rs
-  show (Op2'LSL'Sh rm sh) = showOp2 rm "LSL #" sh -- Rm, LSL #<shift> | Allowed shifts 0-31
-  show (Op2'LSR'Sh rm sh) = showOp2 rm "LSR #" sh -- Rm, LSR #<shift> | Allowed shifts 1-32
-  show (Op2'ASR'Sh rm sh) = showOp2 rm "ASR #" sh -- Rm, ASR #<shift> | Allowed shifts 1-32
-  show (Op2'ROR'Sh rm sh) = showOp2 rm "ROR #" sh -- Rm, ROR #<shift> | Allowed shifts 1-31
-
-showOp2             :: (Show a, Show b) => a -> String -> b -> String
-showOp2 op mne op'  =  show op ++ ", " ++ mne ++ show op'
 
 
 instance Show Instr where
@@ -222,21 +249,6 @@ instance Show Instr where
     show (STR'Reg   rd rs     ) = "\tSTR "  ++ show rd ++ ", = [" ++ show rs ++ " ]" 
     show (STRB'Reg  rd rs     ) = "\tSTRB " ++ show rd ++ ", = [" ++ show rs ++ " ]" 
     show (INDIR  dir          ) = show dir    
-
-
-showRegs [] = ""
-showRegs rs = concat $ intersperse ", " $ map show rs
-
---showInstr             :: (Show a, Show b) => String -> [a] -> [b] -> String
---showInstr mne rs ops  =  mne ++ " " ++ concat (intersperse ", " $ map show ops)
-
--- All test
--- modules
--- error messages
--- try problem =)4
--- * line number
-
-
 
 
 
