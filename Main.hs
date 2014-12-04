@@ -69,7 +69,7 @@ parse source = do
 -- TODO: type signature
 check program = do
   -- Takes a program AST and gets a list of error
-  let errs = checkProgram program
+  let (program', errs) = checkProgram program
 
   -- If list is empty, exit with success
   if ( length errs > 0 )
@@ -77,5 +77,5 @@ check program = do
         putStrLn $ unlines errs
         exitWith $ ExitFailure 200
     else do
-        putStrLn $ makePretty $ transProgram program
+        putStrLn $ makePretty $ transProgram program'
         exitWith   ExitSuccess
