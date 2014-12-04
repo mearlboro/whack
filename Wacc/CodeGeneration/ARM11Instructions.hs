@@ -10,7 +10,7 @@ data Register
   | SP -- R13 | Stack Pointer
   | LR -- R14 | Link Register (which holds return addresses)
   | PC -- R15 | Program Counter
-  deriving (Enum)
+  deriving (Enum, Eq)
 
 type Reg = Register
 
@@ -129,6 +129,10 @@ data Instr
 
   | STR'Reg  Rd Rd  -- |
   | STRB'Reg Rd Rd  -- |
+
+  | STR'Off  Rd Rd Int -- |
+  | STRB'Off Rd Rd Int -- |
+  | LDR'Off  Rd Rd Int  -- |
 
 
   -- Directive
