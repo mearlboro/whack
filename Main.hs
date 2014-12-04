@@ -77,9 +77,5 @@ check program = do
         putStrLn $ unlines errs
         exitWith $ ExitFailure 200
     else do
-        let assembled = transProgram program
         putStrLn $ makePretty $ transProgram program
-        let exitValue = getExit assembled
-        if exitValue == 0 
-            then exitWith   ExitSuccess
-            else exitWith $ ExitFailure exitValue 
+        exitWith   ExitSuccess
