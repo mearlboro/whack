@@ -6,10 +6,41 @@ import Wacc.Data.SymbolTable
 
 import qualified Data.Map as Map
 import Data.Array
-import Data.List (intersperse)
+import Data.List (intersperse, mapAccumR, mapAccumL)
 import Data.Maybe
 import Data.Char
 import Debug.Trace
+import Wacc.Data.ShowInstances
+
+import Debug.Trace
+import Data.Tuple (swap)
+
+
+--null_reference_error_msg 
+--  = DataLabel "null_reference_error_msg" 
+--              "NullReferenceError: dereference a null reference\n\0"
+
+--p_throw_runtime_error 
+--  = [ BL "p_print_string"
+--    , MOV'Reg R0 (-1) 
+--    , BL "exit" ]
+
+--p_check_null_pointer 
+--  = [ PUSH LR 
+--    , CMP R0 0 
+--    , LDREQ R0 "null_reference_error_msg"
+--    , BLEQ "p_throw_runtime_error" 
+--    , POP PC ]
+
+-- The string label in .data that contains the message to print
+iPrintString :: String -> [ Instr ] 
+iPrintString = undefined
+
+
+-- int x = 10
+-- int x = (trace "bla" 10)
+
+-- If no data, do not output .data
 
 -- ************************************************************************** --
 -- **************************                         *********************** --
@@ -37,7 +68,7 @@ transProgram
 
 transProgram (Program funcs body)  =  (s'', progInstrs)
   where
-    -- Translate each functions 
+    -- Translate each function 
     (s', funcsInstrs)  =  transFuncs funcs state0
 
     -- Main body is executed in its own scope; discard final state
@@ -58,6 +89,7 @@ transProgram (Program funcs body)  =  (s'', progInstrs)
       = ArmState 
       { stackMap      = Map.empty
       , stackOffset   = 0 
+      , stackPointer  = 0
       , availableRegs = [R4 .. R10]
       , numJumpLabels = 0
       , dataLabels    = [] 
@@ -70,14 +102,21 @@ transProgram (Program funcs body)  =  (s'', progInstrs)
 -- ************************************************************************** --
 
 transFunc :: Func -> ArmState -> (ArmState, [Instr])
-transFunc (Func ftype fname args body it) s  =  (s', functInstrs)
+transFunc (Func ftype fname args body it) s  =  (s' {stackMap = oldMap}, functInstrs)
   where 
+    oldMap = stackMap s 
+
+    insertParam ((Param _ pname), offset) = Map.insert pname (SP, offset)
+    offsets = tail (scanl (+) 0 sizes)
+    sizes = map (sizeOf . ptypeOf) args
+    finalMap = foldl (flip insertParam) oldMap (zip args offsets)
+
     -- Translate the function body in its own scope
-    (s', bodyInstrs)  =  transScoped body s
+    (s', bodyInstrs)  =  transScoped body s { stackMap = finalMap }
 
     -- The whole function translated to assembly
     functInstrs       
-      =  [ DEFINE ( JumpLabel fname ) ]  -- Define label with unique function name 
+      =  [ DEFINE ( JumpLabel ("f_" ++ fname ++ ":")) ]  -- Define label with unique function name 
       ++ [ PUSH [ LR ]                ]  -- Pushes current return address onto stack                       
       ++ bodyInstrs                      -- The instructions from the func body
       ++ [ POP  [ PC ]                ]  -- There is always a return statementa
@@ -91,9 +130,9 @@ transFuncs fs arm = transFuncs' fs (arm, [])
   where
     transFuncs' :: [ Func ] -> (ArmState, [Instr]) -> (ArmState, [ Instr ])
     transFuncs' []      result   = result
-    transFuncs' (f:fs) (arm, is) = (arm'', is ++ is' ++ is'')
+    transFuncs' (f:fs) (arm, is) = (arm'', is ++ is'')
       where
-        s@(arm', is') = transFunc  f arm
+        s@(arm', _is') = transFunc  f arm
         (arm'', is'') = transFuncs' fs s
 
 -- ************************************************************************** --
@@ -185,7 +224,7 @@ transStat (PrintStat e it) s
 transStat (PrintlnStat e it) s = error "PrintlnStat"
 
 -- 
-transStat (ScopedStat stat) s = transStat stat s
+transStat (ScopedStat stat) s = transScoped stat s
 
 -- 
 transStat (ReadStat lhs it) s = error "ReadStat" 
@@ -239,16 +278,18 @@ transStat (DeclareStat vtype vname rhs it) s = (s''', declareInstrs)
     s'' = s' { stackOffset = offset }
     -- We want to remember where vname is on the stack 
     -- Now remember the location of the variable on the stack
-    s''' = s'' { stackMap = Map.insert vname (SP, offset) (stackMap s'') }
+    newMap = Map.insert vname (SP, offset) (stackMap s'')
+    s''' = s'' { stackMap = newMap }
     -- We need to push the value in the dst reg onto the stack just cos
     -- TODO optimize in case of 0 offset
-    pushDst = [ STR'Off dst SP offset ] -- [sp, #<off>] where 
+    pushDst = [ strVar dst SP size offset ] -- [sp, #<off>] where 
     -- The whole instruction
     declareInstrs = rhsInstrs ++ pushDst
 
 -- We are assigning a variable to a new value
 transStat (AssignStat (LhsIdent id) rhs it) s = (s', assignInstrs)
   where
+    -- TODO magic constant 4
     -- Obtain the register that the rhs value will be saved into
     (dst:_) = availableRegs s
     -- Generate instructions for the right hand side
@@ -258,9 +299,9 @@ transStat (AssignStat (LhsIdent id) rhs it) s = (s', assignInstrs)
     -- but how do we know this? we need the stackmap yeeeeey
     -- This will need to change though when we use more than one register. cos
     -- the variable might just be in a register and not somewhere on the stack
-    (src, off) = fromJust $ Map.lookup id (stackMap s') 
+    (src, off) = fromJust $ Map.lookup id (stackMap s) 
     -- Now for the actual freaking instruction. TODO use STRB when needed
-    storeMe = [ STR'Off dst src off ] -- TODO use diff. instr. if off == 0
+    storeMe = [ strVar dst src 4 off ] -- TODO use diff. instr. if off == 0
     -- The final thing
     assignInstrs = rhsInstrs ++ storeMe
 
@@ -294,6 +335,21 @@ transStat (IfStat cond thens elses it) s = (s'''', ifInstrs)
       ++ elseInstrs
       ++ [ DEFINE (JumpLabel endifLabel) ]
 
+
+strVar :: Rn -> Rd -> Int -> Int -> Instr 
+strVar rd rn size off 
+  | size == 1 = if off == 0 then STRB'Reg rd rn else STRB'Off rd rn off
+  | otherwise = if off == 0 then STR'Reg rd rn else STR'Off rd rn off
+
+ldrVar :: Rn -> Rd -> Int -> Int -> Instr 
+ldrVar rd rn size off 
+  | size == 1 = if off == 0 then LDRSB'Reg rd rn else LDRSB'Off rd rn off
+  | otherwise = if off == 0 then LDR'Reg rd rn else LDR'Off rd rn off
+
+strArg :: Rn -> Rn -> Int -> Int -> Instr 
+strArg rd rn size off 
+  | size == 1 = STRB'Arg rd rn off 
+  | otherwise = STR'Arg rd rn off 
 
 -- ************************************************************************** --
 -- ***********************                            *********************** --
@@ -360,16 +416,45 @@ strPrintPredef dataLabel ps
 -- ***********************                            *********************** -- 
 -- ************************************************************************** --
 
---transLhs :: AssignLhs -> [ Instr ] 
---transLhs (LhsIdent id) = error "TODO"              
---transLhs (LhsPairElem pelem) = error "TODO"                 
---transLhs (LhsArrayElem (ArrayElem id exprs)) = error "TODO" 
+transLhs :: AssignLhs -> [ Instr ] 
+transLhs (LhsIdent id)              = error "TODO"              
+transLhs (LhsPairElem pelem)        = error "TODO"                 
+transLhs (LhsArrayElem (id, exprs)) = error "TODO" 
 
-transRhs :: AssignRhs -> IdentTable -> ArmState -> (ArmState, [Instr])
+transRhs :: AssignRhs -> It -> ArmState -> (ArmState, [Instr])
 transRhs (RhsExpr       e            ) it arm = transExpr e arm          
-transRhs (RhsPairElem   (Fst e)      ) it arm = error "TODO"
-transRhs (RhsPairElem   (Snd e)      ) it arm = error "TODO"
-transRhs (RhsArrayLiter (exprs)      ) it arm = (finalArm, rhsInstr)
+transRhs (RhsPairElem   (Fst e)      ) it s = (s', pelemInstr)
+  where
+    (dst:_)          = availableRegs s
+    (s', exprInstrs) = transExpr e s
+
+    PairType (Just (fstType, sndType)) = typeOfExpr e it 
+    size = sizeOf fstType
+
+    pelemInstr 
+      =  exprInstrs 
+      ++ [ MOV'Reg R0 dst ]
+      ++ [ BL (JumpLabel "p_check_null_pointer") ]
+      ++ [ LDR'Reg dst dst ]
+      ++ [ ldrVar dst dst size 0 ] 
+
+transRhs (RhsPairElem (Snd e)) it s = (s', pelemInstr)
+  where
+    (dst:_) = availableRegs s
+    (s', exprInstrs) = transExpr e s 
+
+    PairType (Just (fstType, sndType)) = typeOfExpr e it 
+    size = sizeOf sndType
+
+    pelemInstr 
+      =  exprInstrs 
+      ++ [ MOV'Reg R0 dst                        ]
+      ++ [ BL (JumpLabel "p_check_null_pointer") ]
+      ++ [ LDR'Off dst dst 4                     ]
+      ++ [ ldrVar dst dst size 0                 ]
+
+
+transRhs (RhsArrayLiter (exprs)) it arm = (arm', rhsInstr)
   where
     rhsInstr = malloc ++ exprsInstr ++ lengthInstr 
     arrayLength = length exprs
@@ -380,17 +465,77 @@ transRhs (RhsArrayLiter (exprs)      ) it arm = (finalArm, rhsInstr)
              [ MOV dst (Op2'Reg R0)    ]
     (dst:nxt:_) = availableRegs arm
     -- Add to heap each elem of the array 
-    (arm' , exprsInstr) = transArray exprs it arm 
+    (arm' , exprsInstr) = transArray exprs (it) arm 
     -- Add the length of the array to the heap  
-    offset = stackOffset arm' - sizeOf (ArrayType {})
+    --offset = stackOffset arm' - sizeOf (ArrayType {})
     lengthInstr = [ LDR nxt arrayLength   ] ++ 
-                  [ STR'Reg nxt dst       ] ++ 
-                  [ STR'Off dst SP offset ]
-    finalArm = arm' { stackOffset = offset }
+                  [ STR'Reg nxt dst       ] -- ++ 
+                  -- [ STR'Off dst SP offset ]
+    --finalArm = arm' { stackOffset = offset }
 
 
-transRhs (RhsNewPair    e e'         ) it arm = error "TODO"
-transRhs (RhsCall       fname  params) it arm = error "TODO"
+transRhs (RhsNewPair fstExpr sndExpr) it s = (s'',  newPairInstrs )
+  where
+    pairAdrSize = 8
+
+    (dst:nxt:_) = availableRegs s
+
+    (s',  fstInstrs) = transPairElemExpr fstExpr it 0 s
+    (s'', sndInstrs) = transPairElemExpr sndExpr it 1 s'
+
+    -- To store the address of the pair onto the stack
+    offset = stackOffset s'' 
+
+    -- Reserved 8 bytes for the 2 addresses
+    newPairInstrs 
+      =  [ LDR R0 pairAdrSize      ] 
+      ++ [ BL (JumpLabel "malloc") ] 
+      ++ [ MOV'Reg dst R0          ]
+      ++ fstInstrs
+      ++ sndInstrs
+      -- TODO magic pair
+
+
+transRhs (RhsCall fname params) it s = (s', callInstrs)
+  where
+    -- mapAccumR :: (acc -> x -> (acc, y)) -> acc -> [x] -> (acc, [y])
+    -- x = Expr 
+    --transFuncts :: -> ParamList -> (ArmState, [[Instr]])
+    (dst:_) = availableRegs s
+    -- Expresssion instructtion
+    (s', instrs) = mapAccumR (flip transExpr) s (reverse params)
+    -- Generate instructions to push params on the stack
+    sizeOfExpr = sizeOf . flip typeOfExpr it -- ex
+
+    pushArg e = let s = sizeOfExpr e in [[ strArg dst SP s (-s) ]]
+
+    pushArgs = map pushArg params 
+
+    paramInstrs = (concat . concat) (zipWith (:) instrs pushArgs)
+
+    totSize = sum (map sizeOfExpr params)
+
+    callInstrs 
+      = paramInstrs 
+      ++ [ BL (JumpLabel ("f_" ++ fname ++ ":")) ]
+      ++ (if totSize == 0 then [] else [ ADD SP SP $ Op2'ImmVal totSize ]) 
+      ++ [ MOV'Reg dst R0 ] -- TODO
+
+
+type WhichOfTheTwo = Int 
+transPairElemExpr :: Expr -> It -> WhichOfTheTwo -> ArmState -> (ArmState, [ Instr ])
+transPairElemExpr expr it wott s = (s' { availableRegs = rs }, instr)
+  where 
+    rs@(dst:nxt:regs) = availableRegs s 
+    (s', exprInstr) = transExpr expr s { availableRegs = nxt:regs }
+    size = (sizeOf (typeOfExpr expr it))
+    instr 
+      =  exprInstr 
+      ++ [ LDR R0 size             ] 
+      ++ [ BL (JumpLabel "malloc") ]
+      ++ [ strVar nxt R0 size 0    ]
+      ++ [ strVar R0 dst 4 (wott * 4) ]
+  
 
 -- Translates an array 
 transArray :: [ Expr ] -> It -> ArmState -> (ArmState, [Instr])
@@ -398,9 +543,9 @@ transArray es it arm = transArray' es 0 (arm, [])
       where
         transArray' :: [ Expr ] -> Int -> (ArmState, [Instr]) -> (ArmState, [ Instr ])
         transArray' [] _ result            = result
-        transArray' (e:es) index (arm, is) = (arm'', is ++ is' ++ is'')
+        transArray' (e:es) index (arm, is) = (arm'', is ++ is'')
           where
-            s@(arm', is') = transArrayElem e it index arm
+            s@(arm', _is') = transArrayElem e it index arm
             (arm'', is'') = transArray' es (index+1) s
 
 
@@ -460,8 +605,14 @@ transExpr (CharLiterExpr c) s
 transExpr (IdentExpr id) s = (s, pushDst) -- TODO LOL
     where
       (dst:_) = availableRegs s
-      (src, off) = fromJust $ Map.lookup id (stackMap s) 
-      pushDst = [ LDR'Off dst src off ] -- [sp, #<off>] where 
+      
+      hello = Map.lookup id (stackMap s)
+      (src, off) = fromJust $ Map.lookup id (stackMap s)
+
+      pushDst = [ LDR'Off dst src off ] -- [sp, #<off>] where TODO check 0 case
+
+transExpr (UnaryOperExpr NegUnOp (IntLiterExpr i)) s 
+  = transExpr (IntLiterExpr (-i)) s
 
 -- | Evaluates the expression and places it in the destination regster @dst@,
 --   will perform  the unary operation on that reg 
@@ -476,8 +627,11 @@ transExpr (ParenthesisedExpr e) s
   = transExpr e s 
 
 -- |
-transExpr PairLiterExpr s 
-  = (s, [ LDR R0 8] ++ [ BL $ JumpLabel "malloc" ])
+transExpr (PairLiterExpr) s = (s, [ LDR dst size ])
+  where
+    (dst:_) = availableRegs s 
+    size = 0 -- sizeOf NullType
+
 
 
 -- | TODO make ArrayElem a type synonym PLSSSSSSS
@@ -526,7 +680,7 @@ transUnOp NegUnOp s
   = (s, negUnOpInstrs)
     where 
       negUnOpInstrs =  [ RSBS dst dst $ Op2'ImmVal 0]  -- reverse subtract | dst := 0 - dst
-                    ++ [ BLVS $ l]     -- jumps to pThrow if overflow
+                    ++ [ BLVS $ l ]     -- jumps to pThrow if overflow
                                              -- |_Change this
       (l:_)      =  dataLabels    s
       (dst:_)    =  availableRegs s
@@ -539,27 +693,58 @@ transUnOp NegUnOp s
 
 -- | 
 transScoped          :: Stat -> ArmState -> (ArmState, [Instr])
-transScoped stat arm = (arm', editStack SUB ++ statInstr ++ editStack ADD)
+transScoped stat arm = (arm'''', editStack SUB ++ statInstr ++ editStack ADD)
       where
         -- Make room on the stack or free the stack
         editStack :: (Rd -> Rn -> Operand2 -> Instr) -> [ Instr ]
         editStack mne = 
-                   take chunks (cycle [ mne SP SP $ Op2'ImmVal 1024 ]) ++
+                 take chunks (cycle [ mne SP SP $ Op2'ImmVal 1024 ]) ++
           if left == 0 then [] else [ mne SP SP $ Op2'ImmVal left ] 
 
+        -- This is the old map
+        oldMap = stackMap arm
+
+        oldOffset = stackOffset arm 
+        -- Update stack offset
+        arm' = arm { stackOffset = oldOffset + bytesNeeded }
+        -- Comment later
+        allah = getBytesNeeded' stat 
+        -- Update variables in map, change the map
+        arm'' = arm' { stackMap = Map.map (\(r, o) -> (r, o+bytesNeeded)) oldMap }
         -- Translate the statemente after reserving space on the stack
-        (arm', statInstr) = transStat stat arm { stackOffset = freeBytes }
+        (arm''', statInstr) = transStat stat arm''
+        -- Restore stack offset
+        arm'''' = arm''' { stackMap = oldMap }
+
         -- Work out how many variables are declared in the scope of this 
         -- statement.
-        freeBytes      = getBytesNeeded stat
+        bytesNeeded  =  getBytesNeeded stat 
         -- Can only add and sub from sp in chunks of 1024
-        (chunks, left) = divMod freeBytes 1024 
+        (chunks, left) = divMod bytesNeeded 1024 
+
+        --arm'' = arm' { stackOffset = oldOffset }
 
 -- | Does the statement introduce variables in its scope?
 getBytesNeeded                            :: Stat -> Int -- In Bytes
 getBytesNeeded (SeqStat s s'           )  =  getBytesNeeded s + getBytesNeeded s'                   
 getBytesNeeded (DeclareStat vtype _ _ _)  =  sizeOf vtype
 getBytesNeeded _                          =  0 
+
+-- | Does the statement introduce variables in its scope?
+getBytesNeeded'    :: Stat -> Int -- In Bytes
+getBytesNeeded' s  =  snd $ getBytesNeeded'' s (False, 0)
+  where
+    getBytesNeeded'' (SeqStat s s') (stop, acc)  =  if stop' then (undefined, acc') else (stop'', acc'')
+        where
+          (stop' , acc' ) = getBytesNeeded'' s  (stop, acc) 
+          (stop'', acc'') = getBytesNeeded'' s' (stop', acc')
+
+    getBytesNeeded'' (DeclareStat vtype _ _ _) (_, acc)  =  (False, acc + sizeOf vtype)
+    getBytesNeeded'' (ScopedStat  _          ) (_, acc)  =  (True, acc)    
+    getBytesNeeded'' (WhileStat   _ _ _      ) (_, acc)  =  (True, acc)        
+    getBytesNeeded'' (IfStat      _ _ _ _    ) (_, acc)  =  (True, acc)       
+    getBytesNeeded'' (_                      ) (_, acc)  =  (False, acc)             
+
 
 sizeOf                :: Type -> Int  -- In bytes 
 sizeOf IntType        =  4                                 
@@ -568,13 +753,13 @@ sizeOf CharType       =  1
 sizeOf StringType     =  4 -- Addresss                              
 sizeOf (PairType  _)  =  4 -- Address   
 sizeOf (ArrayType _)  =  4 -- Address                         
-sizeOf NullType       =  0 -- ?                                
+sizeOf NullType       =  4 -- ?                                
 sizeOf EmptyType      =  0 -- ?
 
 typeOfExpr                                        :: Expr -> It -> Type    
 typeOfExpr ( BoolLiterExpr     _            ) _   =  BoolType    
 typeOfExpr ( CharLiterExpr     _            ) _   =  CharType      
-typeOfExpr ( IdentExpr         id           ) it  =  fromJust (findType' id it)       
+typeOfExpr ( IdentExpr         id           ) it  =  fromJust $ findType' id it
 typeOfExpr ( UnaryOperExpr     NotUnOp  _   ) _   =  BoolType
 typeOfExpr ( UnaryOperExpr     LenUnOp  _   ) _   =  IntType
 typeOfExpr ( UnaryOperExpr     OrdUnOp  _   ) _   =  IntType
@@ -624,6 +809,12 @@ sizeOfType EmptyType     = 0 -- ?
 -- **************************   Code Prettification   *********************** --
 -- **************************                         *********************** -- 
 -- ************************************************************************** --
+
+pairUp                :: [a] -> [a] -> [a] 
+pairUp    []     []   =  [] 
+pairUp    xs     []   =  xs 
+pairUp    []     ys   =  ys 
+pairUp (x:xs) (y:ys)  =  x:y:(pairUp xs ys)
 
 -- TODO Do Not Rename 
 makePretty :: ( ArmState, [ Instr ] ) -- computed by transProgram
