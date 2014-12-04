@@ -1,9 +1,9 @@
 module Wacc.CodeGeneration.ARM11Instructions where
 
 import Data.List (intersperse)
-
-
-
+  
+import Wacc.Data.SymbolTable
+  
 -- The available registers of ARM11
 data Register
   = R0 | R1 | R2 | R3 | R4 | R5 | R6 | R7 | R8 | R9 | R10 | R11 | R12
@@ -20,18 +20,28 @@ type Rm = Register
 type Rs = Register
 
 
+-- The state
+-- data ARMState 
+--   = ARMState { stackMap      :: Data.Map.Map IdentName Int
+--              , stackOffset   :: Int
+--              , freeRegs      :: [ Reg ]
+--              , numJumpLabels :: Int
+--              , dataLabels    :: [ Label ]
+--              , predefLabels  :: [ Label ]
+--              }
+
 -- Labels 
+
+type LabelName = String
 data Label 
-  = JumpLabel   String        -- Name of a label in ARM
-  | StringLabel String String -- msg_i: label for strings
+  = JumpLabel   LabelName           -- Name of a label in ARM
+  | DataLabel   LabelName String    -- msg_i: label for strings
+  | PredefLabel LabelName [ Instr ] 
 
 instance Show Label where
-  show ( JumpLabel   l     ) 
-      =  l
-  show ( StringLabel l str ) 
-      =  l
-      ++ "\n\t.word " ++ show ( length str )
-      ++ "\n\t.ascii \"" ++ str  ++ "\"\n"
+  show ( JumpLabel   l   ) = l 
+  show ( DataLabel   l _ ) = l 
+  show ( PredefLabel l _ ) = l
 
 
 -- Directives
@@ -45,7 +55,7 @@ instance Show Directive where
   show Text       = ".text"
   show Data       = ".data"
   show (Global l) = ".global " ++ show l
-  show Ltorg      = ".ltorg"
+  show Ltorg      = "\t.ltorg"
 
 -- List of registers | <reglist> = {Ri, Rj, Rn,...} | A comma separated list of regs enclosed by {}
 type RegList = [Register]
@@ -127,8 +137,8 @@ data Instr
   | STR'Lbl  Rd Label  -- |
   | STRB'Lbl Rd Label  -- |
 
-  | STR'Reg  Rd Rd  -- |
-  | STRB'Reg Rd Rd  -- |
+  | STR'Reg  Rd Rd     -- |
+  | STRB'Reg Rd Rd     -- |
 
 
   -- Directive
@@ -211,7 +221,7 @@ instance Show Instr where
     show (STRB'Lbl  rd l      ) = "\tSTRB " ++ show rd ++ ", =" ++ show l
     show (STR'Reg   rd rs     ) = "\tSTR "  ++ show rd ++ ", = [" ++ show rs ++ " ]" 
     show (STRB'Reg  rd rs     ) = "\tSTRB " ++ show rd ++ ", = [" ++ show rs ++ " ]" 
-    show (INDIR  dir          ) = "\t" ++ show dir    
+    show (INDIR  dir          ) = show dir    
 
 
 showRegs [] = ""

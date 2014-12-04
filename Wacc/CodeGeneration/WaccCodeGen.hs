@@ -2,6 +2,7 @@ module Wacc.CodeGeneration.WaccCodeGen where
 
 import Wacc.CodeGeneration.ARM11Instructions
 import Wacc.Data.DataTypes
+import Wacc.Data.SymbolTable
 
 import qualified Data.Map as Map
 import Data.Array
@@ -60,11 +61,17 @@ transProgram (Program funcs body)
 makePretty :: ( [ Instr ], ArmState ) -- computed by transProgram
            ->   String                -- printable compiled program
 makePretty (instrs, s@(_, ls, _, _)) 
-    =  show ( INDIR Text )  ++ "\n"                  
-    ++ ( concat $ intersperse "\n" $ map show ls  ) 
+    =  show ( INDIR Data )  ++ "\n"
+    ++ concatMap putDataLabel ls
+    ++ show ( INDIR Text )  ++ "\n"                  
     ++ show ( INDIR ( Global ( JumpLabel "main" ) ) ) ++ "\n"
     ++ ( concat $ intersperse "\n" $ map show instrs )
 
+      where
+        putDataLabel ( DataLabel l str ) 
+          =  l
+          ++ "\n\t.word " ++ show ( length str + 1 )
+          ++ "\n\t.ascii \"" ++ str  ++ "\\0\"\n"
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -111,68 +118,45 @@ transFunc (Func ftype fname args body it) s
 transStat :: Stat      -> ArmState
           -> ( [ Instr ], ArmState )
 
--- |
 transStat SkipStat s
   = ([], s)
 
--- |
 transStat (FreeStat e it) s = error "FreeStat"
 
----- | 
 transStat (ExitStat e _) s 
   = (exitInstrs, s')
     where
       (exprInstrs, s') = transExpr e s
       exitInstrs       = exprInstrs ++ [ BL ( JumpLabel "exit" ) ]
 
--- | 
 transStat (ReturnStat e _) s = error "ReturnStat" 
--- = ((m, l', rs), instr)
---  where
---    (exprInstr, l') = transExpr e rs m l 
---    instr           = [ BL "exit" ]
 
+transStat (PrintStat e it) s@(m, ls, i, rs@(dst:_))
+  = ( instrs', (m, ls'''', i, rs))
+    where
+        (instrs, (_, ls', _, _)) = transExpr e s 
+        instrs' = instrs ++ [ MOV'Reg R0 dst ] ++ label
+        label   = case typeOfExpr e it of
+                   BoolType   -> [ BL $ JumpLabel "p_print_bool"   ]
+                   CharType   -> [ BL $ JumpLabel "putchar"        ]
+                   IntType    -> [ BL $ JumpLabel "p_print_int"    ]
+                   StringType -> [ BL $ JumpLabel "p_print_string" ]  
 
-transStat (PrintStat e it) s@(m, ls, i, rs) = error "PrintStat" 
---transStat (PrintStat e it) s@(m, ls, i, rs) 
---  = (instrs, (m, printStrLabel: ls', i, rs))
---    where
---
---      typez <- 
---      (exprInstrs, s'@(_, ls', _, _)) = transExpr e s  -- Will add extra labels if string or whatevs
---  
---      -- first define a SringLabel containing the information to be printed
---      printStrLabel = StringLabel ( "msg_" ++ cl ) "print_text" -- TODO: how does text even get here??????
---      cl = show $ length ls
---
---      instrs =  exprInstrs 
---             ++ [ DEFINE $ JumpLabel $ "p_print_" ++ "type" ] -- TODO: get type??
---             ++ [ PUSH [ LR ] ]
---             ++ printSetupInstrs 
---             ++ [ BL ( JumpLabel "printf" ) ]
---             ++ [ MOV R0 $ Op2'ImmVal 0 ]
---             ++ [ BL ( JumpLabel "fflush" ) ]
---             ++ [ POP [ PC ]  ] 
---      printSetupInstrs = []
+        ls''''  = if typeOfExpr e it == BoolType
+                      then 
+                          let (l,  ls'' ) = newDataLabel "true"  ls'  in
+                          let (l', ls''') = newDataLabel "false" ls'' in
+                          ls'''
+                      else ls'
+
 
 transStat (PrintlnStat e it) s  = error "PrintlnStat"
--- |                
---transStat (PrintlnStat e it) s@(m, ls, rs)  =  ((m, l', rs), instr)
---  where
---    (exprInstr, l') = transExpr e rs m l 
---    instr           = exprInstr ++ [{- Special instructions to print? -}]
 
-
--- |                 
 transStat (ScopedStat stat) s
   = transStat stat s
 
-
----- |                               
 transStat (ReadStat lhs it) s = error "TODO" 
 
-
--- |                    
 transStat (WhileStat cond body it) s@(m, ls, i, rs@(dst:_)) 
   = (whileInstrs, s'')
     where
@@ -189,7 +173,6 @@ transStat (WhileStat cond body it) s@(m, ls, i, rs@(dst:_))
                          ++ [ CMP dst $ Op2'ImmVal 0 ] 
                          ++ [ BEQ label1    ]
 
--- |             
 transStat (SeqStat stat stat') s
   = (stat0Instr ++ stat1Instr, s'')
     where
@@ -198,30 +181,9 @@ transStat (SeqStat stat stat') s
 
 transStat (DeclareStat vtype vname rhs it) s = error "DeclareStat" 
 
--- |        
--- transStat (DeclareStat vtype vname rhs it) s 
---   = (declInstr, s')
---     where
---       STR' t = if sizeOfType t == 1 then STRB'Reg else STR'Reg
--- 
---       size                            = sizeOfType vtype
---       (rhsInstr, s'@(_, _, _, dst:_)) = transRHS rhs s -- TODO: que/
---       declInstr                       =  [ SUB SP SP $ Op2'ImmVal size ] -- Reserve space on the stack
---                                       ++ rhsInstr
---                                       ++ [ (STR' vtype) SP dst ]
---                                       ++ [ ADD SP SP $ Op2'ImmVal size ]
-
--- |                  
 transStat (AssignStat lhs rhs it) s =  error "AssignStat" 
 
--- |              
 transStat (IfStat cond sthen selse it) s = error "IfStat" 
-
----- |
---transLHS :: AssignLhs -> [ Instr ] 
---transLHS (LhsIdent id) = error "TODO"              
---transLHS (LhsPairElem pelem) = error "TODO"                 
---transLHS (LhsArrayElem (ArrayElem id exprs)) = error "TODO" 
 
 transRHS (RhsExpr e) s = transExpr e s
 
@@ -270,7 +232,10 @@ transExpr (IntLiterExpr i) s@(_, _, _, rs@(dst:_)) =
    ( [ LDR dst i ], s )
 
 -- |
-transExpr (StrLiterExpr str) s@(m, ls, i, rs@(dst:_)) = error "NEED A DIRECTIVE FIELD IN ARM STATE" 
+transExpr (StrLiterExpr str) s@(m, ls, i, rs@(dst:_))
+  = ( [ LDR'Lbl dst l ], (m, ls', i, rs) )
+    where
+        (l, ls') = newDataLabel str ls
 
 -- |
 transExpr PairLiterExpr s@(m, ls, i, rs@(dst:_)) = error "PairLiterExpr" 
@@ -282,6 +247,12 @@ transExpr (ArrayElemExpr (ArrayElem ident exprs)) s@(m, ls, i, rs@(dst:_)) = err
 transExpr (BinaryOperExpr op e e') s@(m, ls, i, rs@(dst:_)) = error "BinaryOperExpr"  
  
 
+--------------------------------------------------------------------------------
+newDataLabel str ls 
+  = (l, ls ++ [l]) 
+    where 
+      l     = DataLabel lName str
+      lName = "msg_" ++ ( show $ length ls )
 
 -- | Generate instructions for a unary operator
 transUnOp :: UnaryOper -> ArmState
@@ -301,23 +272,57 @@ transUnOp NegUnOp s@(m, ls, i, rs@(dst:_)) = error "NegUnop"
 ----------------------------------------------------------------------------------
 
 
---extractVar                       :: Expr -> Store -> Variable 
---extractVar (IdentExpr ident) s   =  lookupStore s ident
---extractVar _                 _   =  error "extractIdent: Expecting IdentExpr"
 
 
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- TYPE OF EXPRESSION
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+sizeOf                :: Type -> Int  -- In bytes 
+sizeOf IntType        =  4                                 
+sizeOf BoolType       =  1                             
+sizeOf CharType       =  1                             
+sizeOf StringType     =  4 -- Addresss                              
+sizeOf (PairType  _)  =  4 -- Address   
+sizeOf (ArrayType _)  =  4 -- Address                         
+sizeOf NullType       =  0 -- ?                                
+sizeOf EmptyType      =  0 -- ?
+ 
+typeOfExpr                                        :: Expr -> It -> Type    
+typeOfExpr ( BoolLiterExpr     _            ) _   =  BoolType    
+typeOfExpr ( CharLiterExpr     _            ) _   =  CharType      
+typeOfExpr ( IdentExpr         id           ) it  =  fromJust (findType' id it)       
+typeOfExpr ( UnaryOperExpr     NotUnOp  _   ) _   =  BoolType
+typeOfExpr ( UnaryOperExpr     LenUnOp  _   ) _   =  IntType
+typeOfExpr ( UnaryOperExpr     OrdUnOp  _   ) _   =  IntType
+typeOfExpr ( UnaryOperExpr     ChrUnOp  _   ) _   =  CharType
+typeOfExpr ( UnaryOperExpr     NegUnOp  _   ) _   =  IntType
+typeOfExpr ( ParenthesisedExpr e            ) it  =  typeOfExpr e it        
+typeOfExpr ( IntLiterExpr      _            ) _   =  IntType   
+typeOfExpr ( StrLiterExpr      _            ) _   =  StringType
+typeOfExpr ( PairLiterExpr                  ) _   =  NullType       
+typeOfExpr ( ArrayElemExpr     arrelem      ) it  =  typeOfArrElem arrelem it     
+typeOfExpr ( BinaryOperExpr    AddBinOp _ _ ) _   =  IntType
+typeOfExpr ( BinaryOperExpr    SubBinOp _ _ ) _   =  IntType
+typeOfExpr ( BinaryOperExpr    MulBinOp _ _ ) _   =  IntType
+typeOfExpr ( BinaryOperExpr    DivBinOp _ _ ) _   =  IntType
+typeOfExpr ( BinaryOperExpr    ModBinOp _ _ ) _   =  IntType
+typeOfExpr ( BinaryOperExpr    AndBinOp _ _ ) _   =  BoolType
+typeOfExpr ( BinaryOperExpr    OrrBinOp _ _ ) _   =  BoolType
+typeOfExpr ( BinaryOperExpr    LsBinOp  _ _ ) _   =  BoolType
+typeOfExpr ( BinaryOperExpr    GtBinOp  _ _ ) _   =  BoolType
+typeOfExpr ( BinaryOperExpr    LEBinOp  _ _ ) _   =  BoolType
+typeOfExpr ( BinaryOperExpr    GEBinOp  _ _ ) _   =  BoolType
+typeOfExpr ( BinaryOperExpr    EqBinOp  _ _ ) _   =  BoolType
+typeOfExpr ( BinaryOperExpr    NEBinOp  _ _ ) _   =  BoolType        
+ 
+typeOfArrElem :: ArrayElem -> It -> Type
+typeOfArrElem _ _ = NullType -- lazy to make it compile, irrelephant atm
+--typeOfArrElem (id, es) it   = deepen (length es + 1) $ fromJust (findType' id it) 
+--  where
+--    deepen 0  t             =  t
+--    deepen n (ArrayType t)  =  deepen (n-1) t
+--    deepen _  t             =  t
 
--- sizeof :: Expr -> Word -- How many consecutive addresses does it take 
-sizeof (BoolLiterExpr     _    ) = 1            
-sizeof (CharLiterExpr     _    ) = 1            
-sizeof (IdentExpr         name ) = error "WHHHHHHHAT"
-sizeof (UnaryOperExpr _ _      ) = 1
-sizeof (ParenthesisedExpr e    ) = sizeof e               
-sizeof (IntLiterExpr      _    ) = 1               
-sizeof (StrLiterExpr      str  ) = length str              
-sizeof (PairLiterExpr          ) = 0  -- ?                
-sizeof (ArrayElemExpr (ArrayElem arrName exprs)) = error "TODO"           
-sizeof (BinaryOperExpr  _ e1 e2) = error "TODO"  
 
 sizeOfType :: Type -> Int  -- In bytes 
 sizeOfType IntType       = 4                                 
