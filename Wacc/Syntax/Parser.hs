@@ -290,7 +290,7 @@ pExpr = buildExpressionParser waccOperators pExpr'
           int <- waccInteger
           if   int > 2^31
               then fail $ "Positive Integer Overflow @" ++ show int
-              else return int
+              else return (fromIntegral int) -- TODO do
 
         pNegUnOp str op = do
             waccReservedOp str
@@ -336,7 +336,7 @@ pArrayElem :: Parser ArrayElem
 pArrayElem = do
   ident <- waccIdentifier
   dims  <- many1 $ waccBrackets pExpr
-  return $ ArrayElem ident dims
+  return $ (ident, dims)
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
