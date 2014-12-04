@@ -242,7 +242,7 @@ transExpr (IntLiterExpr i) s
 
 -- |
 transExpr (StrLiterExpr str) s
-  = (s, [ LDR'Lbl dst l ])
+  = (s', [ LDR'Lbl dst l ])
     where
       (dst:_)  = availableRegs s
       s'       = s { dataLabels = ls' }
