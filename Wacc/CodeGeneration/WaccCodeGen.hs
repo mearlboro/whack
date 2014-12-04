@@ -298,8 +298,9 @@ transStat (IfStat cond thens elses it) s = (s'''', ifInstrs)
 
 -- ************************************************************************** --
 -- ***********************                            *********************** --
--- ***********************         Printing           *********************** --
--- ***********************                            *********************** -- 
+-- ***********************    Predefined Functions    *********************** --
+-- ***********************           Labels           *********************** -- 
+-- ***********************                            *********************** --
 -- ************************************************************************** -- 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -343,7 +344,7 @@ boolPrintPredef dataLabel1 dataLabel2 ps
 strPrintPredef dataLabel ps
   = ps ++ [ PredefLabel name instrs ]
     where
-      name = "p_print_string"
+      name   = "p_print_string"
       instrs =  ( [ DEFINE $ PredefLabel name [] ]
              ++ [ PUSH [ LR ] ]
              ++ [ LDR'Reg R1 R0 ]
@@ -354,6 +355,36 @@ strPrintPredef dataLabel ps
              ++ [ MOV R0 $ Op2'ImmVal 0 ]
              ++ [ BL ( JumpLabel "fflush" ) ]
              ++ [ POP [ PC ] ] )
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- | These functions will create the so-called predefLabels for errors. These funcs
+--   will print an error message and exit the program if necessary.
+
+-- Integer overflow error 
+ovfErrPredef ls ps
+  = (ls', ps ++ [ PredefLabel name instrs ])
+    where
+      -- Creates a data label for printing an overflow error -- TODO \n \0 label issue
+      ls'@(ovfLbl:_) =  newDataLabel ( "OverflowError: the result is too small/large" ++ 
+                                       "to store in a 4-byte signed-integer."          )
+                                     ls 
+      name   =  "p_throw_overflow_error"
+      -- The set of instructions calls runtime error which exits the program
+      instrs =  ( [ DEFINE $ PredefLabel name [] ]
+             ++ [ LDR'Lbl R0 ovfLbl ]
+             ++ [ BL ( JumpLabel "p_throw_runtime_error" ) ] )
+
+
+-- Runtime error
+runtErrPredef ps 
+  = ps ++ [ PredefLabel name instrs ]
+    where
+      name   = "p_throw_runtime_error"
+      instrs =  ( [ BL ( JumpLabel "p_print_string" ) ] 
+             ++ [ MOV R0 $ Op2'ImmVal (-1) ]
+             ++ [ BL ( JumpLabel "exit" )  ] )
+
 
 
 -- ************************************************************************** --
@@ -421,6 +452,8 @@ transArrayElem e it index arm = (arm' { availableRegs = r } , exprInstr ++ store
         storeInstr = if typeOfExpr e it == BoolType  -- TODO func for CHAR 
                         then [STRB'Off nxt dst offset]
                         else [STR'Off  nxt dst offset]  
+
+
 -- ************************************************************************** --
 -- ***********************                            *********************** --
 -- ***********************   Expression Translation   *********************** --
