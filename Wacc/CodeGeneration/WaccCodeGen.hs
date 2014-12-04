@@ -133,7 +133,7 @@ transStat (ReturnStat e _) s = error "ReturnStat"
 --    instr           = [ BL "exit" ]
 
 
-transStat (PrintStat e it) s@(m, ls, i, rs) = error "PrintStat" 
+transStat (PrintStat e it) s@(m, ls, i, rs) = transExpr e s
 --transStat (PrintStat e it) s@(m, ls, i, rs) 
 --  = (instrs, (m, printStrLabel: ls', i, rs))
 --    where
@@ -223,9 +223,20 @@ transStat (IfStat cond sthen selse it) s = error "IfStat"
 --transLHS (LhsPairElem pelem) = error "TODO"                 
 --transLHS (LhsArrayElem (ArrayElem id exprs)) = error "TODO" 
 
-transRHS (RhsExpr e) s = transExpr e s
+--data AssignRhs                                   -- <assign-rghs> ::=
+--  = RhsExpr       Expr                           -- <expr>
+--  | RhsPairElem   PairElem                       -- <pair-elem>
+--  | RhsArrayLiter ArrayLiter                     -- <array-liter>
+--  | RhsNewPair    Expr       Expr                -- 'newpair' '(' <expr> ',' <expr> ')'
+--  | RhsCall       IdentName  ArgList             -- 'call' <ident> '(' <arg-list>? ')'
+--  deriving ( Eq , Ord )
 
-
+transRHS :: AssignRhs -> ArmState -> ( [ Instr], ArmState)
+transRHS (RhsExpr e)           s = transExpr e s --provisory
+transRHS (RhsPairElem elem)    s = error "TODO" 
+transRHS (RhsArrayLiter arr)   s = error "TODO"
+transRHS (RhsNewPair e1 e2)    s = error "TODO"
+transRHS (RhsCall idName args) s = error "TODO"
 -- ************************************************************************** --
 -- ***********************                            *********************** --
 -- ***********************   Expression Translation   *********************** --
@@ -244,7 +255,7 @@ transExpr (BoolLiterExpr b) s@(_, _, _, (dst:_))
 
 -- | Put the corresponding integer value of @c@ into the destination reg @dst@
 transExpr (CharLiterExpr c) s@(_, _, _, (dst:_))
-  = ( [ MOV dst (Op2'ImmVal $ ord c) ], s )  -- todO use LDR
+  = ( [ MOV'Chr dst c ], s )  -- todO use LDR
 
 
 -- | Lookup what register variable @id@ is in, and copy its content in @dst@ reg
@@ -266,14 +277,16 @@ transExpr (ParenthesisedExpr e) s
   = transExpr e s 
 
 -- |
-transExpr (IntLiterExpr i) s@(_, _, _, rs@(dst:_)) = 
-   ( [ LDR dst i ], s )
+transExpr (IntLiterExpr i) s@(_, _, _, rs@(dst:_))
+  = ( [ LDR dst i ], s )
 
 -- |
 transExpr (StrLiterExpr str) s@(m, ls, i, rs@(dst:_)) = error "NEED A DIRECTIVE FIELD IN ARM STATE" 
 
 -- |
-transExpr PairLiterExpr s@(m, ls, i, rs@(dst:_)) = error "PairLiterExpr" 
+transExpr PairLiterExpr s@(m, ls, i, rs@(dst:_)) 
+  = ([ LDR R0 8] ++ [ BL $ JumpLabel "malloc" ] ++ [] , s)
+
 
 -- | TODO make ArrayElem a type synonym PLSSSSSSS
 transExpr (ArrayElemExpr (ArrayElem ident exprs)) s@(m, ls, i, rs@(dst:_)) = error "ArrayElemExpr"  
@@ -288,15 +301,24 @@ transUnOp :: UnaryOper -> ArmState
           -> ( [ Instr ], ArmState )
 transUnOp NotUnOp s@(m, ls, i, rs@(dst:_)) = (unopInstrs, s)
   where
-    unopInstrs =  [ EOR R4 R4 $ Op2'ImmVal 1 ]
-               ++ [ MOV'Reg R0 R4 ]
+    unopInstrs =  [ EOR dst dst $ Op2'ImmVal 1 ]
     
+transUnOp LenUnOp s@(m, ls@(l:_), i, rs@(dst:_)) = (unopInstrs, s)
+  where unopInstrs = [ LDR'Lbl dst l ]  -- stores in dst the adrress of a string
+                  ++ [ LDR'Reg dst dst ]-- puts into dst the length of the addr,
+                                        -- meaning the legth of the string
+                  -- REDO comment
 
-transUnOp LenUnOp s@(m, ls, i, rs@(dst:_)) = error "LenUnop"
-transUnOp OrdUnOp s@(m, ls, i, rs@(dst:_)) = error "OrdUnop"
-transUnOp ChrUnOp s@(m, ls, i, rs@(dst:_)) = error "ChrUnop"
-transUnOp NegUnOp s@(m, ls, i, rs@(dst:_)) = error "NegUnop"
+-- | Ints and chars are treated the same by ARM, so there is not need to do
+-- anything out of the ordinary regarding Ord and Chr  
+transUnOp OrdUnOp s@(m, ls, i, rs@(dst:_)) = ([] , s)
 
+transUnOp ChrUnOp s@(m, ls, i, rs@(dst:_)) = ([] , s) 
+
+transUnOp NegUnOp s@(m, ls, i, rs@(dst:_)) = (negUnOpInstrs, s)
+  where negUnOpInstrs = [ RSBS dst dst $ Op2'ImmVal 0]  -- reverse subtract | dst := 0 - dst
+                     ++ [ BLVS $ head ls]     -- jumps to pThrow if overflow
+                                  -- |_Change this
 
 ----------------------------------------------------------------------------------
 
