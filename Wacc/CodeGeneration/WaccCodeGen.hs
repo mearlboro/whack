@@ -63,6 +63,7 @@ transProgram (Program funcs body)  =  (s'', progInstrs)
       , dataLabels    = [] 
       , predefLabels  = [] }
 
+
 -- ************************************************************************** --
 -- ***********************                            *********************** --
 -- ***********************     Function Translation   *********************** --
@@ -96,6 +97,7 @@ transFuncs fs arm = transFuncs' fs (arm, [])
         s@(arm', is') = transFunc  f arm
         (arm'', is'') = transFuncs' fs s
 
+
 -- ************************************************************************** --
 -- ***********************                            *********************** --
 -- ***********************    Statement Translation   *********************** --
@@ -121,8 +123,9 @@ transStat (ExitStat expr _) s = (s', exitInstrs)
     -- Instructions for the exit statement
     exitInstrs         
       =  exprInstrs 
-      ++ [ MOV R0 $ Op2'Reg dst  ] -- TODO: Comment
-      ++ [ BL (JumpLabel "exit") ] -- TODO: Comment
+      ++ [ MOV R0 $ Op2'Reg dst  ]
+      ++ [ BL (JumpLabel "exit") ]
+
 
 -- 
 transStat (ReturnStat expr _) s = (s', retInstrs)
@@ -135,6 +138,7 @@ transStat (ReturnStat expr _) s = (s', retInstrs)
     moveResult = [ MOV R0 $ Op2'Reg dst ] 
     -- Instructions for the return statement
     retInstrs = exprInstrs ++ moveResult
+
 
 -- TODO: to implement arrays, pairs (printing an address), identifiers 
 transStat (PrintStat e it) s
@@ -173,13 +177,10 @@ transStat (PrintStat e it) s
                        _          -> (ls, ps)        
 
         -- Generates the proper data labels for each type of the print param
-        intDataLabels  ls = let (l,  ls' ) = newDataLabel "%d"    ls  in
-                            ls'
-        boolDataLabels ls = let (l,  ls' ) = newDataLabel "true"  ls  in
-                            let (l', ls'') = newDataLabel "false" ls' in
-                            ls''
-        strDataLabels  ls = let (l,  ls' ) = newDataLabel "%.*s"  ls  in
-                            ls'
+        intDataLabels  ls =           newDataLabel "%d"    ls 
+        boolDataLabels ls = let ls' = newDataLabel "true"  ls in
+                                      newDataLabel "false" ls' 
+        strDataLabels  ls =           newDataLabel "%.*s"  ls 
 
 --
 transStat (PrintlnStat e it) s = error "PrintlnStat"
@@ -314,6 +315,7 @@ intPrintPredef dataLabel ps
       name   =  "p_print_int"                         
       instrs =  ( [ DEFINE $ PredefLabel name [] ] -- we don't need instructions here
              ++ [ PUSH [ LR ] ]
+             ++ [ MOV'Reg R1 R0 ]
              ++ [ LDR'Lbl R0 dataLabel ]
              ++ [ ADD R0 R0 $ Op2'ImmVal 4 ] 
              ++ [ BL ( JumpLabel "printf" ) ]
@@ -445,8 +447,8 @@ transExpr (StrLiterExpr str) s
   = (s', [ LDR'Lbl dst l ])
     where
       (dst:_)  = availableRegs s
-      s'       = s { dataLabels = ls' }
-      (l, ls') = newDataLabel str $ dataLabels s
+      s'       = s { dataLabels = ls }
+      ls@(l:_) = newDataLabel str $ dataLabels s
 
 
 -- | Put the char @c@ into the destination reg @dst@
@@ -490,7 +492,7 @@ transExpr (BinaryOperExpr op e e') s = error "BinaryOperExpr"
 --------------------------------------------------------------------------------
 -- | Create a new data label and return the list with the label added.
 newDataLabel str ls 
-  = (l, ls ++ [l]) 
+  = (l:ls) 
     where 
       l     = DataLabel lName str
       lName = "msg_" ++ ( show $ length ls )
