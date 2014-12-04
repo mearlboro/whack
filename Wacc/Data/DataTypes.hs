@@ -77,9 +77,7 @@ data PairElem                                    -- <pair-elem> ::=
   | Snd Expr                                     -- 'snd' <expr>
   deriving ( Eq , Ord )
 
-data ArrayElem                                   -- <array-elem> ::=
-  = ArrayElem IdentName [ Expr ]                 -- <ident> '[' <expr> ']'
-  deriving ( Eq , Ord )
+type ArrayElem = (IdentName, [ Expr ])           -- <array-elem> ::=
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- | WACC's language specification defines a nested type system. In order to  --
@@ -139,7 +137,7 @@ type ArrayLiter = [ Expr ]                       -- <array-liter> ::= '[' ( <exp
 
 type IdentName  = [ Char ]                       -- <ident> ::= (' '|'a'-'z'|'A'-'Z')(' '|'a'-'z'|'A'-'Z'|'0'-'9')*
 
-type IntLiter   = Integer                        -- <int-sign>? <digit>+
+type IntLiter   = Int                            -- <int-sign>? <digit>+
 
 type BoolLiter  = Bool                           -- <bool-liter> ::= 'true' | 'false'
 

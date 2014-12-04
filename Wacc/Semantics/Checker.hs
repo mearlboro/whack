@@ -198,7 +198,7 @@ checkPairElem pElem it _ctxs types  =
 -- matches one of the expected types. We also check that all exprs representing
 -- the indices, evaluate to integers
 checkArrayElem  :: ArrayElem -> It -> [ Context ] -> [ Type ] -> [ SemanticErr ]
-checkArrayElem aElem@( ArrayElem ident exprs ) it ctxs types  =
+checkArrayElem aElem@( ident , exprs ) it ctxs types  =
     if   isJust aElemType
     then typeErr ++ exprsErr
     else [ "Could Not Retrieve Array Type @" ++ ident ]
@@ -234,10 +234,10 @@ getPairElemType pElem it  =
 
   where
 
-    getIdent                                          :: Expr -> Maybe IdentName
-    getIdent ( IdentExpr                 ident     )  =  Just ident
-    getIdent ( ArrayElemExpr ( ArrayElem ident _ ) )  =  Just ident
-    getIdent                                   _      =  Nothing
+    getIdent                                  :: Expr -> Maybe IdentName
+    getIdent ( IdentExpr       ident       )  =  Just ident
+    getIdent ( ArrayElemExpr ( ident , _ ) )  =  Just ident
+    getIdent                           _      =  Nothing
 
     getType _     ( PairType   Nothing      )  =  NullType
     getType which ( PairType ( Just types ) )  =  which types
@@ -266,7 +266,7 @@ getPairElemType pElem it  =
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- Get the type of an array element.
 getArrayElemType                               :: ArrayElem -> It -> Maybe Type
-getArrayElemType ( ArrayElem ident exprs ) it  =
+getArrayElemType ( ident , exprs ) it  =
     if isValidArray then arrElemType else Nothing
   where
     arrayObj                  =  findIdent' ident it
