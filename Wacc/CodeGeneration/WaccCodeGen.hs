@@ -209,8 +209,6 @@ transStat (AssignStat lhs rhs it) s =  error "AssignStat"
 
 transStat (IfStat cond sthen selse it) s = error "IfStat" 
 
-transRHS (RhsExpr e) s = transExpr e s
-
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- | These functions will create the so-called predefLabels for print. They consist
 --   of lists of instructions generated similarly to main and the other functions,
@@ -264,6 +262,21 @@ strPrintPredef dataLabel ps
              ++ [ POP [ PC ] ] )
 
 
+
+
+--transLHS :: AssignLhs -> [ Instr ] 
+--transLHS (LhsIdent id) = error "TODO"              
+--transLHS (LhsPairElem pelem) = error "TODO"                 
+--transLHS (LhsArrayElem (ArrayElem id exprs)) = error "TODO" 
+
+transRHS :: AssignRhs -> ArmState -> ( ArmState, [ Instr ])
+transRHS (RhsExpr e)           s = transExpr e s --provisory
+transRHS (RhsPairElem elem)    s = error "TODO" 
+transRHS (RhsArrayLiter arr)   s = error "TODO"
+transRHS (RhsNewPair e1 e2)    s = error "TODO"
+transRHS (RhsCall idName args) s = error "TODO"
+
+
 -- ************************************************************************** --
 -- ***********************                            *********************** --
 -- ***********************   Expression Translation   *********************** --
@@ -300,7 +313,7 @@ transExpr (CharLiterExpr c) s
     where
       (dst:_) = availableRegs s
 
--- TODO!!
+-- TODO! TEST!
 -- | Lookup what register variable @id@ is in, and copy its content in @dst@
 transExpr (IdentExpr id) s
   = (s, [ LDR'Reg dst SP ] ++ [ MOV'Reg R0 dst ] ) -- TODO LOL
@@ -321,7 +334,9 @@ transExpr (ParenthesisedExpr e) s
   = transExpr e s 
 
 -- |
-transExpr PairLiterExpr s = error "PairLiterExpr" 
+transExpr PairLiterExpr s 
+  = (s, [ LDR R0 8] ++ [ BL $ JumpLabel "malloc" ])
+
 
 -- | TODO make ArrayElem a type synonym PLSSSSSSS
 transExpr (ArrayElemExpr (ArrayElem ident exprs)) s = error "ArrayElemExpr"  
@@ -349,12 +364,30 @@ transUnOp NotUnOp s
                  ++ [ MOV'Reg R0  dst ]
       (dst:_)    =  availableRegs s
     
+transUnOp LenUnOp s
+  = (s, unopInstrs)
+    where 
+      unopInstrs =  [ LDR'Lbl dst l ]  -- stores in dst the adrress of a string
+                 ++ [ LDR'Reg dst dst ]-- puts into dst the length of the addr,
+                                        -- meaning the legth of the string
+                  -- REDO comment
+      (l:_)      =  dataLabels    s
+      (dst:_)    =  availableRegs s
 
-transUnOp LenUnOp s = error "LenUnop"
-transUnOp OrdUnOp s = error "OrdUnop"
-transUnOp ChrUnOp s = error "ChrUnop"
-transUnOp NegUnOp s = error "NegUnop"
+-- | Ints and chars are treated the same by ARM, so there is not need to do
+-- anything out of the ordinary regarding Ord and Chr  
+transUnOp OrdUnOp s = (s, [])
 
+transUnOp ChrUnOp s = (s, []) 
+
+transUnOp NegUnOp s 
+  = (s, negUnOpInstrs)
+    where 
+      negUnOpInstrs =  [ RSBS dst dst $ Op2'ImmVal 0]  -- reverse subtract | dst := 0 - dst
+                    ++ [ BLVS $ l]     -- jumps to pThrow if overflow
+                                             -- |_Change this
+      (l:_)      =  dataLabels    s
+      (dst:_)    =  availableRegs s
 
 ----------------------------------------------------------------------------------
 
