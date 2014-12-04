@@ -126,7 +126,7 @@ transStat (ExitStat e _) s
 transStat (ReturnStat e _) s = error "ReturnStat" 
 
 
--- TODO: to implement arrays, pairs (printing an address) 
+-- TODO: to implement arrays, pairs (printing an address), identifiers 
 transStat (PrintStat e it) s
   = ( s'', instrs')
     where
@@ -177,7 +177,7 @@ transStat (PrintlnStat e it) s  = error "PrintlnStat"
 transStat (ScopedStat stat) s
   = transStat stat s
 
-transStat (ReadStat lhs it) s = error "TODO" 
+transStat (ReadStat lhs it) s = error "ReadStat" 
 
 transStat (WhileStat cond body it) s 
   = (s'', whileInstrs)
@@ -196,6 +196,7 @@ transStat (WhileStat cond body it) s
                          ++ [ CMP dst $ Op2'ImmVal 0 ] 
                          ++ [ BEQ label1    ]
       (dst:_)            =  availableRegs s 
+
 transStat (SeqStat stat stat') s
   = (s'', stat1Instr ++ stat2Instr)
     where
@@ -215,6 +216,8 @@ transRHS (RhsExpr e) s = transExpr e s
 --   of lists of instructions generated similarly to main and the other functions,
 --   but are defined as a sub-type of Label for logic convenience, and for easing 
 --   up their use in a BL instruction.
+
+-- TODO: if is ident, add MOV r1 r0 after push
 intPrintPredef dataLabel ps
   = ps ++ [ PredefLabel name instrs ]
     where
@@ -295,13 +298,13 @@ transExpr (StrLiterExpr str) s
 transExpr (CharLiterExpr c) s
   = (s, [ MOV dst (Op2'ImmChr c) ])
     where
-        (dst:_) = availableRegs s
+      (dst:_) = availableRegs s
 
+-- TODO!!
 -- | Lookup what register variable @id@ is in, and copy its content in @dst@
 transExpr (IdentExpr id) s
-  = (s, [ MOV dst (Op2'Reg src) ]) -- TODO LOL
+  = (s, [ LDR'Reg dst SP ] ++ [ MOV'Reg R0 dst ] ) -- TODO LOL
     where
-      src = R0 --findReg id m 
       (dst:_) = availableRegs s
 
 
@@ -374,7 +377,7 @@ sizeOf EmptyType      =  0 -- ?
 typeOfExpr                                        :: Expr -> It -> Type    
 typeOfExpr ( BoolLiterExpr     _            ) _   =  BoolType    
 typeOfExpr ( CharLiterExpr     _            ) _   =  CharType      
-typeOfExpr ( IdentExpr         id           ) it  =  fromJust (findType' id it)       
+typeOfExpr ( IdentExpr         id           ) it  =  fromJust (findType' id it)
 typeOfExpr ( UnaryOperExpr     NotUnOp  _   ) _   =  BoolType
 typeOfExpr ( UnaryOperExpr     LenUnOp  _   ) _   =  IntType
 typeOfExpr ( UnaryOperExpr     OrdUnOp  _   ) _   =  IntType
