@@ -694,7 +694,7 @@ makePretty :: ( ArmState, [ Instr ] ) -- computed by transProgram
            ->   String                -- printable compiled program
 makePretty (s, instrs) 
     =  show ( INDIR Data )  ++ "\n"
-    ++ concatMap putDataLabel ( dataLabels s )
+    ++ concatMap putDataLabel ( reverse ( dataLabels s ) )
     ++ show ( INDIR Text )  ++ "\n"                  
     ++ show ( INDIR ( Global ( "main" ) ) ) ++ "\n"
     ++ ( concat $ intersperse "\n" $ map show instrs ) ++ "\n"
