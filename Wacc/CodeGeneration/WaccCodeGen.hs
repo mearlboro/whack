@@ -192,7 +192,7 @@ transStat (SeqStat stat0 stat1) arm = (arm'', stat0Instr ++ stat1Instr)
 transStat (AssignStat (LhsIdent id) rhs it) arm = (arm', assignInstr)
   where
     -- Work out the value of the rhs
-    (arm', rhsInstr) = transRhs rhs arm 
+    (arm', rhsInstr) = transRhs rhs it arm 
     -- The value of rhs will be saved in the destination register, so get it!
     dst = armDstReg arm'
     -- So we want to copy whatever is now in the destination register, into
@@ -277,22 +277,60 @@ transStat (DeclareStat vtype vname rhs it) arm = (arm''', declareInstr)
 
 
 
-transRhs :: AssignRhs -> ArmState -> (ArmState, [Instr])
-transRhs (RhsExpr       e            ) arm = transExpr e arm          
-transRhs (RhsPairElem   (Fst e)      ) arm = error "TODO"
-transRhs (RhsPairElem   (Snd e)      ) arm = error "TODO"
-transRhs (RhsArrayLiter (exprs)      ) arm = error "TODO"
+transRhs :: AssignRhs -> IdentTable -> ArmState -> (ArmState, [Instr])
+transRhs (RhsExpr       e            ) it arm = transExpr e arm          
+transRhs (RhsPairElem   (Fst e)      ) it arm = error "TODO"
+transRhs (RhsPairElem   (Snd e)      ) it arm = error "TODO"
+transRhs (RhsArrayLiter (exprs)      ) it arm = (finalArm, rhsInstr)
   where
-    arrayLenght = length exprs
-    --arraySize   = sum (map $ (sizeOf . `typeOfExpr` it) exprs) + sizeOf (ArrayType {})
+    rhsInstr = malloc ++ exprsInstr + lengthInstr 
+    arrayLength = length exprs
+    arraySize   = sum (map $ (sizeOf . flip typeOfExpr it) exprs) + sizeOf (ArrayType {})
     -- Allocate memeory on the heap
-    --malloc = [ LDR R0 arraySize        ] ++ 
-    --         [ BL (JumpLabel "malloc") ] ++
-    --         [ ]
+    malloc = [ LDR R0 arraySize        ] ++ 
+             [ BL (JumpLabel "malloc") ] ++
+             [ MOV dst (Op2'Reg R0)    ]
+    (dst:nxt:_) = armFreeRegs arm
+    -- Add to heap each elem of the array 
+    (arm' , exprsInstr) = transArray exprs arm
+    -- Add the length of the array to the heap  
+    offset = armStackOff arm' - sizeOf (ArrayType {})
+    lengthInstr = [ LDR nxt arrayLength   ] ++ 
+                  [ STR'Reg nxt dst       ] ++ 
+                  [ STR'Off dst SP offset ]
+    finalArm = arm' { armStackOff = offset }
 
 
-transRhs (RhsNewPair    e e'         ) arm = error "TODO"
-transRhs (RhsCall       fname  params) arm = error "TODO"
+transRhs (RhsNewPair    e e'         ) it arm = error "TODO"
+transRhs (RhsCall       fname  params) it arm = error "TODO"
+
+-- Translates an array 
+transArray :: [ Expr ] -> ArmState -> (ArmState, [Instr])
+transArray es arm = transArray' es 0 (arm, [])
+      where
+        transArray' :: [ Expr ] -> Int -> (ArmState, [Instr]) -> (ArmState, [ Instr ])
+        transArray' [] _ result            = result
+        transArray' (e:es) index (arm, is) = (arm'', is ++ is' ++ is'')
+          where
+            s@(arm', is') = transArrayElem e index arm
+            (arm'', is'') = transArray' es (index+1) s
+
+
+--Translates an array elem 
+transArrayElem :: Expr -> Int -> ArmState -> (ArmState, [Instr])
+transArrayElem e index arm = (arm' { armFreeRegs = r } , exprInstr ++ storeInstr)
+    where
+        
+        r@(dst:nxt:regs) = armFreeRegs arm 
+
+        -- Translate the expression 
+        (arm', exprInstr) = transExpr e arm{armFreeRegs = nxt:regs}
+        -- At what index in the heap the elem is
+        -- +4 Beause the first 4 bytes are taken up by the length
+        offset = (index * sizeOf $ typeOfExpr e) + 4 -- MAGIC NUMBER NOOO 
+        storeInstr = if typeOfExpr e == BoolType  -- TODO func for CHAR 
+                        then [STRB'Off nxt dst offset]
+                        else [STR'Off  nxt dst offset]  
 
 transLhs :: AssignLhs -> ArmState -> (ArmState, [Instr])
 transLhs (LhsIdent id)           arm = error "TODO"
@@ -305,6 +343,16 @@ transLhs (LhsArrayElem (id, es)) arm = error "TODO"
 -- ***********************   Expression Translation   *********************** --
 -- ***********************                            *********************** -- 
 -- ************************************************************************** --
+-- transExprs :: [ Expr ] -> ArmState -> (ArmState, [Instr])
+--     transExprs es arm = transExprs' es (arm, [])
+--       where
+--         transFuncs' :: [ Expr ] -> (ArmState, [Instr]) -> (ArmState, [ Instr ])
+--         transFuncs' []      result   = result
+--         transFuncs' (e:es) (arm, is) = (arm'', is ++ is' ++ is'')
+--           where
+--             s@(arm', is') = transExpr  e arm
+--             (arm'', is'') = transExprs' es s
+
 
 transExpr (IdentExpr id) s = (s, pushDst) -- TODO LOL
     where
