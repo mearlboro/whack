@@ -1,7 +1,5 @@
 module Wacc.CodeGeneration.ARM11Instructions where
 
-import Wacc.Data.DataTypes
-
 import Data.List (intersperse, intercalate)
 
 import qualified Data.Map as Map
@@ -16,10 +14,10 @@ import qualified Data.Map as Map
 data ArmState 
   = ArmState
   -- Maps identifier names to the register they are currently in
-  { stackMap      :: Map.Map IdentName (Reg, Int) -- TODO it's not int
+  { stackMap      :: Map.Map String (Reg, Int) -- TODO it's not int
   -- This is how much space has been reserved on the stack for the current scope
   , stackOffset   :: Int
-  -- The list of register that are avaialable and are free to be used
+  -- The freaking stack pointer man!
   , availableRegs :: [ Reg ]
   -- TODO: Comment
   , numJumpLabels :: Int
@@ -55,7 +53,7 @@ data Register
   | SP -- R13 | Stack Pointer
   | LR -- R14 | Link Register (which holds return addresses)
   | PC -- R15 | Program Counter
-  deriving (Enum, Eq)
+  deriving (Enum, Eq, Ord)
 
 -- Register type synonyms
 type Reg = Register
@@ -132,13 +130,13 @@ data Instr
   | STR'Lbl    Rd Label  -- TODO: Comment
   | STRB'Lbl   Rd Label  -- TODO: Comment
 
-  | LDR'Reg  Rd Rd     -- TODO: Comment
-  | STR'Reg  Rd Rd     -- TODO: Comment
-  | STRB'Reg Rd Rd     -- TODO: Comment
+  | LDR'Reg  Rd Rn     -- TODO: Comment
+  | STR'Reg  Rd Rn     -- TODO: Comment
+  | STRB'Reg Rd Rn     -- TODO: Comment
 
-  | LDR'Off  Rd Rd Int -- TODO: Comment
-  | STR'Off  Rd Rd Int -- TODO: Comment
-  | STRB'Off Rd Rd Int -- TODO: Comment
+  | LDR'Off  Rd Rn Int -- TODO: Comment
+  | STR'Off  Rd Rn Int -- TODO: Comment
+  | STRB'Off Rd Rn Int -- TODO: Comment
 
   -- Directive
   | INDIR Directive -- TODO: Comment Do we need this?
@@ -185,7 +183,7 @@ instance Show Register where
   show R10 = "r10"
   show R11 = "r11"
   show R12 = "r12"
-  show SP  = "{sp}" -- R13 | Stack Pointer
+  show SP  = "sp" -- R13 | Stack Pointer
   show LR  = "{lr}" -- R14 | Link Register (which holds return addresses)
   show PC  = "{pc}" -- R15 | Program Counter
 
@@ -252,24 +250,30 @@ instance Show Instr where
     show (BEQ    l            ) = "\tBEQ "   ++ show l
     show (CBZ    rn l         ) = "\tCBZ "   ++ show rn ++ ", " ++ show l
     show (CBNZ   rn l         ) = "\tCBNZ "  ++ show rn ++ ", " ++ show l
-
-    show (DEFINE l            ) = "\t" ++ show l 
+    show (RSBS rd rn op2      ) = "\tRSBS "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2        
+    show (BLVS   l            ) = "\tBLVS "  ++ show l
+    show (DEFINE l            ) = "\t"       ++ show l 
 
     show (PUSH   regs         ) = "\tPUSH "  ++ intercalate ", " (map show regs) 
     show (POP    regs         ) = "\tPOP "   ++ intercalate ", " (map show regs)
 
-    show (LDR          rd n   ) = "\tLDR "   ++ show rd ++ ", =" ++ show n
+    -- LDR STR constant
+    show (LDR       rd n      ) = "\tLDR "   ++ show rd ++ ", =" ++ show n
+    show (STR       rd n      ) = "\tSTR "   ++ show rd ++ ", =" ++ show n
+    show (STRB      rd n      ) = "\tSTRB "  ++ show rd ++ ", =" ++ show n
+
     show (LDR'Lbl      rd l   ) = "\tLDR "   ++ show rd ++ ", =" ++ show l
     show (LDRNE'Lbl    rd l   ) = "\tLDRNE " ++ show rd ++ ", =" ++ show l
     show (LDRNQ'Lbl    rd l   ) = "\tLDRNQ " ++ show rd ++ ", =" ++ show l
-    show (LDR'Reg      rd rs  ) = "\tLDR "   ++ show rd ++ ", [" ++ show rs ++ "]" 
+    show (STR'Lbl      rd l   ) = "\tSTR "   ++ show rd ++ ", =" ++ show l  
+    show (STRB'Lbl     rd l   ) = "\tSTRB "  ++ show rd ++ ", =" ++ show l
 
-    show (STR       rd n      ) = "\tSTR "   ++ show rd ++ ", =" ++ show n
-    show (STRB      rd n      ) = "\tSTRB "  ++ show rd ++ ", =" ++ show n
-    show (STR'Lbl   rd l      ) = "\tSTR "   ++ show rd ++ ", =" ++ show l
-    show (STRB'Lbl  rd l      ) = "\tSTRB "  ++ show rd ++ ", =" ++ show l
-    show (STR'Reg   rd rs     ) = "\tSTR "   ++ show rd ++ ", [" ++ show rs ++ "]" 
+    show (LDR'Reg      rd rs  ) = "\tLDR "   ++ show rd ++ ", [" ++ show rs ++ "]" 
+    show (STR'Reg      rd rs  ) = "\tSTR "   ++ show rd ++ ", [" ++ show rs ++ "]" 
     show (STRB'Reg  rd rs     ) = "\tSTRB "  ++ show rd ++ ", [" ++ show rs ++ "]" 
 
-    show (INDIR       dir     ) = show dir    
+    show (LDR'Off  rd rn off  ) = "\tLDR "  ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]" -- TODO: Comment
+    show (STR'Off  rd rn off  ) = "\tSTR "  ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]" -- TODO: Comment
+    show (STRB'Off rd rn off  ) = "\tSTRB " ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]" -- TODO: Comment
 
+    show (INDIR       dir     ) = show dir
