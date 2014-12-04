@@ -1,163 +1,89 @@
 module Wacc.CodeGeneration.ARM11Instructions where
 
-import Data.List (intersperse)
-import qualified Data.Map as Map
- 
-import Wacc.Data.SymbolTable
 import Wacc.Data.DataTypes
 
+import Data.List (intersperse, intercalate)
 
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+import qualified Data.Map as Map
 
--- The available registers of ARM11
-data Register
-  = R0 | R1 | R2 | R3 | R4 | R5 | R6 | R7 | R8 | R9 | R10 | R11 | R12
-  | SP -- R13 | Stack Pointer
-  | LR -- R14 | Link Register (which holds return addresses)
-  | PC -- R15 | Program Counter
-  deriving (Enum)
+-- ************************************************************************** --
+-- **************************                         *********************** --
+-- **************************     Data Definition     *********************** --
+-- **************************                         *********************** -- 
+-- ************************************************************************** --
 
-type Reg = Register
-
-type Rd = Register
-type Rn = Register
-type Rm = Register
-type Rs = Register
-
--- List of registers | <reglist> = {Ri, Rj, Rn,...}
-type RegList = [Register]
-
-
-instance Show Register where
-  show R0  = "r0"
-  show R1  = "r1"
-  show R2  = "r2"
-  show R3  = "r3"
-  show R4  = "r4"
-  show R5  = "r5"
-  show R6  = "r6"
-  show R7  = "r7"
-  show R8  = "r8"
-  show R9  = "r9"
-  show R10 = "r10"
-  show R11 = "r11"
-  show R12 = "r12"
-  show SP  = "{sp}" -- R13 | Stack Pointer
-  show LR  = "{lr}" -- R14 | Link Register (which holds return addresses)
-  show PC  = "{pc}" -- R15 | Program Counter
-
-showRegs [] = ""
-showRegs rs = concat $ intersperse ", " $ map show rs
-
-
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-
--- The state
+-- The absolutely majestic ArmState
 data ArmState 
-  = ArmState { stackMap      :: Map.Map IdentName Int
-             , stackOffset   :: Int
-             , availableRegs :: [ Reg ]
-             , numJumpLabels :: Int
-             , dataLabels    :: [ Label ]
-             , predefLabels  :: [ Label ]
-             }
+  = ArmState
+  -- Maps identifier names to the register they are currently in
+  { stackMap      :: Map.Map IdentName (Reg, Int) -- TODO it's not int
+  -- This is how much space has been reserved on the stack for the current scope
+  , stackOffset   :: Int
+  -- The list of register that are avaialable and are free to be used
+  , availableRegs :: [ Reg ]
+  -- TODO: Comment
+  , numJumpLabels :: Int
+  -- TODO: Comment
+  , dataLabels    :: [ Label ]
+  -- TODO: Comment
+  , predefLabels  :: [ Label ]
+  } deriving (Eq)
 
-
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-
--- Labels 
-type LabelName = String
-data Label 
-  = JumpLabel   LabelName           -- Name of a label in ARM
-  | DataLabel   LabelName String    -- msg_i: label for strings
-  | PredefLabel LabelName [ Instr ] 
-
-
-instance Show Label where
-  show ( JumpLabel   l   ) = l 
-  show ( DataLabel   l _ ) = l 
-  show ( PredefLabel l _ ) = l
-
-
-
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-
--- Directives
+-- Assembly directives
 data Directive
   = Text
   | Data
-  | Global Label
+  | Global String
   | Ltorg
+  deriving (Eq)
 
+-- The name of a label is just a string in ARM
+type LabelName = String
 
-instance Show Directive where
-  show Text       = ".text"
-  show Data       = ".data"
-  show (Global l) = ".global " ++ show l
-  show Ltorg      = "\t.ltorg"
+-- Label kinds 
+data Label 
+  = JumpLabel   LabelName           -- Name of a label in ARM
+  | DataLabel   LabelName String    -- msg_i: label for strings
+  | PredefLabel LabelName [ Instr ] -- TODO: Comment
+  deriving (Eq) 
 
+-- The registers of ARM11
+data Register
+  = R0 -- Result register or argument register
+  | R1 | R2 | R3 -- Function argument registers
+  | R4 | R5 | R6 | R7 | R8 | R9 | R10 | R11 | R12 -- General purpose registers
+  | SP -- R13 | Stack Pointer
+  | LR -- R14 | Link Register (which holds return addresses)
+  | PC -- R15 | Program Counter
+  deriving (Enum, Eq)
 
+-- Register type synonyms
+type Reg = Register
+type Rd  = Register
+type Rn  = Register
+type Rm  = Register
+type Rs  = Register
 
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- List of registers | <reglist> = {Ri, Rj, Rn, ...} 
+type RegList = [ Register ]
 
--- This is used as an operand in many instructions
-data Operand2
-  = Op2'ImmVal Imm8m -- Immediate value                              | #<imm8m>
-  | Op2'ImmChr Char  -- Char immediate value                         | #'c'
-  | Op2'Reg    Rm    -- Register                                     | Rm
-  | Op2'LSL    Rm Rs -- Register, logical    shift left  by register | Rm, LSL Rs
-  | Op2'LSR    Rm Rs -- Register, logical    shift right by register | Rm, LSR Rs
-  | Op2'ASR    Rm Rs -- Register, arithmetic shift right by register | Rm, ASR Rs
-  | Op2'ROR    Rm Rs -- Register, rotate           right by register | Rm, ROR Rs
-  | Op2'LSL'Sh Rm Sh -- Register, logical    shift left  by constant | Rm, LSL #<shift> | Allowed shifts 0-31
-  | Op2'LSR'Sh Rm Sh -- Register, logical    shift right by constant | Rm, LSR #<shift> | Allowed shifts 1-32
-  | Op2'ASR'Sh Rm Sh -- Register, arithmetic shift right by constant | Rm, ASR #<shift> | Allowed shifts 1-32
-  | Op2'ROR'Sh Rm Sh -- Register, rotate           right by constant | Rm, ROR #<shift> | Allowed shifts 1-31
-
--- A 32-bit constant, formed by right-rotating an 8-bit value by an even number of bits.
-type Imm8m = Int
-
--- Shift constant, whose range depends on the instruction it appears in
-type Sh = Int
-
-
-instance Show Operand2 where
-  show (Op2'ImmVal imm8m) = "#" ++ show imm8m     -- #<imm8m>
-  show (Op2'ImmChr c    ) = "#" ++ show c         -- #'c'
-  show (Op2'Reg    rm   ) = show rm               -- Rm
-  show (Op2'LSL    rm rs) = showOp2 rm "LSL "  rs -- Rm, LSL Rs
-  show (Op2'LSR    rm rs) = showOp2 rm "LSR "  rs -- Rm, LSR Rs
-  show (Op2'ASR    rm rs) = showOp2 rm "ASR "  rs -- Rm, ASR Rs
-  show (Op2'ROR    rm rs) = showOp2 rm "ROR "  rs -- Rm, ROR Rs
-  show (Op2'LSL'Sh rm sh) = showOp2 rm "LSL #" sh -- Rm, LSL #<shift> | Allowed shifts 0-31
-  show (Op2'LSR'Sh rm sh) = showOp2 rm "LSR #" sh -- Rm, LSR #<shift> | Allowed shifts 1-32
-  show (Op2'ASR'Sh rm sh) = showOp2 rm "ASR #" sh -- Rm, ASR #<shift> | Allowed shifts 1-32
-  show (Op2'ROR'Sh rm sh) = showOp2 rm "ROR #" sh -- Rm, ROR #<shift> | Allowed shifts 1-31
-
-showOp2             :: (Show a, Show b) => a -> String -> b -> String
-showOp2 op mne op'  =  show op ++ ", " ++ mne ++ show op'
-
-
-
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-
--- ARM11 instructions
+-- Look at all these instructions we can use!
 data Instr
 
   -- Arithemtics
   = ADD  Rd Rn Operand2 -- Add              | ADD{S} Rd, Rn, <Operand2> | Rd := Rn + Operand2
   | SUB  Rd Rn Operand2 -- Subtract         | SUB{S} Rd, Rn, <Operand2> | Rd := Rn – Operand2
-  | RSB  Rd Rn Operand2 -- Reverse Subrtract
-  | RSBS Rd Rn Operand2 -- Reverse Subtract & update flags
+  | RSB  Rd Rn Operand2 -- Reverse Subrtract TODO: Comment
+  | RSBS Rd Rn Operand2 -- Reverse Subtract & update flags TODO: Comment
   | MUL  Rd Rm Rs       -- Multiply         | MUL{S} Rd, Rm, Rs         | Rd := (Rm * Rs)[31:0]
   | MLA  Rd Rm Rs Rn    -- Mul & accumulate | MLA{S} Rd, Rm, Rs, Rn     | Rd := (Rn + (Rm * Rs))[31:0]
   | SDIV Rd Rn Rm       -- Divide signed    | SDIV   Rd, Rn, Rm         | Rd := Rn / Rm
   | UDIV Rd Rn Rm       -- Divide unsigned  | UDIV   Rd, Rn, Rm         | Rd := Rn / Rm
 
   -- Moving
-  | MOV     Rd Operand2     -- Move | MOV{S} Rd, <Operand2> | Rd := Operand2
-  | MOV'Reg Rd Rs           -- ... TODO:
-  | MOV'Chr Rd Char
+  | MOV     Rd Operand2 -- Move | MOV{S} Rd, <Operand2> | Rd := Operand2
+  | MOV'Reg Rd Rs       -- TODO: Comment
+  | MOV'Chr Rd Char     -- TODO: Comment
 
   -- Shifting
   | ASR    Rd Rm Rs     -- Arithmetic shift right by register | ASR{S} Rd, Rm, Rs | Rd := ASR(Rm, Rs)
@@ -185,8 +111,8 @@ data Instr
   -- Branching (jump)
   | B       Label  -- Branch                       | B        <label> | PC := label. label is this instruction ±32MB (T2: ±16MB, T: –252 - +256B)
   | BL      Label  -- Branch with link             | BL       <label> | LR := address of next instruction, PC := label. label is this instruction ±32MB (T2: ±16MB).
-  | BLVS    Label  -- Branch if overflow
-  | BEQ     Label
+  | BLVS    Label  -- Branch if overflow TODO: Comment
+  | BEQ     Label  -- TODO: Comment 
   | CBZ  Rn Label  -- Compare, branch if zero      | CBZ  Rn, <label> | If Rn == 0 then PC := label. label is (this instruction + 4-130).
   | CBNZ Rn Label  -- Compare, branch if non-zero  | CBNZ Rn, <label> | If Rn != 0 then PC := label. label is (this instruction + 4-130).
   | DEFINE  Label  -- This is NOT an ARM instruction -- It is just to tell where a label is defined
@@ -196,22 +122,99 @@ data Instr
   | POP  RegList  --  Pop  | PUSH <reglist> | <reglist> = {Ri, Rj, Rn,...}
 
   -- Load and Store
-  | LDR  Rd Integer    -- | LDR rd, =numeric constant
-  | STR  Rd Integer    -- |
-  | STRB Rd Integer    -- |
+  | LDR  Rd Int    -- LDR rd, =numeric constant TODO: Comment
+  | STR  Rd Int    -- TODO: Comment
+  | STRB Rd Int    -- TODO: Comment
 
-  | LDR'Lbl    Rd Label  -- | LDR rd, =label
-  | LDRNE'Lbl  Rd Label
-  | LDRNQ'Lbl  Rd Label
-  | STR'Lbl    Rd Label  -- |
-  | STRB'Lbl   Rd Label  -- |
+  | LDR'Lbl    Rd Label  -- LDR rd, =label TODO: Comment
+  | LDRNE'Lbl  Rd Label  -- TODO: Comment
+  | LDRNQ'Lbl  Rd Label  -- TODO: Comment
+  | STR'Lbl    Rd Label  -- TODO: Comment
+  | STRB'Lbl   Rd Label  -- TODO: Comment
 
-  | LDR'Reg  Rd Rd
-  | STR'Reg  Rd Rd     -- |
-  | STRB'Reg Rd Rd     -- |
+  | LDR'Reg  Rd Rd     -- TODO: Comment
+  | STR'Reg  Rd Rd     -- TODO: Comment
+  | STRB'Reg Rd Rd     -- TODO: Comment
+
+  | LDR'Off  Rd Rd Int -- TODO: Comment
+  | STR'Off  Rd Rd Int -- TODO: Comment
+  | STRB'Off Rd Rd Int -- TODO: Comment
 
   -- Directive
-  | INDIR Directive
+  | INDIR Directive -- TODO: Comment Do we need this?
+  deriving (Eq)
+
+-- This is used as an operand in many instructions
+data Operand2
+  = Op2'ImmVal Imm8m -- Immediate value                              | #<imm8m>
+  | Op2'ImmChr Char  -- Char immediate value                         | #'c'
+  | Op2'Reg    Rm    -- Register                                     | Rm
+  | Op2'LSL    Rm Rs -- Register, logical    shift left  by register | Rm, LSL Rs
+  | Op2'LSR    Rm Rs -- Register, logical    shift right by register | Rm, LSR Rs
+  | Op2'ASR    Rm Rs -- Register, arithmetic shift right by register | Rm, ASR Rs
+  | Op2'ROR    Rm Rs -- Register, rotate           right by register | Rm, ROR Rs
+  | Op2'LSL'Sh Rm Sh -- Register, logical    shift left  by constant | Rm, LSL #<shift> | Allowed shifts 0-31
+  | Op2'LSR'Sh Rm Sh -- Register, logical    shift right by constant | Rm, LSR #<shift> | Allowed shifts 1-32
+  | Op2'ASR'Sh Rm Sh -- Register, arithmetic shift right by constant | Rm, ASR #<shift> | Allowed shifts 1-32
+  | Op2'ROR'Sh Rm Sh -- Register, rotate           right by constant | Rm, ROR #<shift> | Allowed shifts 1-31
+  deriving (Eq)
+
+-- A 32-bit constant, formed by right-rotating an 8-bit value by an even number of bits.
+type Imm8m = Int
+
+-- Shift constant, whose range depends on the instruction it appears in
+type Sh = Int
+
+-- ************************************************************************** --
+-- **************************                         *********************** --
+-- **************************     Show Instances      *********************** --
+-- **************************                         *********************** -- 
+-- ************************************************************************** --
+
+instance Show Register where
+  show R0  = "r0"
+  show R1  = "r1"
+  show R2  = "r2"
+  show R3  = "r3"
+  show R4  = "r4"
+  show R5  = "r5"
+  show R6  = "r6"
+  show R7  = "r7"
+  show R8  = "r8"
+  show R9  = "r9"
+  show R10 = "r10"
+  show R11 = "r11"
+  show R12 = "r12"
+  show SP  = "{sp}" -- R13 | Stack Pointer
+  show LR  = "{lr}" -- R14 | Link Register (which holds return addresses)
+  show PC  = "{pc}" -- R15 | Program Counter
+
+instance Show Directive where
+  show Text       = ".text"
+  show Data       = ".data"
+  show (Global l) = ".global " ++ l
+  show Ltorg      = "\t.ltorg"
+
+instance Show Label where
+  show ( JumpLabel   l   ) = l 
+  show ( DataLabel   l _ ) = l 
+  show ( PredefLabel l _ ) = l
+
+instance Show Operand2 where
+  show (Op2'ImmVal imm8m) = "#" ++ show imm8m     -- #<imm8m>
+  show (Op2'ImmChr c    ) = "#" ++ show c         -- #'c'
+  show (Op2'Reg    rm   ) = show rm               -- Rm
+  show (Op2'LSL    rm rs) = showOp2 rm "LSL "  rs -- Rm, LSL Rs
+  show (Op2'LSR    rm rs) = showOp2 rm "LSR "  rs -- Rm, LSR Rs
+  show (Op2'ASR    rm rs) = showOp2 rm "ASR "  rs -- Rm, ASR Rs
+  show (Op2'ROR    rm rs) = showOp2 rm "ROR "  rs -- Rm, ROR Rs
+  show (Op2'LSL'Sh rm sh) = showOp2 rm "LSL #" sh -- Rm, LSL #<shift> | Allowed shifts 0-31
+  show (Op2'LSR'Sh rm sh) = showOp2 rm "LSR #" sh -- Rm, LSR #<shift> | Allowed shifts 1-32
+  show (Op2'ASR'Sh rm sh) = showOp2 rm "ASR #" sh -- Rm, ASR #<shift> | Allowed shifts 1-32
+  show (Op2'ROR'Sh rm sh) = showOp2 rm "ROR #" sh -- Rm, ROR #<shift> | Allowed shifts 1-31
+
+showOp2             :: (Show a, Show b) => a -> String -> b -> String
+showOp2 op mne op'  =  show op ++ ", " ++ mne ++ show op'
 
 
 instance Show Instr where
@@ -252,8 +255,8 @@ instance Show Instr where
 
     show (DEFINE l            ) = "\t" ++ show l 
 
-    show (PUSH   regs         ) = "\tPUSH "  ++ showRegs regs
-    show (POP    regs         ) = "\tPOP "   ++ showRegs regs
+    show (PUSH   regs         ) = "\tPUSH "  ++ intercalate ", " (map show regs) 
+    show (POP    regs         ) = "\tPOP "   ++ intercalate ", " (map show regs)
 
     show (LDR          rd n   ) = "\tLDR "   ++ show rd ++ ", =" ++ show n
     show (LDR'Lbl      rd l   ) = "\tLDR "   ++ show rd ++ ", =" ++ show l
@@ -261,15 +264,12 @@ instance Show Instr where
     show (LDRNQ'Lbl    rd l   ) = "\tLDRNQ " ++ show rd ++ ", =" ++ show l
     show (LDR'Reg      rd rs  ) = "\tLDR "   ++ show rd ++ ", = [" ++ show rs ++ " ]" 
 
-
-    show (STR    rd n         ) = "\tSTR "   ++ show rd ++ ", =" ++ show n
-    show (STRB   rd n         ) = "\tSTRB "  ++ show rd ++ ", =" ++ show n
+    show (STR       rd n      ) = "\tSTR "   ++ show rd ++ ", =" ++ show n
+    show (STRB      rd n      ) = "\tSTRB "  ++ show rd ++ ", =" ++ show n
     show (STR'Lbl   rd l      ) = "\tSTR "   ++ show rd ++ ", =" ++ show l
     show (STRB'Lbl  rd l      ) = "\tSTRB "  ++ show rd ++ ", =" ++ show l
     show (STR'Reg   rd rs     ) = "\tSTR "   ++ show rd ++ ", = [" ++ show rs ++ " ]" 
     show (STRB'Reg  rd rs     ) = "\tSTRB "  ++ show rd ++ ", = [" ++ show rs ++ " ]" 
 
-    show (INDIR     dir       ) = show dir    
-
-
+    show (INDIR       dir     ) = show dir    
 

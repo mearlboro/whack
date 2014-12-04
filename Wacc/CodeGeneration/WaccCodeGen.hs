@@ -6,11 +6,9 @@ import Wacc.Data.SymbolTable
 
 import qualified Data.Map as Map
 import Data.Array
-import Data.List ( intersperse )
+import Data.List (intersperse)
 import Data.Maybe
 import Data.Char
--- import Data.Tuple.Select ( sel3 )
-
 import Debug.Trace
 
 -- ************************************************************************** --
@@ -19,68 +17,51 @@ import Debug.Trace
 -- **************************                         *********************** -- 
 -- ************************************************************************** --
 
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+-- The trans____ family of functions will get the AST of a statement, 
+-- expression, or function, and an ARM state containing information about labels 
+-- and registers. It will then return the set of instructions and the updated 
+-- state wrapped in a tuple. 
+-- trans____ 
+--  :: *AST*         -- Func, Stat, Expr to be compiled
+--  -> ARMState      -- Describing the state before transforming
+--  -> ( ArmState  , -- Describing the new state 
+--       [ Instr ] ) -- The instructions compiled out of the input
+--
+-- Properties of trans____ : normal, deterministic, total {I like this}
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-transProgram :: Program        -- | The program Augmented AST
-             -> ( ArmState  ,  -- | Program state, to extract the string labels
-                  [ Instr ] )  -- | The instructions the program translates to
-transProgram (Program funcs body) 
-    = (s, instrs)
-      where
-        instrs 
-          =  [ DEFINE ( JumpLabel "main:" ) ]  -- Define main function label
-          ++ [ PUSH [ LR ]                  ]  -- Pushes the current return address onto the stack
-          ++ instrs'                           -- 
-          ++ [ LDR R0 0                     ]  -- 
-          ++ [ POP  [ PC ]                  ]  --
-          ++ [ INDIR Ltorg                  ] 
-        (s, instrs') = transStat body state0 
-        state0       = ArmState { stackMap      = Map.empty
-                                , stackOffset   = 0 
-                                , availableRegs = [R4 .. R10]
-                                , numJumpLabels = 0
-                                , dataLabels    = [] 
-                                , predefLabels  = []
-                                }
+transProgram 
+  :: Program   -- The program Augmented AST
+  -> (ArmState, [ Instr ]) -- The whole program translated into assembly
 
--- TODO rename lol
-makePretty :: ( ArmState, [ Instr ] ) -- computed by transProgram
-           ->   String                -- printable compiled program
-makePretty (s, instrs) 
-    =  show ( INDIR Data )  ++ "\n"
-    ++ concatMap putDataLabel ( dataLabels s )
-    ++ show ( INDIR Text )  ++ "\n"                  
-    ++ show ( INDIR ( Global ( JumpLabel "main" ) ) ) ++ "\n"
-    ++ ( concat $ intersperse "\n" $ map show instrs ) ++ "\n"
-    ++ concatMap putPredefLabel ( predefLabels s )
+transProgram (Program funcs body)  =  (s'', progInstrs)
+  where
+    -- Translate each functions 
+    (s', funcsInstrs)  =  transFuncs funcs state0
 
-      where
-        putDataLabel ( DataLabel l str ) 
-          =  l
-          ++ "\n\t.word " ++ show ( length str + 1 )
-          ++ "\n\t.ascii \"" ++ str  ++ "\\0\"\n"
+    -- Main body is executed in its own scope; discard final state
+    (s'', bodyInstrs)  =  transScoped body s'
 
-        putPredefLabel ( PredefLabel l instrs )
-          = ( concat $ intersperse "\n\t" $ map show instrs ) ++ "\n"
+    -- The whole program translated to assembly
+    progInstrs 
+      =  funcsInstrs
+      ++ [ DEFINE ( JumpLabel "main:" ) ]  -- Define main function label
+      ++ [ PUSH [ LR ]                  ]  -- Pushes the current return address onto the stack
+      ++ bodyInstrs                        -- TODO: Comment
+      ++ [ LDR R0 0                     ]  -- TODO: Comment
+      ++ [ POP  [ PC ]                  ]  -- TODO: Comment
+      ++ [ INDIR Ltorg                  ]  -- TODO: Comment
 
-nextLabel :: Int -> Label
-nextLabel i = JumpLabel $ "L" ++ show i
-
-
-
-
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
--- | The following transform functions will get the AST of a statement, expression,
---   or function and an ARM state containing information about labels and registers
---   It will return a set of instructions instead of the given piece of program and
---   an updated state wrapped in a tuple. 
---
--- trans____ :: *AST*      -- | Func, Stat, Expr to be compiled
---           -> ARMState   -- | Describing the state before transforming
---           -> ( ArmState  , -- | The instructions compiled out of the input
---                [ Instr ] ) -- | Describing the new state
-
--- properties of trans : normal, deterministic, total
+    -- The initial ArmState
+    state0 
+      = ArmState 
+      { stackMap      = Map.empty
+      , stackOffset   = 0 
+      , availableRegs = [R4 .. R10]
+      , numJumpLabels = 0
+      , dataLabels    = [] 
+      , predefLabels  = [] }
 
 -- ************************************************************************** --
 -- ***********************                            *********************** --
@@ -88,21 +69,32 @@ nextLabel i = JumpLabel $ "L" ++ show i
 -- ***********************                            *********************** -- 
 -- ************************************************************************** --
 
--- | 
-transFunc :: Func      -> ArmState
-          -> ( ArmState, [ Instr ] )
-              
-transFunc (Func ftype fname args body it) s 
-  = (s', functInstrs)
-    where
-      functInstrs       
-        =  [ DEFINE ( JumpLabel fname ) ]  -- Define label with unique function name 
-        ++ [ PUSH [ LR ]                ]  -- Pushes current return address onto stack                       
-        ++ bodyInstrs                      -- The instructions from the func body
-        ++ [ POP  [ PC ]                ]  -- Restore program counter from the stack
-      (s', bodyInstrs) = transStat body s
+transFunc :: Func -> ArmState -> (ArmState, [Instr])
+transFunc (Func ftype fname args body it) s  =  (s', functInstrs)
+  where 
+    -- Translate the function body in its own scope
+    (s', bodyInstrs)  =  transScoped body s
 
+    -- The whole function translated to assembly
+    functInstrs       
+      =  [ DEFINE ( JumpLabel fname ) ]  -- Define label with unique function name 
+      ++ [ PUSH [ LR ]                ]  -- Pushes current return address onto stack                       
+      ++ bodyInstrs                      -- The instructions from the func body
+      ++ [ POP  [ PC ]                ]  -- There is always a return statementa
+      ++ [ POP  [ PC ]                ]  -- Restore program counter from the stack
+      ++ [ INDIR Ltorg                ] 
 
+-- This is horrible and can be made into a one-liner. 
+-- Honor and Glory to whoever can do it
+transFuncs :: [ Func ] -> ArmState -> (ArmState, [Instr])
+transFuncs fs arm = transFuncs' fs (arm, [])
+  where
+    transFuncs' :: [ Func ] -> (ArmState, [Instr]) -> (ArmState, [ Instr ])
+    transFuncs' []      result   = result
+    transFuncs' (f:fs) (arm, is) = (arm'', is ++ is' ++ is'')
+      where
+        s@(arm', is') = transFunc  f arm
+        (arm'', is'') = transFuncs' fs s
 
 -- ************************************************************************** --
 -- ***********************                            *********************** --
@@ -112,19 +104,37 @@ transFunc (Func ftype fname args body it) s
 
 transStat :: Stat -> ArmState -> ( ArmState, [ Instr ] )
 
-transStat SkipStat s
-  = (s, [])
+--
+transStat SkipStat s = (s, [])
 
-transStat (FreeStat e it) s = error "FreeStat"
+-- 
+transStat (FreeStat e _) s = error "FreeStat"
 
-transStat (ExitStat e _) s 
-  = (s', exitInstrs)
-    where
-      (s', exprInstrs) = transExpr e s
-      exitInstrs       = exprInstrs ++ [ BL ( JumpLabel "exit" ) ]
+-- To exit we load the value of the expression into the first available reg
+-- and then move its value into register 0. then call BL exit  
+transStat (ExitStat expr _) s = (s', exitInstrs)
+  where
+    -- Obtain the register that the expression value will be saved into
+    (dst:_)  =  availableRegs s
+    -- Translate the expression to exit
+    (s', exprInstrs)  =  transExpr expr s
+    -- Instructions for the exit statement
+    exitInstrs         
+      =  exprInstrs 
+      ++ [ MOV R0 $ Op2'Reg dst  ] -- TODO: Comment
+      ++ [ BL (JumpLabel "exit") ] -- TODO: Comment
 
-transStat (ReturnStat e _) s = error "ReturnStat" 
-
+-- 
+transStat (ReturnStat expr _) s = (s', retInstrs)
+  where
+    -- Obtain the register that the expression value will be saved into
+    (dst:_)  =  availableRegs s
+    -- Translate the expression to return
+    (s', exprInstrs) = transExpr expr s 
+    -- Move result of expression from dst into return register R0
+    moveResult = [ MOV R0 $ Op2'Reg dst ] 
+    -- Instructions for the return statement
+    retInstrs = exprInstrs ++ moveResult
 
 -- TODO: to implement arrays, pairs (printing an address), identifiers 
 transStat (PrintStat e it) s
@@ -171,43 +181,125 @@ transStat (PrintStat e it) s
         strDataLabels  ls = let (l,  ls' ) = newDataLabel "%.*s"  ls  in
                             ls'
 
+--
+transStat (PrintlnStat e it) s = error "PrintlnStat"
 
-transStat (PrintlnStat e it) s  = error "PrintlnStat"
+-- 
+transStat (ScopedStat stat) s = transStat stat s
 
-transStat (ScopedStat stat) s
-  = transStat stat s
-
+-- 
 transStat (ReadStat lhs it) s = error "ReadStat" 
 
-transStat (WhileStat cond body it) s 
-  = (s'', whileInstrs)
+-- 
+transStat (WhileStat cond body it) s = (s''', whileInstr)
     where
-      label0             =  nextLabel i 
-      label1             =  nextLabel ( i + 1 )
-      i                  =  numJumpLabels s
-      (s'', condInstrs)  =  transExpr cond s'                
-      (s' , bodyInstr )  =  transStat body sBody
-      sBody              =  s { numJumpLabels = i + 2 }
-      whileInstrs        =  [ B label0      ]          
-                         ++ [ DEFINE label1 ]         
-                         ++ bodyInstr                 
-                         ++ [ DEFINE label0 ]         
-                         ++ condInstrs                 
-                         ++ [ CMP dst $ Op2'ImmVal 0 ] 
-                         ++ [ BEQ label1    ]
-      (dst:_)            =  availableRegs s 
+      -- Obtain next free label
+      currLabel = numJumpLabels s
+      -- We need 2 labels: one for the condition
+      condLabel = "while_cond_" ++ show currLabel
+      -- And one for the body
+      bodyLabel = "while_body_" ++ show (currLabel + 1)
+      -- Obtain the register that the cond expression value will be saved into
+      (dst:_) = availableRegs s
+      -- We have used up 2 labels so we need to update the state
+      s' = s { numJumpLabels = currLabel + 2 }
+      -- Now let's translate the loop condition expression with the new state
+      (s'', condInstrs) = transExpr cond s' 
+      -- Now for the body statements, which are scoped           
+      (s''', bodyInstrs) = transScoped body s''
+      -- Now concatenate everything together
+      whileInstr
+        =  [ B (JumpLabel condLabel)      ] -- TODO: Comment        
+        ++ [ DEFINE (JumpLabel bodyLabel) ] -- TODO: Comment       
+        ++ bodyInstrs                 
+        ++ [ DEFINE (JumpLabel condLabel) ] -- TODO: Comment       
+        ++ condInstrs               
+        ++ [ CMP dst $ Op2'ImmVal 0       ] 
+        ++ [ BEQ (JumpLabel bodyLabel)    ] -- TODO: Comment  
 
-transStat (SeqStat stat stat') s
-  = (s'', stat1Instr ++ stat2Instr)
-    where
-      (s' , stat1Instr) = transStat stat  s 
-      (s'', stat2Instr) = transStat stat' s'
+-- 
+transStat (SeqStat zun tak) s = (s'', zunInstrs ++ takInstrs)
+  where
+    (s', zunInstrs) = transStat zun s 
+    (s'', takInstrs) = transStat tak s'
 
-transStat (DeclareStat vtype vname rhs it) s = error "DeclareStat" 
+--
+transStat (DeclareStat vtype vname rhs it) s = (s''', declareInstrs)
+  where
+    -- Obtain the register that the rhs value will be saved into
+    (dst:_) = availableRegs s
+    -- Translate right hand side
+    (s', rhsInstrs) = transRhs rhs it s
+    -- How many bytes does this variable take up?
+    size = sizeOf vtype
+    -- Where is the current stack pointer with respect the free space on
+    -- the stack? This is how we find the location of the variable on the stack
+    offset = stackOffset s' - size -- Even s?
+    -- Update the stack offset 
+    s'' = s' { stackOffset = offset }
+    -- We want to remember where vname is on the stack 
+    -- Now remember the location of the variable on the stack
+    s''' = s'' { stackMap = Map.insert vname (SP, offset) (stackMap s'') }
+    -- We need to push the value in the dst reg onto the stack just cos
+    -- TODO optimize in case of 0 offset
+    pushDst = [ STR'Off dst SP offset ] -- [sp, #<off>] where 
+    -- The whole instruction
+    declareInstrs = rhsInstrs ++ pushDst
 
-transStat (AssignStat lhs rhs it) s =  error "AssignStat" 
+-- We are assigning a variable to a new value
+transStat (AssignStat (LhsIdent id) rhs it) s = (s', assignInstrs)
+  where
+    -- Obtain the register that the rhs value will be saved into
+    (dst:_) = availableRegs s
+    -- Generate instructions for the right hand side
+    (s', rhsInstrs) = transRhs rhs it s
+    -- So we want to copy whatever is now in the destination register, into
+    -- the register (or stack or whatever duuuude) where the variable @id@ is.
+    -- but how do we know this? we need the stackmap yeeeeey
+    -- This will need to change though when we use more than one register. cos
+    -- the variable might just be in a register and not somewhere on the stack
+    (src, off) = fromJust $ Map.lookup id (stackMap s') 
+    -- Now for the actual freaking instruction. TODO use STRB when needed
+    storeMe = [ STR'Off dst src off ] -- TODO use diff. instr. if off == 0
+    -- The final thing
+    assignInstrs = rhsInstrs ++ storeMe
 
-transStat (IfStat cond sthen selse it) s = error "IfStat" 
+-- 
+transStat (IfStat cond thens elses it) s = (s'''', ifInstrs)
+  where
+    -- Obtain next free label
+    currLabel = numJumpLabels s
+    -- We need 2 labels: one for the else branch
+    elseLabel = "if_else_" ++ show currLabel
+    -- And one for after the if
+    endifLabel = "if_end_" ++ show (currLabel + 1)
+    -- Obtain the register that the cond expression value will be saved into
+    (dst:_) = availableRegs s
+    -- We have used up 2 labels so we need to update the arm state
+    s' = s { numJumpLabels = currLabel + 2 }
+    -- Now let's translate the if condition expression
+    (s'', condInstrs) = transExpr cond s' 
+    -- Now for the then branch, in its own scope
+    (s''', thenInstrs) = transScoped thens s''
+    -- Now for the else branch, also in its own scope
+    (s'''', elseInstrs) = transScoped elses s'''
+    -- Now concatenate everything together
+    ifInstrs
+      =  condInstrs                        -- Do the condition      
+      ++ [ CMP dst $ Op2'ImmVal 0 ]        -- If condition false?
+      ++ [ BEQ (JumpLabel elseLabel) ]     -- If so go to else
+      ++ thenInstrs
+      ++ [ B (JumpLabel endifLabel) ]
+      ++ [ DEFINE (JumpLabel elseLabel) ]         
+      ++ elseInstrs
+      ++ [ DEFINE (JumpLabel endifLabel) ]
+
+
+-- ************************************************************************** --
+-- ***********************                            *********************** --
+-- ***********************         Printing           *********************** --
+-- ***********************                            *********************** -- 
+-- ************************************************************************** -- 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- | These functions will create the so-called predefLabels for print. They consist
@@ -262,21 +354,71 @@ strPrintPredef dataLabel ps
              ++ [ POP [ PC ] ] )
 
 
+-- ************************************************************************** --
+-- ***********************                            *********************** --
+-- ***********************    RHS & LHS Translation   *********************** --
+-- ***********************                            *********************** -- 
+-- ************************************************************************** --
+
+--transLhs :: AssignLhs -> [ Instr ] 
+--transLhs (LhsIdent id) = error "TODO"              
+--transLhs (LhsPairElem pelem) = error "TODO"                 
+--transLhs (LhsArrayElem (ArrayElem id exprs)) = error "TODO" 
+
+transRhs :: AssignRhs -> IdentTable -> ArmState -> (ArmState, [Instr])
+transRhs (RhsExpr       e            ) it arm = transExpr e arm          
+transRhs (RhsPairElem   (Fst e)      ) it arm = error "TODO"
+transRhs (RhsPairElem   (Snd e)      ) it arm = error "TODO"
+transRhs (RhsArrayLiter (exprs)      ) it arm = (finalArm, rhsInstr)
+  where
+    rhsInstr = malloc ++ exprsInstr ++ lengthInstr 
+    arrayLength = length exprs
+    arraySize   = sum (map (sizeOf . flip typeOfExpr it) exprs) + sizeOf (ArrayType {})
+    -- Allocate memeory on the heap
+    malloc = [ LDR R0 arraySize        ] ++ 
+             [ BL (JumpLabel "malloc") ] ++
+             [ MOV dst (Op2'Reg R0)    ]
+    (dst:nxt:_) = availableRegs arm
+    -- Add to heap each elem of the array 
+    (arm' , exprsInstr) = transArray exprs it arm 
+    -- Add the length of the array to the heap  
+    offset = stackOffset arm' - sizeOf (ArrayType {})
+    lengthInstr = [ LDR nxt arrayLength   ] ++ 
+                  [ STR'Reg nxt dst       ] ++ 
+                  [ STR'Off dst SP offset ]
+    finalArm = arm' { stackOffset = offset }
 
 
---transLHS :: AssignLhs -> [ Instr ] 
---transLHS (LhsIdent id) = error "TODO"              
---transLHS (LhsPairElem pelem) = error "TODO"                 
---transLHS (LhsArrayElem (ArrayElem id exprs)) = error "TODO" 
+transRhs (RhsNewPair    e e'         ) it arm = error "TODO"
+transRhs (RhsCall       fname  params) it arm = error "TODO"
 
-transRHS :: AssignRhs -> ArmState -> ( ArmState, [ Instr ])
-transRHS (RhsExpr e)           s = transExpr e s --provisory
-transRHS (RhsPairElem elem)    s = error "TODO" 
-transRHS (RhsArrayLiter arr)   s = error "TODO"
-transRHS (RhsNewPair e1 e2)    s = error "TODO"
-transRHS (RhsCall idName args) s = error "TODO"
+-- Translates an array 
+transArray :: [ Expr ] -> It -> ArmState -> (ArmState, [Instr])
+transArray es it arm = transArray' es 0 (arm, [])
+      where
+        transArray' :: [ Expr ] -> Int -> (ArmState, [Instr]) -> (ArmState, [ Instr ])
+        transArray' [] _ result            = result
+        transArray' (e:es) index (arm, is) = (arm'', is ++ is' ++ is'')
+          where
+            s@(arm', is') = transArrayElem e it index arm
+            (arm'', is'') = transArray' es (index+1) s
 
 
+--Translates an array elem 
+transArrayElem :: Expr -> It -> Int -> ArmState -> (ArmState, [Instr])
+transArrayElem e it index arm = (arm' { availableRegs = r } , exprInstr ++ storeInstr)
+    where
+        
+        r@(dst:nxt:regs) = availableRegs arm 
+
+        -- Translate the expression 
+        (arm', exprInstr) = transExpr e arm{availableRegs = nxt:regs}
+        -- At what index in the heap the elem is
+        -- +4 Beause the first 4 bytes are taken up by the length
+        offset = (index * (sizeOf (typeOfExpr e it))) + 4 -- MAGIC NUMBER NOOO 
+        storeInstr = if typeOfExpr e it == BoolType  -- TODO func for CHAR 
+                        then [STRB'Off nxt dst offset]
+                        else [STR'Off  nxt dst offset]  
 -- ************************************************************************** --
 -- ***********************                            *********************** --
 -- ***********************   Expression Translation   *********************** --
@@ -315,11 +457,11 @@ transExpr (CharLiterExpr c) s
 
 -- TODO! TEST!
 -- | Lookup what register variable @id@ is in, and copy its content in @dst@
-transExpr (IdentExpr id) s
-  = (s, [ LDR'Reg dst SP ] ++ [ MOV'Reg R0 dst ] ) -- TODO LOL
+transExpr (IdentExpr id) s = (s, pushDst) -- TODO LOL
     where
       (dst:_) = availableRegs s
-
+      (src, off) = fromJust $ Map.lookup id (stackMap s) 
+      pushDst = [ LDR'Off dst src off ] -- [sp, #<off>] where 
 
 -- | Evaluates the expression and places it in the destination regster @dst@,
 --   will perform  the unary operation on that reg 
@@ -339,7 +481,7 @@ transExpr PairLiterExpr s
 
 
 -- | TODO make ArrayElem a type synonym PLSSSSSSS
-transExpr (ArrayElemExpr (ArrayElem ident exprs)) s = error "ArrayElemExpr"  
+transExpr (ArrayElemExpr (ident, exprs)) s = error "ArrayElemExpr"  
 
 -- |
 transExpr (BinaryOperExpr op e e') s = error "BinaryOperExpr"  
@@ -389,14 +531,36 @@ transUnOp NegUnOp s
       (l:_)      =  dataLabels    s
       (dst:_)    =  availableRegs s
 
-----------------------------------------------------------------------------------
+-- ************************************************************************** --
+-- ***********************                            *********************** --
+-- ***********************     Statement Helpers      *********************** --
+-- ***********************                            *********************** -- 
+-- ************************************************************************** --
 
+-- | 
+transScoped          :: Stat -> ArmState -> (ArmState, [Instr])
+transScoped stat arm = (arm', editStack SUB ++ statInstr ++ editStack ADD)
+      where
+        -- Make room on the stack or free the stack
+        editStack :: (Rd -> Rn -> Operand2 -> Instr) -> [ Instr ]
+        editStack mne = 
+                   take chunks (cycle [ mne SP SP $ Op2'ImmVal 1024 ]) ++
+          if left == 0 then [] else [ mne SP SP $ Op2'ImmVal left ] 
 
+        -- Translate the statemente after reserving space on the stack
+        (arm', statInstr) = transStat stat arm { stackOffset = freeBytes }
+        -- Work out how many variables are declared in the scope of this 
+        -- statement.
+        freeBytes      = getBytesNeeded stat
+        -- Can only add and sub from sp in chunks of 1024
+        (chunks, left) = divMod freeBytes 1024 
 
+-- | Does the statement introduce variables in its scope?
+getBytesNeeded                            :: Stat -> Int -- In Bytes
+getBytesNeeded (SeqStat s s'           )  =  getBytesNeeded s + getBytesNeeded s'                   
+getBytesNeeded (DeclareStat vtype _ _ _)  =  sizeOf vtype
+getBytesNeeded _                          =  0 
 
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
--- TYPE OF EXPRESSION
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 sizeOf                :: Type -> Int  -- In bytes 
 sizeOf IntType        =  4                                 
 sizeOf BoolType       =  1                             
@@ -406,11 +570,11 @@ sizeOf (PairType  _)  =  4 -- Address
 sizeOf (ArrayType _)  =  4 -- Address                         
 sizeOf NullType       =  0 -- ?                                
 sizeOf EmptyType      =  0 -- ?
- 
+
 typeOfExpr                                        :: Expr -> It -> Type    
 typeOfExpr ( BoolLiterExpr     _            ) _   =  BoolType    
 typeOfExpr ( CharLiterExpr     _            ) _   =  CharType      
-typeOfExpr ( IdentExpr         id           ) it  =  fromJust (findType' id it)
+typeOfExpr ( IdentExpr         id           ) it  =  fromJust (findType' id it)       
 typeOfExpr ( UnaryOperExpr     NotUnOp  _   ) _   =  BoolType
 typeOfExpr ( UnaryOperExpr     LenUnOp  _   ) _   =  IntType
 typeOfExpr ( UnaryOperExpr     OrdUnOp  _   ) _   =  IntType
@@ -453,5 +617,35 @@ sizeOfType (PairType  _) = 4 -- Address
 sizeOfType (ArrayType _) = 4 -- Address                         
 sizeOfType NullType      = 0 -- ?                                
 sizeOfType EmptyType     = 0 -- ?
+
+
+-- ************************************************************************** --
+-- **************************                         *********************** --
+-- **************************   Code Prettification   *********************** --
+-- **************************                         *********************** -- 
+-- ************************************************************************** --
+
+-- TODO Do Not Rename 
+makePretty :: ( ArmState, [ Instr ] ) -- computed by transProgram
+           ->   String                -- printable compiled program
+makePretty (s, instrs) 
+    =  show ( INDIR Data )  ++ "\n"
+    ++ concatMap putDataLabel ( dataLabels s )
+    ++ show ( INDIR Text )  ++ "\n"                  
+    ++ show ( INDIR ( Global ( "main" ) ) ) ++ "\n"
+    ++ ( concat $ intersperse "\n" $ map show instrs ) ++ "\n"
+    ++ concatMap putPredefLabel ( predefLabels s )
+      where
+        putDataLabel ( DataLabel l str ) 
+          =  l
+          ++ "\n\t.word " ++ show ( length str + 1 )
+          ++ "\n\t.ascii \"" ++ str  ++ "\\0\"\n"
+
+        putPredefLabel ( PredefLabel l instrs )
+          = ( concat $ intersperse "\n\t" $ map show instrs ) ++ "\n"
+
+-- TODO move somewhere else
+nextLabel :: Int -> Label
+nextLabel i = JumpLabel $ "L" ++ show i
 
 

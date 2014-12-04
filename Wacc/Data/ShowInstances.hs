@@ -90,7 +90,7 @@ instance Show AssignLhs where
   show lhs = case lhs of
     LhsIdent     ident -> ident
     LhsPairElem  pElem -> show pElem
-    LhsArrayElem aElem -> show aElem
+    LhsArrayElem (id, es) -> show id ++ "[" ++ showMany es "][" ++ "]"
 
 instance Show AssignRhs where
   show rhs = case rhs of
@@ -121,10 +121,6 @@ instance Show PairElem where
     Fst e -> "fst " ++ show e
     Snd e -> "snd " ++ show e
 
--- | Array elements
-instance Show ArrayElem where
-  show ( ArrayElem ident exprs ) =
-    ident ++ "[" ++ showMany exprs "][" ++ "]"
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -139,7 +135,7 @@ instance Show Expr where
     IntLiterExpr      i       -> show i
     StrLiterExpr      s       -> show s
     PairLiterExpr             -> "null"
-    ArrayElemExpr     ae      -> show ae
+    ArrayElemExpr    (id, es) -> show id ++ "[" ++ showMany es "][" ++ "]"
     BinaryOperExpr    op e e' -> show e ++ " " ++ show op ++ " " ++ show e'
 
 -- | Operators
