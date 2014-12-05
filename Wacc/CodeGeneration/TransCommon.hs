@@ -99,16 +99,8 @@ typeOfExpr ( BinaryOperExpr    GEBinOp  _ _ ) _   =  BoolType
 typeOfExpr ( BinaryOperExpr    EqBinOp  _ _ ) _   =  BoolType
 typeOfExpr ( BinaryOperExpr    NEBinOp  _ _ ) _   =  BoolType   
 
+typeOfArrElem _ _ = EmptyType -- TODO
 
-typeOfArrElem :: ArrayElem -> It -> Type
-typeOfArrElem _ _ = NullType -- lazy to make it compile, irrelephant atm
---typeOfArrElem (id, es) it   = deepen (length es + 1) $ fromJust (findType' id it) 
---  where
---    deepen 0  t             =  t
---    deepen n (ArrayType t)  =  deepen (n-1) t
---    deepen _  t             =  t
-
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- Get the type of a pair element. We try to check the containing expression
 -- and it must be of type PairType. If it fails there's no type to return.
 -- Otherwise we can safely pattermatch on PairType and retrieve the pair
@@ -162,7 +154,7 @@ makePretty :: ( ArmState, [ Instr ] ) -- computed by transProgram
            ->   String                -- printable compiled program
 makePretty (s, instrs) 
     =  show ( INDIR Data )  ++ "\n"
-    ++ concatMap putDataLabel ( dataLabels s )
+    ++ concatMap putDataLabel ( reverse ( dataLabels s ) )
     ++ show ( INDIR Text )  ++ "\n"                  
     ++ show ( INDIR ( Global ( "main" ) ) ) ++ "\n"
     ++ ( concat $ intersperse "\n" $ map show instrs ) ++ "\n"
@@ -279,7 +271,7 @@ containsLabel name ls
   = or . map (==name) $ map labelName ls
 
 
--- TODO move somewhere else
+--
 nextLabel :: Int -> Label
 nextLabel i = JumpLabel $ "L" ++ show i
  

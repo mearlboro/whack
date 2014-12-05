@@ -112,12 +112,12 @@ transUnOp s OrdUnOp = (s, [])
 transUnOp s ChrUnOp = (s, []) 
 
 transUnOp s NegUnOp 
-  = (s, negUnOpInstrs)
+  = (s', negUnOpInstrs)
     where 
+      s'            = stateAddOverflowError s
       negUnOpInstrs =  [ RSBS dst dst $ Op2'ImmVal 0]  -- reverse subtract | dst := 0 - dst
-                    ++ [ BLVS $ l]     -- jumps to pThrow if overflow
-                                             -- |_Change this
-      (l:_)      =  dataLabels s
+                    ++ [ BLVS ( JumpLabel "p_throw_overflow_error") ]
+
       (dst:_)    =  freeRegs s
 
 
@@ -128,11 +128,19 @@ transBinOp :: Assembler BinaryOper
 transBinOp s AddBinOp 
   = ( s', instrs )
     where
-      s'       =  s { dataLabels = ls', predefLabels = ps' }
+      s'       = stateAddOverflowError s 
 
       instrs   =  ( [ ADDS r r r' ] 
                ++ [ BLVS ( JumpLabel "p_throw_overflow_error") ] )
       (r:r':_) =  freeRegs s
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- Adds the overflow error data and predef labels as needed for all integers
+stateAddOverflowError s 
+  = s { dataLabels = ls', predefLabels = ps' }
+
+    where
 
       (ls', ps') 
         = if not $ containsLabel "p_throw_overflow_error" ps 
