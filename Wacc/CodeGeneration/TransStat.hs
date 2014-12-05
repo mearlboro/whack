@@ -12,6 +12,7 @@ import Wacc.Data.DataTypes
 import qualified Data.Map   as Map (Map, insert, lookup, map)
 import           Data.Maybe        (fromJust)
 import           Data.List         (mapAccumL, mapAccumR) 
+import           Data.Tuple        (swap)
 
 -- ************************************************************************** --
 -- ***********************                            *********************** --
@@ -19,9 +20,10 @@ import           Data.List         (mapAccumL, mapAccumR)
 -- ***********************                            *********************** -- 
 -- ************************************************************************** --
 
+-- Generate instructions for a statement
 transStat :: Assembler Stat
 
---
+-- No much we can do with a skip statement
 transStat s SkipStat = (s, [])
 
 -- 
@@ -29,30 +31,24 @@ transStat s (FreeStat e _) = error "FreeStat"
 
 -- To exit we load the value of the expression into the first available reg
 -- and then move its value into register 0. then call BL exit  
-transStat s (ExitStat expr it) = (s', exitInstrs)
+transStat s (ExitStat e _) = (s', exitI)
   where
     -- Obtain the register that the expression value will be saved into
-    (dst:_)  =  freeRegs s
+    dst = head (freeRegs s)
     -- Translate the expression to exit
-    (s', exprInstrs)  =  transExpr s expr 
-    -- Instructions for the exit statement
-    exitInstrs         
-      =  exprInstrs 
-      ++ [ MOV R0 $ Op2'Reg dst  ] -- TODO: Comment
-      ++ [ BL (JumpLabel "exit") ] -- TODO: Comment
+    (s', exprI) = transExpr s e 
+    -- TODO: Comment
+    exitI = exprI ++ [ MOV'Reg R0 dst, BL (JumpLabel "exit") ]
 
 -- 
-transStat s (ReturnStat e it) = (s', return'is)
+transStat s (ReturnStat e _) = (s', returnI)
   where
     -- Obtain the register that the expression value will be saved into
-    (dst:_)  =  freeRegs s
+    dst = head (freeRegs s)
     -- Translate the expression to return
-    (s', expr'is) = transExpr s e 
+    (s', exprI) = transExpr s e 
     -- Move result of expression from dst into return register R0
-    move = [ MOV R0 $ Op2'Reg dst ] 
-    -- Instructions for the return statement
-    return'is = expr'is ++ move
-
+    returnI = exprI ++ [ MOV'Reg R0 dst ] 
 
 ---- TODO: to implement arrays, pairs (printing an address)
 transStat s (PrintStat e it) 
@@ -115,86 +111,73 @@ transStat s (ScopedStat stat) = transScoped s stat
 transStat s (ReadStat lhs it) = error "ReadStat" 
 
 -- 
-transStat s (WhileStat cond body it) = (s''', whileInstr)
+transStat s (WhileStat cond body _) = (s''', whileI)
     where
-      -- Obtain next free label
-      currLabel = numJumpLabels s
-      -- We need 2 labels: one for the condition
-      condLabel = "while_cond_" ++ show currLabel
+      -- Obtain the next free label
+      currL = numJumpLabels s
+      -- We need two labels: one for the condition
+      condL = "while_cond_" ++ show currL
       -- And one for the body
-      bodyLabel = "while_body_" ++ show (currLabel + 1)
+      bodyL = "while_body_" ++ show (currL + 1)
       -- Obtain the register that the cond expression value will be saved into
-      (dst:_) = freeRegs s
+      dst = head (freeRegs s)
       -- We have used up 2 labels so we need to update the state
-      s' = s { numJumpLabels= currLabel + 2 }
+      s' = s { numJumpLabels = currL + 2 }
       -- Now let's translate the loop condition expression with the new state
-      (s'', condInstrs) = transExpr s' cond 
+      (s'', condI) = transExpr s' cond 
       -- Now for the body statements, which are scoped           
-      (s''', bodyInstrs) = transScoped s'' body
+      (s''', bodyI) = transScoped s'' body
       -- Now concatenate everything together
-      whileInstr
-        =  [ B (JumpLabel condLabel)      ] -- TODO: Comment        
-        ++ [ DEFINE (JumpLabel bodyLabel) ] -- TODO: Comment       
-        ++ bodyInstrs                 
-        ++ [ DEFINE (JumpLabel condLabel) ] -- TODO: Comment       
-        ++ condInstrs               
-        ++ [ CMP dst $ Op2'ImmVal 0       ] 
-        ++ [ BEQ (JumpLabel bodyLabel)    ] -- TODO: Comment  
+      whileI =  
+        [ B (JumpLabel condL)      -- TODO: Comment        
+        , DEFINE (JumpLabel bodyL) -- TODO: Comment       
+        ] ++ bodyI ++              
+        [ DEFINE (JumpLabel condL) -- TODO: Comment       
+        ] ++ condI ++            
+        [ CMP dst $ Op2'ImmVal 0   
+        , BEQ (JumpLabel bodyL) ]  -- TODO: Comment  
 
--- 
-transStat s (SeqStat zun tak) = (s'', zunInstrs ++ takInstrs)
-  where
-    (s', zunInstrs) = transStat s zun  
-    (s'', takInstrs) = transStat s' tak 
+-- mapAccumL for the win
+transStat s (SeqStat x y) = let (s', iss) = mapAccumL transStat s [x, y] in (s', concat iss)
 
 --
-transStat s (DeclareStat vtype vname rhs it) = (s''', declareInstrs)
+transStat s (DeclareStat vtype vname rhs it) = (s''', declareI)
   where
     -- Obtain the register that the rhs value will be saved into
-    (dst:_) = freeRegs s
+    dst = head (freeRegs s)
     -- Translate right hand side
-    (s', rhsInstrs) = transRhs s (rhs, it) 
+    (s', rhsI) = transRhs s (rhs, it) 
     -- How many bytes does this variable take up?
     size = sizeOf vtype
-    -- Where is the current stack pointer with respect the free space on
-    -- the stack? This is how we find the location of the variable on the stack
-    offset = stackOffset s' - size -- Even s?
-    -- Update the stack offset 
+    -- Work out the stack offset for this variable
+    offset = stackOffset s' - size -- TODO: check s == s' here
+    -- Update the stack offset for the next declaration
     s'' = s' { stackOffset = offset }
-    -- We want to remember where vname is on the stack 
-    -- Now remember the location of the variable on the stack
-    newMap = Map.insert vname (SP, offset) (memoryMap s'')
-    s''' = s'' { memoryMap = newMap }
-    -- We need to push the value in the dst reg onto the stack just cos
-    -- TODO optimize in case of 0 offset
-    pushDst = [ strVar dst SP size offset ] -- [sp, #<off>] where 
-    -- The whole instruction
-    declareInstrs = rhsInstrs ++ pushDst
+    -- Now remember the location of vname in memory
+    s''' = insertLoc s'' vname (SP, offset)  -- TODO: check s == s'' here
+    -- We now need to push the value in dst reg onto the stack
+    declareI = rhsI ++ [ strVar dst SP size offset ]  
 
 -- We are assigning a variable to a new value
-transStat s (AssignStat (LhsIdent id) rhs it) = (s', assignInstrs)
+transStat s (AssignStat (LhsIdent id) rhs it) = (s', assignI)
   where
-    -- TODO magic constant 4
+    -- TODO
+    magic4 = 4
     -- Obtain the register that the rhs value will be saved into
-    (dst:_) = freeRegs s
+    dst = head (freeRegs s)
     -- Generate instructions for the right hand side
-    (s', rhsInstrs) = transRhs s (rhs, it) 
-    -- So we want to copy whatever is now in the destination register, into
-    -- the register (or stack or whatever duuuude) where the variable @id@ is.
-    -- but how do we know this? we need the stackmap yeeeeey
-    -- This will need to change though when we use more than one register. cos
-    -- the variable might just be in a register and not somewhere on the stack
-    (src, off) = fromJust $ Map.lookup id (memoryMap s) 
-    -- Now for the actual freaking instruction. TODO use STRB when needed
-    storeMe = [ strVar dst src 4 off ] -- TODO use diff. instr. if off == 0
-    -- The final thing
-    assignInstrs = rhsInstrs ++ storeMe
+    (s', rhsI) = transRhs s (rhs, it) 
+    -- Figure out where the variable is in memory
+    (src, off) = lookupLoc s' id  -- TODO check s == s' 
+    -- TODO comment
+    assignI = rhsI ++ [ strVar dst src magic4 off ]
 
-
--- We are assigning a variable to a new value
+-- We are assigning the first or second element of a pair to a new value
 transStat s (AssignStat (LhsPairElem pelem) rhs it) = (s', pelemInstr)
   where
+    -- Obtain the free registers
     (dst:nxt:_) = freeRegs s 
+    -- 
     (s', rhsInstrs) = transRhs s (rhs, it) 
     (rg, off) = fromJust (Map.lookup (getElemId pelem) (memoryMap s'))
 
@@ -221,42 +204,38 @@ transStat s (AssignStat (LhsPairElem pelem) rhs it) = (s', pelemInstr)
     getIdent                           _      =  Nothing
 
 
--- We are assigning a variable to a new value
---transStat (AssignStat (LhsArrayElem (id, exprs)) rhs it) = (s', pelemInstr)
---  where
-
+transStat s (AssignStat (LhsArrayElem (id, exprs)) rhs it) = error "TODO"
 
 
 -- 
-transStat s (IfStat cond thens elses it) = (s'''', ifInstrs)
+transStat s (IfStat cond thens elses it) = (s'''', ifI)
   where
     -- Obtain next free label
-    currLabel = numJumpLabels s
+    currL = numJumpLabels s
     -- We need 2 labels: one for the else branch
-    elseLabel = "if_else_" ++ show currLabel
+    elseL = "if_else_" ++ show currL
     -- And one for after the if
-    endifLabel = "if_end_" ++ show (currLabel + 1)
+    endifL = "if_end_" ++ show (currL + 1)
     -- Obtain the register that the cond expression value will be saved into
-    (dst:_) = freeRegs s
+    dst = head (freeRegs s)
     -- We have used up 2 labels so we need to update the arm state
-    s' = s { numJumpLabels = currLabel + 2 }
+    s' = s { numJumpLabels = currL + 2 }
     -- Now let's translate the if condition expression
-    (s'', condInstrs) = transExpr s' cond
-    -- Now for the then branch, in its own scope
-    (s''', thenInstrs) = transScoped s'' thens 
+    (s'', condI) = transExpr s' cond
+    -- Now for the then end else branch, in its own scope
+    (s''', thenI) = transScoped s'' thens 
     -- Now for the else branch, also in its own scope
-    (s'''', elseInstrs) = transScoped s'''' elses 
+    (s'''', elseI) = transScoped s'''' elses 
     -- Now concatenate everything together
-    ifInstrs
-      =  condInstrs                        -- Do the condition      
-      ++ [ CMP dst $ Op2'ImmVal 0 ]        -- If condition false?
-      ++ [ BEQ (JumpLabel elseLabel) ]     -- If so go to else
-      ++ thenInstrs
-      ++ [ B (JumpLabel endifLabel) ]
-      ++ [ DEFINE (JumpLabel elseLabel) ]         
-      ++ elseInstrs
-      ++ [ DEFINE (JumpLabel endifLabel) ]
-
+    ifI =  
+      condI ++                          
+      [ CMP dst $ Op2'ImmVal 0      -- If condition false?
+      , BEQ (JumpLabel elseL)       -- If so go to else
+      ] ++ thenI ++ 
+      [ B (JumpLabel endifL) 
+      , DEFINE (JumpLabel elseL)         
+      ] ++ elseI ++ 
+      [ DEFINE (JumpLabel endifL) ]
 
 
 -- ************************************************************************** --
