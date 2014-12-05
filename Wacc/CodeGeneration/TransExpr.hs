@@ -66,6 +66,10 @@ transExpr s (IdentExpr id) = (s, pushDst) -- TODO LOL
 transExpr s (ParenthesisedExpr e) 
   = transExpr s e 
 
+-- 
+transExpr s (UnaryOperExpr NegUnOp (IntLiterExpr i)) 
+  = transExpr s (IntLiterExpr (-i))
+
 -- | Evaluates the expression and places it in the destination regster @dst@,
 --   will perform  the unary operation on that reg 
 transExpr s (UnaryOperExpr op e)

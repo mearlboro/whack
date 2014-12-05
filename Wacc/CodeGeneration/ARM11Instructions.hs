@@ -186,8 +186,9 @@ data Instr
 
   | STR'Arg   Rd Rn Int
   | STRB'Arg  Rd Rn Int  
+
   -- Directive
-  | INDIR Directive -- TODO: Comment Do we need this?
+  | INDIR Directive -- TODO: Comment
   deriving (Eq)
 
 -- This is used as an operand in many instructions
@@ -332,15 +333,15 @@ instance Show Instr where
     show (STR'Lbl      rd l   ) = "\tSTR "   ++ show rd ++ ", =" ++ show l  
     show (STRB'Lbl     rd l   ) = "\tSTRB "  ++ show rd ++ ", =" ++ show l
 
-    show (LDR'Reg      rd rs   )   = "\tLDR "   ++ show rd ++ ", [" ++ show rs ++ "]" 
+    show (LDR'Reg      rd rs  ) = "\tLDR "   ++ show rd ++ ", [" ++ show rs ++ "]" 
     show (LDRSB'Reg    rd rs  ) = "\tLDRSB "   ++ show rd ++ ", [" ++ show rs ++ "]" 
-    show (STR'Reg      rd rs    )   = "\tSTR "   ++ show rd ++ ", [" ++ show rs ++ "]" 
-    show (STRB'Reg     rd rs  )   = "\tSTRB "  ++ show rd ++ ", [" ++ show rs ++ "]" 
+    show (STR'Reg      rd rs  ) = "\tSTR "   ++ show rd ++ ", [" ++ show rs ++ "]" 
+    show (STRB'Reg     rd rs  ) = "\tSTRB "  ++ show rd ++ ", [" ++ show rs ++ "]" 
 
-    show (LDR'Off  rd rn off  ) = "\tLDR "  ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]" -- TODO: Comment
-    show (LDRSB'Off  rd rn off  ) = "\tLDRSB "  ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]" -- TODO: Comment
-    show (STR'Off  rd rn off  ) = "\tSTR "  ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]" -- TODO: Comment
-    show (STRB'Off rd rn off  ) = "\tSTRB " ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]" -- TODO: Comment
+    show (LDR'Off   rd rn off ) = "\tLDR "  ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]" -- TODO: Comment
+    show (LDRSB'Off rd rn off ) = "\tLDRSB "  ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]" -- TODO: Comment
+    show (STR'Off   rd rn off ) = "\tSTR "  ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]" -- TODO: Comment
+    show (STRB'Off  rd rn off ) = "\tSTRB " ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]" -- TODO: Comment
 
     show (STR'Arg   rd rn off ) = "\tSTR "  ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]!" -- TODO: Comment
     show (STRB'Arg  rd rn off ) = "\tSTRB " ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]!" -- TODO: Comment 
