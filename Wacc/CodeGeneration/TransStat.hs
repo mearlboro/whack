@@ -58,16 +58,16 @@ transStat s (ReturnStat e it) = (s', return'is)
 transStat s (PrintStat e it) 
   = ( s'', instrs')
     where
-        -- The new state just updates the data labels
-        s''          = s' { dataLabels = ls', predefLabels = ps' }
+      -- The new state just updates the data labels
+      s''          = s' { dataLabels = ls', predefLabels = ps' }
 
 
-        -- First gets the instructions for the expr, then adds the print
-        instrs'      = instrs ++ [ MOV'Reg R0 dst ] ++ label
-        (s', instrs) = transExpr s e  
-        (dst:_)      = freeRegs s'
-        -- The print label/function called depends on the type
-        label        = case typeOfExpr e it of
+      -- First gets the instructions for the expr, then adds the print
+      instrs'      = instrs ++ [ MOV'Reg R0 dst ] ++ label
+      (s', instrs) = transExpr s e  
+      (dst:_)      = freeRegs s'
+      -- The print label/function called depends on the type
+      label        = case typeOfExpr e it of
                           IntType    -> [ BL $ JumpLabel "p_print_int"    ]
                           BoolType   -> [ BL $ JumpLabel "p_print_bool"   ]
                           CharType   -> [ BL $ JumpLabel "putchar"        ]
@@ -75,41 +75,41 @@ transStat s (PrintStat e it)
                           _          -> error "unimplemented print function"
 
 
-        ls  = dataLabels   s'
-        ps  = predefLabels s'
-        -- Updates the data and predef labels with the strings/instructions
-        (ls', ps') = case typeOfExpr e it of
-                       IntType    -> if not $ containsLabel "p_print_int" ps
-                                         then  
-                                             let ls''@(l:_)    = intDataLabels   ls   in 
-                                             let p             = intPrintPredef  l    in
-                                             (ls'', ps ++ p)
-                                         else (ls, ps)
-                       BoolType   -> if not $ containsLabel "p_print_bool" ps
-                                         then
-                                             let ls''@(l:l':_) = boolDataLabels  ls   in
-                                             let p             = boolPrintPredef l l' in
-                                             (ls'', ps ++ p)
-                                         else (ls, ps)
-                       StringType -> if not $ containsLabel "p_print_string" ps
-                                         then
-                                             let ls''@(l:_)    = strDataLabels   ls   in
-                                             let p             = strPrintPredef  l    in 
-                                             (ls'', ps ++ p)
-                                         else (ls, ps)
-                       _          -> (ls, ps)        
-
-        -- Generates the proper data labels for each type of the print param
-        intDataLabels  ls =           (newDataLabel "%d"    ls ):ls
-        boolDataLabels ls = let ls' = (newDataLabel "true"  ls ):ls     in
-                                      (newDataLabel "false" ls'):ls' 
-        strDataLabels  ls =           (newDataLabel "%.*s"  ls ):ls
+      ls  = dataLabels   s'
+      ps  = predefLabels s'
+      -- Updates the data and predef labels with the strings/instructions
+      (ls', ps') = case typeOfExpr e it of
+                        IntType    -> if not $ containsLabel "p_print_int" ps
+                                          then  
+                                              let ls''@(l:_)    = intDataLabels   ls   in 
+                                              let p             = intPrintPredef  l    in
+                                              (ls'', ps ++ p)
+                                          else (ls, ps)
+                        BoolType   -> if not $ containsLabel "p_print_bool" ps
+                                          then
+                                              let ls''@(l:l':_) = boolDataLabels  ls   in
+                                              let p             = boolPrintPredef l l' in
+                                              (ls'', ps ++ p)
+                                          else (ls, ps)
+                        StringType -> if not $ containsLabel "p_print_string" ps
+                                          then
+                                              let ls''@(l:_)    = strDataLabels   ls   in
+                                              let p             = strPrintPredef  l    in 
+                                              (ls'', ps ++ p)
+                                          else (ls, ps)
+                        _          -> (ls, ps)        
+ 
+      -- Generates the proper data labels for each type of the print param
+      intDataLabels  ls =           (newDataLabel "%d"    ls ):ls
+      boolDataLabels ls = let ls' = (newDataLabel "true"  ls ):ls
+                                 in (newDataLabel "false" ls'):ls' 
+      strDataLabels  ls =           (newDataLabel "%.*s"  ls ):ls
 
 --
 transStat s (PrintlnStat e it) = error "PrintlnStat"
 
 -- 
-transStat s (ScopedStat stat) = transScoped s stat 
+transStat s (ScopedStat stat) = transScoped s stat
 
 -- 
 transStat s (ReadStat lhs it) = error "ReadStat" 
