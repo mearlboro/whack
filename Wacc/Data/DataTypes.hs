@@ -191,6 +191,11 @@ instance Eq' Context where
   c           ~== c'          =  c == c'
 
 
+instance Eq' PairElem where
+  Fst _ ~== Fst _ = True 
+  Snd _ ~== Snd _ = True 
+  _     ~== _     = False 
+
 -- For show instances, see GrammarShowInstances
 
 

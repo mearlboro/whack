@@ -229,6 +229,26 @@ getPairElemType           :: PairElem -> It -> Maybe Type
 getPairElemType pElem it  =
   case pElem of
 
+    Fst expr -> getPairElemType' expr True  
+    Snd expr -> getPairElemType' expr False
+
+  where
+
+    getPairElemType' expr first = 
+      case getPairElemType'' expr of
+        Just (PairType (Just (ftype, stype))) -> Just $ if first then ftype else stype
+        _                                     -> Nothing
+
+    getPairElemType'' (IdentExpr       ident  ) = findType' ident it  
+    getPairElemType'' (ArrayElemExpr   arrelem) = getArrayElemType arrelem it 
+    getPairElemType''                        _  = Nothing 
+
+
+
+getPairTypeFromPairElem :: PairElem -> It -> Maybe Type 
+getPairTypeFromPairElem pElem it =
+  case pElem of
+
     Fst expr -> getPairElemType' expr fst
     Snd expr -> getPairElemType' expr snd
 
@@ -246,7 +266,7 @@ getPairElemType pElem it  =
 
     getPairElemType' expr which  =
 
-        if isJust pairIdent && isValidPair then obtainType else Nothing
+        if isValidPair then Just pairType else Nothing
 
       where
 
@@ -261,7 +281,6 @@ getPairElemType pElem it  =
                                    pairType  == NullType  ) &&
                                    pairCtx ~/= Function {}
 
-        obtainType            =  Just $ getType which pairType
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- Get the type of an array element.
