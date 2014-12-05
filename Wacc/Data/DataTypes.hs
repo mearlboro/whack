@@ -1,6 +1,8 @@
 module Wacc.Data.DataTypes where
 
-import Data.Map   ( Map (..)  )
+import qualified Data.Map as Map (Map)
+
+-- qualified remove objLoc
 
 -- ************************************************************************** --
 -- **************************                  ****************************** --
@@ -32,7 +34,7 @@ type ParamList = [ Param ]                       -- <param-list> ::= <param> (';
 
 data Param                                       -- <param> ::=
   = Param                                        -- <type> <ident>
-  { ptypeOf :: Type
+  { ptypeOf :: Type -- TODO
   , pnameOf :: IdentName
   } deriving ( Eq , Ord )
 
@@ -189,6 +191,11 @@ instance Eq' Context where
   c           ~== c'          =  c == c'
 
 
+instance Eq' PairElem where
+  Fst _ ~== Fst _ = True 
+  Snd _ ~== Snd _ = True 
+  _     ~== _     = False 
+
 -- For show instances, see GrammarShowInstances
 
 
@@ -202,8 +209,8 @@ instance Eq' Context where
 -- | General purpose symbol table
 data SymbolTable k a
   = Empty
-  | ST ( SymbolTable k a ) ( Map k a )
-  deriving ( Eq , Ord )
+  | ST ( SymbolTable k a ) ( Map.Map k a )
+  deriving ( Eq , Ord , Show )
 
 -- | An identifier table is a symbol table that maps identifier names to
 --   identifier objects. It may be empty or it may have: a dictionary (Map)
@@ -218,15 +225,19 @@ data Context
   = Variable
   | Function Func
   | Parameter
-  deriving ( Eq , Ord )
+  deriving ( Eq , Ord)
 
 -- | An identifier object has a type and the context it appears in
-type IdentObj = ( Type , Context )
+data IdentObj 
+  = IdentObj
+  { objType :: Type 
+  , objCtx  :: Context
+  } deriving (Eq, Ord)
 
 -- | Type synonym
 type It = IdentTable
 
 -- | A Dictionary maps names to identifier objects
-type Dictionary = Map IdentName IdentObj
+type Dictionary = Map.Map IdentName IdentObj
 
 
