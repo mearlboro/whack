@@ -165,22 +165,22 @@ transStat (PrintStat e it) s
         ps  = predefLabels s'
         -- Updates the data and ppredef labels with the strings/instructions
         (ls', ps') = case typeOfExpr e it of
-                       IntType    -> let ls''@(l:_)    = intDataLabels   ls      in 
-                                     let ps''          = intPrintPredef  l    ps in
-                                     (ls'', ps'')
-                       BoolType   -> let ls''@(l:l':_) = boolDataLabels  ls      in
-                                     let ps''          = boolPrintPredef l l' ps in
-                                     (ls'', ps'')
-                       StringType -> let ls''@(l:_)    = strDataLabels   ls      in
-                                     let ps''          = strPrintPredef  l    ps in 
-                                     (ls'', ps'')
+                       IntType    -> let ls''@(l:_)    = intDataLabels   ls   in 
+                                     let p             = intPrintPredef  l    in
+                                     (ls'', ps ++ p)
+                       BoolType   -> let ls''@(l:l':_) = boolDataLabels  ls   in
+                                     let p             = boolPrintPredef l l' in
+                                     (ls'', ps ++ p)
+                       StringType -> let ls''@(l:_)    = strDataLabels   ls   in
+                                     let p             = strPrintPredef  l    in 
+                                     (ls'', ps ++ p)
                        _          -> (ls, ps)        
 
         -- Generates the proper data labels for each type of the print param
-        intDataLabels  ls =           newDataLabel "%d"    ls 
-        boolDataLabels ls = let ls' = newDataLabel "true"  ls in
-                                      newDataLabel "false" ls' 
-        strDataLabels  ls =           newDataLabel "%.*s"  ls 
+        intDataLabels  ls =           (newDataLabel "%d"    ls ):ls
+        boolDataLabels ls = let ls' = (newDataLabel "true"  ls ):ls     in
+                                      (newDataLabel "false" ls'):ls' 
+        strDataLabels  ls =           (newDataLabel "%.*s"  ls ):ls
 
 --
 transStat (PrintlnStat e it) s = error "PrintlnStat"
@@ -389,9 +389,10 @@ transExpr (BoolLiterExpr b) s
 transExpr (StrLiterExpr str) s
   = (s', [ LDR'Lbl dst l ])
     where
-      (dst:_)  = availableRegs s
-      s'       = s { dataLabels = ls }
-      ls@(l:_) = newDataLabel str $ dataLabels s
+      (dst:_) = availableRegs s
+      s'      = s { dataLabels = l:ls }
+      ls      = dataLabels s
+      l       = newDataLabel str $ dataLabels s
 
 
 -- | Put the char @c@ into the destination reg @dst@
@@ -482,18 +483,25 @@ transBinOp :: BinaryOper -> ArmState -> ( ArmState, [ Instr ] )
 transBinOp AddBinOp s
   = ( s', instrs )
     where
-      s'       =  s { dataLabels = ls'', predefLabels = ps''' }
+      s'       =  s { dataLabels = ls', predefLabels = ps' }
 
       instrs   =  ( [ ADDS r r r' ] 
                ++ [ BLVS ( JumpLabel "p_throw_overflow_error") ] )
       (r:r':_) =  availableRegs s
-      
-      ps'''        = strPrintPredef l     ps''
-      ls''@(l:_)   = newDataLabel "%.*s"  ls' 
-      ps''         = runtErrPredef     ps'
-      (ls', ps' )  = ovfErrPredef  ls  ps
-      ls           = dataLabels    s
-      ps           = predefLabels  s
+
+      (ls', ps') 
+        = if not $ containsLabel "p_throw_overflow_error" ps 
+            then
+              let l        = newDataLabel   "%.*s" ls in  
+              let p        = strPrintPredef l         in 
+              let (l', p') = ovfErrPredef   (l:ls)    in
+              let p''      = runtErrPredef            in 
+              (l': l: ls, ps ++ p ++ p' ++ p'')
+            else
+              (ls,   ps)
+
+      ls           = dataLabels     s
+      ps           = predefLabels   s
 
 -- ************************************************************************** --
 -- ***********************                            *********************** --
@@ -507,8 +515,8 @@ transBinOp AddBinOp s
 --   but are defined as a sub-type of Label for logic convenience, and for easing 
 --   up their use in a BL instruction.
 
-intPrintPredef dataLabel ps
-  = ps ++ [ PredefLabel name instrs ]
+intPrintPredef dataLabel 
+  = [ PredefLabel name instrs ]
     where
       name   =  "p_print_int"                         
       instrs =  ( [ DEFINE $ JumpLabel name ] 
@@ -522,8 +530,8 @@ intPrintPredef dataLabel ps
              ++ [ POP [ PC ] ] )
 
 
-boolPrintPredef dataLabel1 dataLabel2 ps
-  = ps ++ [ PredefLabel name instrs ]
+boolPrintPredef dataLabel1 dataLabel2 
+  = [ PredefLabel name instrs ]
     where
       name   =  "p_print_bool"                         
       instrs =  ( [ DEFINE $ JumpLabel name ]
@@ -538,8 +546,8 @@ boolPrintPredef dataLabel1 dataLabel2 ps
              ++ [ POP [ PC ] ] )
 
 
-strPrintPredef dataLabel ps
-  = ps ++ [ PredefLabel name instrs ]
+strPrintPredef dataLabel
+  = [ PredefLabel name instrs ]
     where
       name   = "p_print_string"
       instrs =  ( [ DEFINE $ JumpLabel name ]
@@ -559,23 +567,23 @@ strPrintPredef dataLabel ps
 --   will print an error message and exit the program if necessary.
 
 -- Integer overflow error 
-ovfErrPredef ls ps
-  = (ls', ps ++ [ PredefLabel name instrs ])
+ovfErrPredef ls
+  = (ovfLbl, [ PredefLabel name instrs ])
     where
       -- Creates a data label for printing an overflow error -- TODO \n \0 label issue
-      ls'@(ovfLbl:_) =  newDataLabel ( "OverflowError: the result is too small/large" ++ 
-                                       "to store in a 4-byte signed-integer."          )
-                                     ls 
+      ovfLbl =  newDataLabel ( "OverflowError: the result is too small/large" ++ 
+                               " to store in a 4-byte signed-integer."         )
+                ls
       name   =  "p_throw_overflow_error"
       -- The set of instructions calls runtime error which exits the program
-      instrs =  ( [ DEFINE $ PredefLabel name [] ]
+      instrs =  ( [ DEFINE $ JumpLabel name ]
              ++ [ LDR'Lbl R0 ovfLbl ]
              ++ [ BL ( JumpLabel "p_throw_runtime_error" ) ] )
 
 
 -- Runtime error
-runtErrPredef ps 
-  = ps ++ [ PredefLabel name instrs ]
+runtErrPredef
+  = [ PredefLabel name instrs ]
     where
       name   = "p_throw_runtime_error"
       instrs =  ( [ DEFINE $ JumpLabel name ] 
@@ -587,13 +595,17 @@ runtErrPredef ps
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- | Create a new data label and return the list with the label added.
 newDataLabel str ls 
-  = (l:ls) 
+  = DataLabel lName str
     where 
-      l     = DataLabel lName str
       lName = "msg_" ++ ( show $ length ls )
 
+labelName :: Label -> LabelName
+labelName (JumpLabel   name  ) = name
+labelName (PredefLabel name _) = name
+labelName (DataLabel   name _) = name
 
-
+containsLabel name ps
+  = or . map (==name) $ map labelName ps
 
 -- ************************************************************************** --
 -- ***********************                            *********************** --
@@ -699,7 +711,9 @@ makePretty (s, instrs)
     ++ show ( INDIR ( Global ( "main" ) ) ) ++ "\n"
     ++ ( concat $ intersperse "\n" $ map show instrs ) ++ "\n"
     ++ concatMap putPredefLabel ( predefLabels s )
+
       where
+
         putDataLabel ( DataLabel l str ) 
           =  l
           ++ "\n\t.word " ++ show ( length str + 1 )
