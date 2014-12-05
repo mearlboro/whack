@@ -34,7 +34,7 @@ transStat s (ExitStat expr it) = (s', exitInstrs)
     -- Obtain the register that the expression value will be saved into
     (dst:_)  =  freeRegs s
     -- Translate the expression to exit
-    (s', exprInstrs)  =  transExpr s (expr, it) 
+    (s', exprInstrs)  =  transExpr s expr 
     -- Instructions for the exit statement
     exitInstrs         
       =  exprInstrs 
@@ -47,23 +47,24 @@ transStat s (ReturnStat e it) = (s', return'is)
     -- Obtain the register that the expression value will be saved into
     (dst:_)  =  freeRegs s
     -- Translate the expression to return
-    (s', expr'is) = transExpr s (e, it) 
+    (s', expr'is) = transExpr s e 
     -- Move result of expression from dst into return register R0
     move = [ MOV R0 $ Op2'Reg dst ] 
     -- Instructions for the return statement
     return'is = expr'is ++ move
 
--- TODO: to implement arrays, pairs (printing an address), identifiers 
+
+---- TODO: to implement arrays, pairs (printing an address)
 transStat s (PrintStat e it) 
   = ( s'', instrs')
     where
         -- The new state just updates the data labels
-        s''          = s' { dataLabels= ls', predefLabels= ps' }
+        s''          = s' { dataLabels = ls', predefLabels = ps' }
 
 
         -- First gets the instructions for the expr, then adds the print
         instrs'      = instrs ++ [ MOV'Reg R0 dst ] ++ label
-        (s', instrs) = transExpr s (e, it) 
+        (s', instrs) = transExpr s e  
         (dst:_)      = freeRegs s'
         -- The print label/function called depends on the type
         label        = case typeOfExpr e it of
@@ -76,27 +77,33 @@ transStat s (PrintStat e it)
 
         ls  = dataLabels   s'
         ps  = predefLabels s'
-        -- Updates the data and ppredef labels with the strings/instructions
+        -- Updates the data and predef labels with the strings/instructions
         (ls', ps') = case typeOfExpr e it of
-                       IntType    -> let ls''@(l:_)    = intDataLabels   ls      in 
-                                     let ps''          = intPrintPredef  l    ps in
-                                     (ls'', ps'')
-                       BoolType   -> let ls''@(l:l':_) = boolDataLabels  ls      in
-                                     let ps''          = boolPrintPredef l l' ps in
-                                     (ls'', ps'')
-                       StringType -> let ls''@(l:_)    = strDataLabels   ls      in
-                                     let ps''          = strPrintPredef  l    ps in 
-                                     (ls'', ps'')
+                       IntType    -> if not $ containsLabel "p_print_int" ps
+                                         then  
+                                             let ls''@(l:_)    = intDataLabels   ls   in 
+                                             let p             = intPrintPredef  l    in
+                                             (ls'', ps ++ p)
+                                         else (ls, ps)
+                       BoolType   -> if not $ containsLabel "p_print_bool" ps
+                                         then
+                                             let ls''@(l:l':_) = boolDataLabels  ls   in
+                                             let p             = boolPrintPredef l l' in
+                                             (ls'', ps ++ p)
+                                         else (ls, ps)
+                       StringType -> if not $ containsLabel "p_print_string" ps
+                                         then
+                                             let ls''@(l:_)    = strDataLabels   ls   in
+                                             let p             = strPrintPredef  l    in 
+                                             (ls'', ps ++ p)
+                                         else (ls, ps)
                        _          -> (ls, ps)        
 
         -- Generates the proper data labels for each type of the print param
-        intDataLabels  l= let (l,  ls' ) = newDataLabel "%d"    ls  in
-                            ls'
-        boolDataLabels l= let (l,  ls' ) = newDataLabel "true"  ls  in
-                            let (l', ls'') = newDataLabel "false" ls' in
-                            ls''
-        strDataLabels  l= let (l,  ls' ) = newDataLabel "%.*s"  ls  in
-                            ls'
+        intDataLabels  ls =           (newDataLabel "%d"    ls ):ls
+        boolDataLabels ls = let ls' = (newDataLabel "true"  ls ):ls     in
+                                      (newDataLabel "false" ls'):ls' 
+        strDataLabels  ls =           (newDataLabel "%.*s"  ls ):ls
 
 --
 transStat s (PrintlnStat e it) = error "PrintlnStat"
@@ -121,7 +128,7 @@ transStat s (WhileStat cond body it) = (s''', whileInstr)
       -- We have used up 2 labels so we need to update the state
       s' = s { numJumpLabels= currLabel + 2 }
       -- Now let's translate the loop condition expression with the new state
-      (s'', condInstrs) = transExpr s' (cond, it) 
+      (s'', condInstrs) = transExpr s' cond 
       -- Now for the body statements, which are scoped           
       (s''', bodyInstrs) = transScoped s'' body
       -- Now concatenate everything together
@@ -234,7 +241,7 @@ transStat s (IfStat cond thens elses it) = (s'''', ifInstrs)
     -- We have used up 2 labels so we need to update the arm state
     s' = s { numJumpLabels = currLabel + 2 }
     -- Now let's translate the if condition expression
-    (s'', condInstrs) = transExpr s' (cond, it)  
+    (s'', condInstrs) = transExpr s' cond
     -- Now for the then branch, in its own scope
     (s''', thenInstrs) = transScoped s'' thens 
     -- Now for the else branch, also in its own scope
@@ -251,102 +258,24 @@ transStat s (IfStat cond thens elses it) = (s'''', ifInstrs)
       ++ [ DEFINE (JumpLabel endifLabel) ]
 
 
-strVar :: Rn -> Rd -> Int -> Int -> Instr 
-strVar rd rn size off 
-  | size == 1 = if off == 0 then STRB'Reg rd rn else STRB'Off rd rn off
-  | otherwise = if off == 0 then STR'Reg rd rn else STR'Off rd rn off
-
-ldrVar :: Rn -> Rd -> Int -> Int -> Instr 
-ldrVar rd rn size off 
-  | size == 1 = if off == 0 then LDRSB'Reg rd rn else LDRSB'Off rd rn off
-  | otherwise = if off == 0 then LDR'Reg rd rn else LDR'Off rd rn off
-
-strArg :: Rn -> Rn -> Int -> Int -> Instr 
-strArg rd rn size off 
-  | size == 1 = STRB'Arg rd rn off 
-  | otherwise = STR'Arg rd rn off 
 
 -- ************************************************************************** --
 -- ***********************                            *********************** --
--- ***********************         Printing           *********************** --
--- ***********************                            *********************** -- 
--- ************************************************************************** -- 
-
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
--- | These functions will create the so-called predefLabels for print. They consist
---   of lists of instructions generated similarly to main and the other functions,
---   but are defined as a sub-type of Label for logic convenience, and for easing 
---   up their use in a BL instruction.
-
--- TODO: if is ident, add MOV r1 r0 after push
-intPrintPredef dataLabel ps
-  = ps ++ [ PredefLabel name instrs ]
-    where
-      name   =  "p_print_int"                         
-      instrs =  ( [ DEFINE $ PredefLabel name [] ] -- we don't need instructions here
-             ++ [ PUSH [ LR ] ]
-             ++ [ LDR'Lbl R0 dataLabel ]
-             ++ [ ADD R0 R0 $ Op2'ImmVal 4 ] 
-             ++ [ BL ( JumpLabel "printf" ) ]
-             ++ [ MOV R0 $ Op2'ImmVal 0 ]
-             ++ [ BL ( JumpLabel "fflush" ) ]
-             ++ [ POP [ PC ] ] )
-
-
-boolPrintPredef dataLabel1 dataLabel2 ps
-  = ps ++ [ PredefLabel name instrs ]
-    where
-      name   =  "p_print_bool"                         
-      instrs =  ( [ DEFINE $ PredefLabel name [] ]
-             ++ [ PUSH [ LR ] ]
-             ++ [ CMP R0 $ Op2'ImmVal 0 ]
-             ++ [ LDRNE'Lbl R0 dataLabel1 ]
-             ++ [ LDRNQ'Lbl R0 dataLabel2 ]
-             ++ [ ADD R0 R0 $ Op2'ImmVal 4  ]  -- How do we know it's 4?
-             ++ [ BL ( JumpLabel "printf" ) ]
-             ++ [ MOV R0 $ Op2'ImmVal 0 ]
-             ++ [ BL ( JumpLabel "fflush" ) ]
-             ++ [ POP [ PC ] ] )
-
-
-strPrintPredef dataLabel ps
-  = ps ++ [ PredefLabel name instrs ]
-    where
-      name = "p_print_string"
-      instrs =  ( [ DEFINE $ PredefLabel name [] ]
-             ++ [ PUSH [ LR ] ]
-             ++ [ LDR'Reg R1 R0 ]
-             ++ [ ADD R2 R0 $ Op2'ImmVal 4 ]
-             ++ [ LDR'Lbl R0 dataLabel ]
-             ++ [ ADD R0 R0$ Op2'ImmVal 4 ]
-             ++ [ BL ( JumpLabel "printf" ) ]
-             ++ [ MOV R0 $ Op2'ImmVal 0 ]
-             ++ [ BL ( JumpLabel "fflush" ) ]
-             ++ [ POP [ PC ] ] )
-
-
--- ************************************************************************** --
--- ***********************                            *********************** --
--- ***********************    RHS & LHS Translation   *********************** --
+-- ***********************       RHS Translation      *********************** --
 -- ***********************                            *********************** -- 
 -- ************************************************************************** --
-
-transLhs :: AssignLhs -> [ Instr ] 
-transLhs (LhsIdent id)              = error "TODO"              
-transLhs (LhsPairElem pelem)        = error "TODO"                 
-transLhs (LhsArrayElem (id, exprs)) = error "TODO" 
 
 --
 transRhs :: Assembler (AssignRhs, It)
 
 --
-transRhs s (RhsExpr e, it) = transExpr s (e, it)  
+transRhs s (RhsExpr e, it) = transExpr s e  
 
 --
 transRhs s (RhsPairElem (Fst e), it) = (s', pelemInstr)
   where
     (dst:_)          = freeRegs s
-    (s', exprInstrs) = transExpr s (e, it)
+    (s', exprInstrs) = transExpr s e
 
     PairType (Just (fstType, sndType)) = typeOfExpr e it 
     size = sizeOf fstType
@@ -362,7 +291,7 @@ transRhs s (RhsPairElem (Fst e), it) = (s', pelemInstr)
 transRhs s (RhsPairElem (Snd e), it) = (s', pelemInstr)
   where
     (dst:_) = freeRegs s
-    (s', exprInstrs) = transExpr s (e, it) 
+    (s', exprInstrs) = transExpr s e 
 
     PairType (Just (fstType, sndType)) = typeOfExpr e it 
     size = sizeOf sndType
@@ -386,7 +315,7 @@ transRhs arm (RhsArrayLiter (exprs), it) = (arm', rhsInstr)
              [ MOV dst (Op2'Reg R0)    ]
     (dst:nxt:_) = freeRegs arm
     -- Add to heap each elem of the array 
-    (arm' , exprsInstr) = transArray arm (exprs, it) 
+    (arm' , exprsInstr) = transArrayLitExpr arm (exprs, it) 
     -- Add the length of the array to the heap  
     --offset = stackOffset arm' - sizeOf (ArrayType {})
     lengthInstr = [ LDR nxt arrayLength   ] ++ 
@@ -423,8 +352,8 @@ transRhs s (RhsCall fname params, it) = (s', callInstrs)
     -- x = Expr 
     --transFuncts :: -> ParamList -> (ArmState, [[Instr]])
     (dst:_) = freeRegs s
-    -- Expresssion instructtion
-    (s', instrs) = mapAccumR (\_s _e -> transExpr _s (_e, it)) s (reverse params)
+    -- Expression instructtion
+    (s', instrs) = mapAccumR transExpr s (reverse params)
     -- Generate instructions to push params on the stack
     sizeOfExpr = sizeOf . flip typeOfExpr it -- ex
 
@@ -441,50 +370,6 @@ transRhs s (RhsCall fname params, it) = (s', callInstrs)
       ++ [ BL (JumpLabel ("f_" ++ fname ++ ":")) ]
       ++ (if totSize == 0 then [] else [ ADD SP SP $ Op2'ImmVal totSize ]) 
       ++ [ MOV'Reg dst R0 ] -- TODO
-
-
-type WhichOfTheTwo = Int 
-transPairElemExpr :: Assembler (Expr, It, WhichOfTheTwo) 
-transPairElemExpr s (expr, it, wott) = (s' { freeRegs = rs }, instr)
-  where 
-    rs@(dst:nxt:regs) = freeRegs s 
-    (s', exprInstr) = transExpr s { freeRegs = nxt:regs } (expr, it) 
-    size = (sizeOf (typeOfExpr expr it))
-    instr 
-      =  exprInstr 
-      ++ [ LDR R0 size             ] 
-      ++ [ BL (JumpLabel "malloc") ]
-      ++ [ strVar nxt R0 size 0    ]
-      ++ [ strVar R0 dst 4 (wott * 4) ]
-  
-
--- Translates an array 
-transArray :: Assembler ([ Expr ], It)
-transArray arm (es, it) = transArray' es 0 (arm, [])
-      where
-        transArray' :: [ Expr ] -> Int -> (ArmState, [Instr]) -> (ArmState, [ Instr ])
-        transArray' [] _ result            = result
-        transArray' (e:es) index (arm, is) = (arm'', is ++ is'')
-          where
-            s@(arm', _is') = transArrayElem arm (e, it, index) 
-            (arm'', is'') = transArray' es (index+1) s
-
-
---Translates an array elem 
-transArrayElem :: Assembler (Expr, It, Int) 
-transArrayElem arm (e, it, index) = (arm' { freeRegs= r } , exprInstr ++ storeInstr)
-    where
-        
-        r@(dst:nxt:regs) = freeRegs arm 
-
-        -- Translate the expression 
-        (arm', exprInstr) = transExpr arm{freeRegs = nxt:regs} (e, it)
-        -- At what index in the heap the elem is
-        -- +4 Beause the first 4 bytes are taken up by the length
-        offset = (index * (sizeOf (typeOfExpr e it))) + 4 -- MAGIC NUMBER NOOO 
-        storeInstr = if typeOfExpr e it == BoolType  -- TODO func for CHAR 
-                        then [STRB'Off nxt dst offset]
-                        else [STR'Off  nxt dst offset]  
 
 -- ************************************************************************** --
 -- ***********************                            *********************** --

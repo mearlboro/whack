@@ -10,6 +10,28 @@ import Data.List  (intersperse)
 
 -- ************************************************************************** --
 -- **************************                         *********************** --
+-- **************************        Helpers          *********************** --
+-- **************************                         *********************** -- 
+-- ************************************************************************** --
+
+strVar :: Rn -> Rd -> Int -> Int -> Instr 
+strVar rd rn size off 
+  | size == 1 = if off == 0 then STRB'Reg rd rn else STRB'Off rd rn off
+  | otherwise = if off == 0 then STR'Reg rd rn else STR'Off rd rn off
+
+ldrVar :: Rn -> Rd -> Int -> Int -> Instr 
+ldrVar rd rn size off 
+  | size == 1 = if off == 0 then LDRSB'Reg rd rn else LDRSB'Off rd rn off
+  | otherwise = if off == 0 then LDR'Reg rd rn else LDR'Off rd rn off
+
+strArg :: Rn -> Rn -> Int -> Int -> Instr 
+strArg rd rn size off 
+  | size == 1 = STRB'Arg rd rn off 
+  | otherwise = STR'Arg rd rn off 
+
+
+-- ************************************************************************** --
+-- **************************                         *********************** --
 -- **************************       Common Utils      *********************** --
 -- **************************                         *********************** -- 
 -- ************************************************************************** --
@@ -129,6 +151,12 @@ getArrayElemType ( ident , exprs ) it  =
     deepen n ( ArrayType t )  =  deepen ( n - 1 ) t
     deepen _   t              =  t
 
+-- ************************************************************************** --
+-- ***********************                            *********************** --
+-- ***********************       Prettification       *********************** -- 
+-- ***********************                            *********************** --
+-- ************************************************************************** -- 
+
 -- TODO Do Not Rename 
 makePretty :: ( ArmState, [ Instr ] ) -- computed by transProgram
            ->   String                -- printable compiled program
@@ -148,14 +176,110 @@ makePretty (s, instrs)
         putPredefLabel ( PredefLabel l instrs )
           = ( concat $ intersperse "\n\t" $ map show instrs ) ++ "\n"
 
+-- ************************************************************************** --
+-- ***********************                            *********************** --
+-- ***********************           Labels           *********************** -- 
+-- ***********************                            *********************** --
+-- ************************************************************************** -- 
 
---------------------------------------------------------------------------------
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- | These functions will create the so-called predefLabels for print. They consist
+--   of lists of instructions generated similarly to main and the other functions,
+--   but are defined as a sub-type of Label for logic convenience, and for easing 
+--   up their use in a BL instruction.
+
+intPrintPredef dataLabel 
+  = [ PredefLabel name instrs ]
+    where
+      name   =  "p_print_int"                         
+      instrs =  ( [ DEFINE $ JumpLabel name ] 
+             ++ [ PUSH [ LR ] ]
+             ++ [ MOV'Reg R1 R0 ]
+             ++ [ LDR'Lbl R0 dataLabel ]
+             ++ [ ADD R0 R0 $ Op2'ImmVal 4 ] 
+             ++ [ BL ( JumpLabel "printf" ) ]
+             ++ [ MOV R0 $ Op2'ImmVal 0 ]
+             ++ [ BL ( JumpLabel "fflush" ) ]
+             ++ [ POP [ PC ] ] )
+
+
+boolPrintPredef dataLabel1 dataLabel2 
+  = [ PredefLabel name instrs ]
+    where
+      name   =  "p_print_bool"                         
+      instrs =  ( [ DEFINE $ JumpLabel name ]
+             ++ [ PUSH [ LR ] ]
+             ++ [ CMP R0 $ Op2'ImmVal 0 ]
+             ++ [ LDRNE'Lbl R0 dataLabel1 ]
+             ++ [ LDRNQ'Lbl R0 dataLabel2 ]
+             ++ [ ADD R0 R0 $ Op2'ImmVal 4  ]  -- How do we know it's 4?
+             ++ [ BL ( JumpLabel "printf" ) ]
+             ++ [ MOV R0 $ Op2'ImmVal 0 ]
+             ++ [ BL ( JumpLabel "fflush" ) ]
+             ++ [ POP [ PC ] ] )
+
+
+strPrintPredef dataLabel
+  = [ PredefLabel name instrs ]
+    where
+      name   = "p_print_string"
+      instrs =  ( [ DEFINE $ JumpLabel name ]
+             ++ [ PUSH [ LR ] ]
+             ++ [ LDR'Reg R1 R0 ]
+             ++ [ ADD R2 R0 $ Op2'ImmVal 4 ]
+             ++ [ LDR'Lbl R0 dataLabel ]
+             ++ [ ADD R0 R0$ Op2'ImmVal 4 ]
+             ++ [ BL ( JumpLabel "printf" ) ]
+             ++ [ MOV R0 $ Op2'ImmVal 0 ]
+             ++ [ BL ( JumpLabel "fflush" ) ]
+             ++ [ POP [ PC ] ] )
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- | These functions will create the so-called predefLabels for errors. These funcs
+--   will print an error message and exit the program if necessary.
+
+-- Integer overflow error 
+ovfErrPredef ls
+  = (ovfLbl, [ PredefLabel name instrs ])
+    where
+      -- Creates a data label for printing an overflow error -- TODO \n \0 label issue
+      ovfLbl =  newDataLabel ( "OverflowError: the result is too small/large" ++ 
+                               " to store in a 4-byte signed-integer."         )
+                ls
+      name   =  "p_throw_overflow_error"
+      -- The set of instructions calls runtime error which exits the program
+      instrs =  ( [ DEFINE $ JumpLabel name ]
+             ++ [ LDR'Lbl R0 ovfLbl ]
+             ++ [ BL ( JumpLabel "p_throw_runtime_error" ) ] )
+
+
+-- Runtime error
+runtErrPredef
+  = [ PredefLabel name instrs ]
+    where
+      name   = "p_throw_runtime_error"
+      instrs =  ( [ DEFINE $ JumpLabel name ] 
+             ++ [ BL $ JumpLabel "p_print_string" ] 
+             ++ [ MOV R0 $ Op2'ImmVal (-1) ]
+             ++ [ BL ( JumpLabel "exit" )  ] )
+
 -- | Create a new data label and return the list with the label added.
 newDataLabel str ls 
-  = (l, ls ++ [l]) 
+  = DataLabel lName str
     where 
-      l     = DataLabel lName str
       lName = "msg_" ++ ( show $ length ls )
 
+labelName :: Label -> LabelName
+labelName (JumpLabel   name  ) = name
+labelName (PredefLabel name _) = name
+labelName (DataLabel   name _) = name
 
+-- 
+containsLabel name ls
+  = or . map (==name) $ map labelName ls
+
+
+-- TODO move somewhere else
+nextLabel :: Int -> Label
+nextLabel i = JumpLabel $ "L" ++ show i
  

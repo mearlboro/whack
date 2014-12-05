@@ -96,6 +96,7 @@ data Instr
 
   -- Arithemtics
   = ADD  Rd Rn Operand2 -- Add              | ADD{S} Rd, Rn, <Operand2> | Rd := Rn + Operand2
+  | ADDS Rd Rn Rs       -- Add              | ADD{S} Rd, Rn, Rs         | Rd := Rn + Rs
   | SUB  Rd Rn Operand2 -- Subtract         | SUB{S} Rd, Rn, <Operand2> | Rd := Rn – Operand2
   | RSB  Rd Rn Operand2 -- Reverse Subrtract TODO: Comment
   | RSBS Rd Rn Operand2 -- Reverse Subtract & update flags TODO: Comment
@@ -249,7 +250,8 @@ showOp2 op mne op'  =  show op ++ ", " ++ mne ++ show op'
 
 
 instance Show Instr where
-    show (ADD    rd rn  op2   ) = "\tADD "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
+    show (ADD    rd rn  op2   ) = "\tADD "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                  
+    show (ADDS   rd rn  rs    ) = "\tADD "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rs                     
     show (SUB    rd rn  op2   ) = "\tSUB "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
     show (MUL    rd rm  rs    ) = "\tMUL "   ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    
     show (MLA    rd rm  rs rn ) = "\tMLA "   ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs ++ ", " ++ show rn 

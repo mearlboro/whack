@@ -7,7 +7,9 @@ import System.FilePath.Posix
 
 import Wacc.Syntax.Parser
 import Wacc.Semantics.Checker
-import Wacc.CodeGeneration.WaccCodeGen
+import Wacc.CodeGeneration.TransProgram
+import Wacc.CodeGeneration.TransCommon (makePretty)
+
 -------------------------------------------------------------------------------
 
 -- |Runs the wacc compiler after checking argument validity.
@@ -77,5 +79,5 @@ check program = do
         putStrLn $ unlines errs
         exitWith $ ExitFailure 200
     else do
-        putStrLn $ makePretty $ transProgram program'
+        putStrLn $ makePretty $ evaluateProgram program'
         exitWith   ExitSuccess
