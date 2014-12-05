@@ -1,8 +1,15 @@
 module Wacc.CodeGeneration.ARM11Instructions where
 
-import Data.List (intersperse, intercalate)
+import qualified Data.Map as Map (Map, insert, lookup)
+import           Data.List       (intersperse, intercalate)
+import           Data.Maybe      (fromJust)
 
-import qualified Data.Map as Map
+-- Added Bytes type. Added Offset type.
+-- Changed stackMap to memoryMap
+-- added insertLoc and findLoc
+-- Changed availabeRegs to freeRegs (?)
+-- removed stackPointer from Arm
+-- added assembler a
 
 -- ************************************************************************** --
 -- **************************                         *********************** --
@@ -10,17 +17,25 @@ import qualified Data.Map as Map
 -- **************************                         *********************** -- 
 -- ************************************************************************** --
 
+-- For functions that translate some 'a' into assembly instructions from an
+-- initial state, returning the new updated state as well as the instructions
+type Assembler a = (ArmState -> a -> (ArmState, [ Instr ]))
+
+-- For when we need to work with bytes and memory
+type Bytes = Int 
+
+-- Offset value from a register in bytes
+type Offset = Bytes
+
 -- The absolutely majestic ArmState
 data ArmState 
   = ArmState
   -- Maps identifier names to the register they are currently in
-  { stackMap      :: Map.Map String (Reg, Int) -- TODO it's not int
+  { memoryMap     :: Map.Map String (Register, Offset) 
   -- This is how much space has been reserved on the stack for the current scope
   , stackOffset   :: Int
-  -- The freaking stack pointer man!
-  , stackPointer  :: Int 
   -- The list of register that are avaialable and are free to be used
-  , availableRegs :: [ Reg ]
+  , freeRegs      :: [ Register ]
   -- TODO: Comment
   , numJumpLabels :: Int
   -- TODO: Comment
@@ -28,6 +43,16 @@ data ArmState
   -- TODO: Comment
   , predefLabels  :: [ Label ]
   } deriving (Eq)
+
+-- Insert variable v into memory map of s at location m 
+insertLoc        :: ArmState -> String -> (Register, Int) -> ArmState
+insertLoc s v m  =  s { memoryMap = Map.insert v m (memoryMap s) } 
+
+-- Finds the location of v in memory map of s. Assumes v exists in the map
+lookupLoc      :: ArmState -> String -> (Register, Int)
+lookupLoc s v  =  fromJust $ Map.lookup v (memoryMap s)
+
+-- ************************************************************************** --
 
 -- Assembly directives
 data Directive
@@ -58,7 +83,6 @@ data Register
   deriving (Enum, Eq, Ord)
 
 -- Register type synonyms
-type Reg = Register
 type Rd  = Register
 type Rn  = Register
 type Rm  = Register

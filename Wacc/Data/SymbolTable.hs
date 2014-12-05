@@ -87,7 +87,7 @@ addObject name otype ctx table  =
     Empty        -> ST Empty $ insertIn empty
     ST encl dict -> ST encl  $ insertIn dict
   where
-    insertIn = insertWith onClash name $ IdentObj otype ctx (undefined, -1) 
+    insertIn = insertWith onClash name $ IdentObj otype ctx -- (undefined, -1) 
 
 -- | Handle case of re-declaration of a variable in the same scope
 onClash          :: ( IdentObj -> IdentObj -> IdentObj )
@@ -149,13 +149,13 @@ findContext'          :: IdentName -> It -> Maybe Context
 findContext' name it  =  objCtx <$> findIdent' name it
 
 
--- | Recursively finds the context of an identifier in the table provided
-findLocation          :: IdentName -> It -> (Reg, Int)
-findLocation name it  =  fromJust $ objLoc <$> findIdent name it
+---- | Recursively finds the context of an identifier in the table provided
+--findLocation          :: IdentName -> It -> (Reg, Int)
+--findLocation name it  =  fromJust $ objLoc <$> findIdent name it
 
--- | Recursively finds the context of an identifier in the table provided
-findLocation'          :: IdentName -> It -> (Reg, Int)
-findLocation' name it  =  fromJust $ objLoc <$> findIdent' name it
+---- | Recursively finds the context of an identifier in the table provided
+--findLocation'          :: IdentName -> It -> (Reg, Int)
+--findLocation' name it  =  fromJust $ objLoc <$> findIdent' name it
 
 
 -- | Does the identifier exist AND refer to a Function object?
