@@ -163,17 +163,26 @@ transStat (PrintStat e it) s
 
         ls  = dataLabels   s'
         ps  = predefLabels s'
-        -- Updates the data and ppredef labels with the strings/instructions
+        -- Updates the data and predef labels with the strings/instructions
         (ls', ps') = case typeOfExpr e it of
-                       IntType    -> let ls''@(l:_)    = intDataLabels   ls   in 
-                                     let p             = intPrintPredef  l    in
-                                     (ls'', ps ++ p)
-                       BoolType   -> let ls''@(l:l':_) = boolDataLabels  ls   in
-                                     let p             = boolPrintPredef l l' in
-                                     (ls'', ps ++ p)
-                       StringType -> let ls''@(l:_)    = strDataLabels   ls   in
-                                     let p             = strPrintPredef  l    in 
-                                     (ls'', ps ++ p)
+                       IntType    -> if not $ containsLabel "p_print_int" ps
+                                         then  
+                                             let ls''@(l:_)    = intDataLabels   ls   in 
+                                             let p             = intPrintPredef  l    in
+                                             (ls'', ps ++ p)
+                                         else (ls, ps)
+                       BoolType   -> if not $ containsLabel "p_print_bool" ps
+                                         then
+                                             let ls''@(l:l':_) = boolDataLabels  ls   in
+                                             let p             = boolPrintPredef l l' in
+                                             (ls'', ps ++ p)
+                                         else (ls, ps)
+                       StringType -> if not $ containsLabel "p_print_string" ps
+                                         then
+                                             let ls''@(l:_)    = strDataLabels   ls   in
+                                             let p             = strPrintPredef  l    in 
+                                             (ls'', ps ++ p)
+                                         else (ls, ps)
                        _          -> (ls, ps)        
 
         -- Generates the proper data labels for each type of the print param
@@ -604,8 +613,8 @@ labelName (JumpLabel   name  ) = name
 labelName (PredefLabel name _) = name
 labelName (DataLabel   name _) = name
 
-containsLabel name ps
-  = or . map (==name) $ map labelName ps
+containsLabel name ls
+  = or . map (==name) $ map labelName ls
 
 -- ************************************************************************** --
 -- ***********************                            *********************** --
