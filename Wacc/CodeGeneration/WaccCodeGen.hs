@@ -3,6 +3,7 @@ module Wacc.CodeGeneration.WaccCodeGen where
 import Wacc.CodeGeneration.ARM11Instructions
 import Wacc.Data.DataTypes
 import Wacc.Data.SymbolTable
+import Wacc.Semantics.Checker
 
 import qualified Data.Map as Map
 import Data.Array
@@ -25,12 +26,12 @@ import Data.Tuple (swap)
 --    , MOV'Reg R0 (-1) 
 --    , BL "exit" ]
 
---p_check_null_pointer 
---  = [ PUSH LR 
---    , CMP R0 0 
---    , LDREQ R0 "null_reference_error_msg"
---    , BLEQ "p_throw_runtime_error" 
---    , POP PC ]
+p_check_null_pointer 
+  = [ PUSH [ LR ] 
+    , CMP R0 $ Op2'ImmVal 0 
+    , LDREQ'Lbl R0 (JumpLabel "null_reference_error_msg")
+    , BLEQ (JumpLabel "p_throw_runtime_error") 
+    , POP [ PC ] ]
 
 -- The string label in .data that contains the message to print
 iPrintString :: String -> [ Instr ] 
@@ -304,6 +305,43 @@ transStat (AssignStat (LhsIdent id) rhs it) s = (s', assignInstrs)
     storeMe = [ strVar dst src 4 off ] -- TODO use diff. instr. if off == 0
     -- The final thing
     assignInstrs = rhsInstrs ++ storeMe
+
+
+-- We are assigning a variable to a new value
+transStat (AssignStat (LhsPairElem pelem) rhs it) s = (s', pelemInstr)
+  where
+    (dst:nxt:_) = availableRegs s 
+    (s', rhsInstrs) = transRhs rhs it s 
+    (rg, off) = fromJust (Map.lookup (getElemId pelem) (stackMap s'))
+
+    --PairType (Just (fstType, sndType)) = fromJust (getPairElemType pelem it) 
+    pelemType = fromJust $ getPairElemType pelem it
+
+    elemSize = sizeOf pelemType -- sizeOf $ if (pelem ~== Fst {}) then fstType else sndType
+    elemOff = if (pelem ~== Fst {}) then 0 else 4
+    pelemInstr 
+      =  rhsInstrs 
+      ++ [ ldrVar nxt rg 4 off ] 
+      ++ [ MOV'Reg R0 nxt ] -- check null
+      ++ [ BL (JumpLabel "p_check_null_pointer") ]
+      ++ [ ldrVar nxt nxt 4  elemOff ]
+      ++ [ strVar dst nxt elemSize 0 ]
+
+    getElemId :: PairElem -> IdentName
+    getElemId (Fst e) = fromJust $ getIdent e
+    getElemId (Snd e) = fromJust $ getIdent e
+
+    getIdent                                  :: Expr -> Maybe IdentName
+    getIdent ( IdentExpr       ident       )  =  Just ident
+    getIdent ( ArrayElemExpr ( ident , _ ) )  =  Just ident
+    getIdent                           _      =  Nothing
+
+
+-- We are assigning a variable to a new value
+--transStat (AssignStat (LhsArrayElem (id, exprs)) rhs it) s = (s', pelemInstr)
+--  where
+
+
 
 -- 
 transStat (IfStat cond thens elses it) s = (s'''', ifInstrs)
@@ -746,6 +784,8 @@ getBytesNeeded' s  =  snd $ getBytesNeeded'' s (False, 0)
     getBytesNeeded'' (_                      ) (_, acc)  =  (False, acc)             
 
 
+sizeOfExpr e it = sizeOf (typeOfExpr e it)
+
 sizeOf                :: Type -> Int  -- In bytes 
 sizeOf IntType        =  4                                 
 sizeOf BoolType       =  1                             
@@ -755,6 +795,7 @@ sizeOf (PairType  _)  =  4 -- Address
 sizeOf (ArrayType _)  =  4 -- Address                         
 sizeOf NullType       =  4 -- ?                                
 sizeOf EmptyType      =  0 -- ?
+
 
 typeOfExpr                                        :: Expr -> It -> Type    
 typeOfExpr ( BoolLiterExpr     _            ) _   =  BoolType    
