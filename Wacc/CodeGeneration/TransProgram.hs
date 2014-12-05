@@ -91,12 +91,12 @@ transFunc s (Func ftype fname params body it)  =  (s'', funcI)
 
     -- The instructions generated for this function
     funcI =  
-      [ DEFINE funcL -- Define label with unique function name 
-      , PUSH [ LR ]              -- Pushes current return address onto stack                       
-      ] ++ bodyI ++              -- The instructions from the func body
-      [ POP  [ PC ]              -- There is always a return statementa
-      , POP  [ PC ]              -- Restore program counter from the stack
-      , INDIR Ltorg ]            -- TODO: Comment           
+      [ DEFINE funcL  -- Define label with unique function name 
+      , PUSH [ LR ]   -- Pushes current return address onto stack                       
+      ] ++ bodyI ++   -- The instructions from the func body
+      [ POP  [ PC ]   -- There is always a return statementa
+      , POP  [ PC ]   -- Restore program counter from the stack
+      , INDIR Ltorg ] -- TODO: Comment           
 
 -- ************************************************************************** --
 

@@ -66,6 +66,10 @@ transExpr s (IdentExpr id) = (s, pushDst) -- TODO LOL
 transExpr s (ParenthesisedExpr e) 
   = transExpr s e 
 
+-- 
+transExpr s (UnaryOperExpr NegUnOp (IntLiterExpr i)) 
+  = transExpr s (IntLiterExpr (-i))
+
 -- | Evaluates the expression and places it in the destination regster @dst@,
 --   will perform  the unary operation on that reg 
 transExpr s (UnaryOperExpr op e)
@@ -112,15 +116,13 @@ transUnOp s OrdUnOp = (s, [])
 transUnOp s ChrUnOp = (s, []) 
 
 transUnOp s NegUnOp 
-  = (s, negUnOpInstrs)
+  = (s', negUnOpInstrs)
     where 
+      s'            = stateAddIntOverflowError s
       negUnOpInstrs =  [ RSBS dst dst $ Op2'ImmVal 0]  -- reverse subtract | dst := 0 - dst
-                    ++ [ BLVS $ l]     -- jumps to pThrow if overflow
-                                             -- |_Change this
-      (l:_)      =  dataLabels s
+                    ++ [ BLVS ( JumpLabel "p_throw_overflow_error") ]
+
       (dst:_)    =  freeRegs s
-
-
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- | Generate instructions for a unary operator
