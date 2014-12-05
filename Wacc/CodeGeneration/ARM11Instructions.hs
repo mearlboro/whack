@@ -1,8 +1,15 @@
 module Wacc.CodeGeneration.ARM11Instructions where
 
-import Data.List (intersperse, intercalate)
+import qualified Data.Map as Map (Map, insert, lookup)
+import           Data.List       (intersperse, intercalate)
+import           Data.Maybe      (fromJust)
 
-import qualified Data.Map as Map
+-- Added Bytes type. Added Offset type.
+-- Changed stackMap to memoryMap
+-- added insertLoc and findLoc
+-- Changed availabeRegs to freeRegs (?)
+-- removed stackPointer from Arm
+-- added assembler a
 
 -- ************************************************************************** --
 -- **************************                         *********************** --
@@ -10,17 +17,25 @@ import qualified Data.Map as Map
 -- **************************                         *********************** -- 
 -- ************************************************************************** --
 
+-- For functions that translate some 'a' into assembly instructions from an
+-- initial state, returning the new updated state as well as the instructions
+type Assembler a = (ArmState -> a -> (ArmState, [ Instr ]))
+
+-- For when we need to work with bytes and memory
+type Bytes = Int 
+
+-- Offset value from a register in bytes
+type Offset = Bytes
+
 -- The absolutely majestic ArmState
 data ArmState 
   = ArmState
   -- Maps identifier names to the register they are currently in
-  { stackMap      :: Map.Map String (Reg, Int) -- TODO it's not int
+  { memoryMap     :: Map.Map String (Register, Offset) 
   -- This is how much space has been reserved on the stack for the current scope
   , stackOffset   :: Int
-  -- The freaking stack pointer man!
-  , stackPointer  :: Int 
   -- The list of register that are avaialable and are free to be used
-  , availableRegs :: [ Reg ]
+  , freeRegs      :: [ Register ]
   -- TODO: Comment
   , numJumpLabels :: Int
   -- TODO: Comment
@@ -28,6 +43,16 @@ data ArmState
   -- TODO: Comment
   , predefLabels  :: [ Label ]
   } deriving (Eq)
+
+-- Insert variable v into memory map of s at location m 
+insertLoc        :: ArmState -> String -> (Register, Int) -> ArmState
+insertLoc s v m  =  s { memoryMap = Map.insert v m (memoryMap s) } 
+
+-- Finds the location of v in memory map of s. Assumes v exists in the map
+lookupLoc      :: ArmState -> String -> (Register, Int)
+lookupLoc s v  =  fromJust $ Map.lookup v (memoryMap s)
+
+-- ************************************************************************** --
 
 -- Assembly directives
 data Directive
@@ -40,10 +65,10 @@ data Directive
 -- The name of a label is just a string in ARM
 type LabelName = String
 
--- Label kinds 
+-- Label kinds -- TODO
 data Label 
   = JumpLabel   LabelName           -- Name of a label in ARM
-  | DataLabel   LabelName String    -- msg_i: label for strings
+  | DataLabel   LabelName   String  -- msg_i: label for strings
   | PredefLabel LabelName [ Instr ] -- TODO: Comment
   deriving (Eq) 
 
@@ -58,7 +83,6 @@ data Register
   deriving (Enum, Eq, Ord)
 
 -- Register type synonyms
-type Reg = Register
 type Rd  = Register
 type Rn  = Register
 type Rm  = Register
@@ -72,6 +96,7 @@ data Instr
 
   -- Arithemtics
   = ADD  Rd Rn Operand2 -- Add              | ADD{S} Rd, Rn, <Operand2> | Rd := Rn + Operand2
+  | ADDS Rd Rn Rs       -- Add              | ADD{S} Rd, Rn, Rs         | Rd := Rn + Rs
   | SUB  Rd Rn Operand2 -- Subtract         | SUB{S} Rd, Rn, <Operand2> | Rd := Rn – Operand2
   | RSB  Rd Rn Operand2 -- Reverse Subrtract TODO: Comment
   | RSBS Rd Rn Operand2 -- Reverse Subtract & update flags TODO: Comment
@@ -113,6 +138,7 @@ data Instr
   | BL      Label  -- Branch with link             | BL       <label> | LR := address of next instruction, PC := label. label is this instruction ±32MB (T2: ±16MB).
   | BLVS    Label  -- Branch if overflow TODO: Comment
   | BEQ     Label  -- TODO: Comment 
+  | BLEQ    Label 
   | CBZ  Rn Label  -- Compare, branch if zero      | CBZ  Rn, <label> | If Rn == 0 then PC := label. label is (this instruction + 4-130).
   | CBNZ Rn Label  -- Compare, branch if non-zero  | CBNZ Rn, <label> | If Rn != 0 then PC := label. label is (this instruction + 4-130).
   | DEFINE  Label  -- This is NOT an ARM instruction -- It is just to tell where a label is defined
@@ -129,6 +155,7 @@ data Instr
 
   | LDR'Lbl    Rd Label  -- LDR rd, =label TODO: Comment
   | LDRNE'Lbl  Rd Label  -- TODO: Comment
+  | LDREQ'Lbl  Rd Label
   | LDRNQ'Lbl  Rd Label  -- TODO: Comment
   | STR'Lbl    Rd Label  -- TODO: Comment
   | STRB'Lbl   Rd Label  -- TODO: Comment
@@ -223,7 +250,8 @@ showOp2 op mne op'  =  show op ++ ", " ++ mne ++ show op'
 
 
 instance Show Instr where
-    show (ADD    rd rn  op2   ) = "\tADD "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
+    show (ADD    rd rn  op2   ) = "\tADD "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                  
+    show (ADDS   rd rn  rs    ) = "\tADD "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rs                     
     show (SUB    rd rn  op2   ) = "\tSUB "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
     show (MUL    rd rm  rs    ) = "\tMUL "   ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    
     show (MLA    rd rm  rs rn ) = "\tMLA "   ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs ++ ", " ++ show rn 
@@ -255,6 +283,7 @@ instance Show Instr where
     show (B      l            ) = "\tB "     ++ show l
     show (BL     l            ) = "\tBL "    ++ show l
     show (BEQ    l            ) = "\tBEQ "   ++ show l
+    show (BLEQ   l            ) = "\tBLEQ "  ++ show l
     show (CBZ    rn l         ) = "\tCBZ "   ++ show rn ++ ", " ++ show l
     show (CBNZ   rn l         ) = "\tCBNZ "  ++ show rn ++ ", " ++ show l
     show (RSBS rd rn op2      ) = "\tRSBS "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2        
@@ -272,6 +301,7 @@ instance Show Instr where
 
     show (LDR'Lbl      rd l   ) = "\tLDR "   ++ show rd ++ ", =" ++ show l
     show (LDRNE'Lbl    rd l   ) = "\tLDRNE " ++ show rd ++ ", =" ++ show l
+    show (LDREQ'Lbl    rd l   ) = "\tLDREQ " ++ show rd ++ ", =" ++ show l
     show (LDRNQ'Lbl    rd l   ) = "\tLDRNQ " ++ show rd ++ ", =" ++ show l
     show (STR'Lbl      rd l   ) = "\tSTR "   ++ show rd ++ ", =" ++ show l  
     show (STRB'Lbl     rd l   ) = "\tSTRB "  ++ show rd ++ ", =" ++ show l

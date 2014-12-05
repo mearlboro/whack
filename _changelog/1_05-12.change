@@ -1,0 +1,22 @@
+
+* WaccCodeGen.hs has been split into TransCommon, TransStat, TransProgram, TransExpr
+
+- TransCommon.hs: * utility functions for translating statements and expressions 
+                  * helpers for generating instructions (strVar, ldrVar…)
+                  * functions to workout the type and the size in bytes of *things* 
+                  * makePretty
+                  * ALL DA LABELS and label creation utils
+                
+- TransProgram.hs: * assembleProgram & evaluateProgram, the two main translation functions to call from Main.hs
+ 
+- TransStat.hs: * transStat, transScoped: deals with translating statements
+
+- TransExpr.hs: * transExpr, transPairElemExpr, transArrayLitExpr
+
+* ARM11Instruction.hs: . now contains | type Assembler a = (ArmState -> a -> (ArmState, [ Instr ])
+		       . ArmState: availableReg -> freeRegs | stackMap -> memoryMap | stackPointer -> *removed*
+ 		       . All translation functions now use the ‘Assembler a’ type signature
+	               . added utility functions for the memoryMap (insertLoc, findLoc)
+
+* Main.hs: changed imports and transProg -> evaluateProgram
+
