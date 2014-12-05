@@ -195,7 +195,7 @@ intPrintPredef dataLabel
              ++ [ POP [ PC ] ] )
 
 
-boolPrintPredef dataLabel1 dataLabel2 
+boolPrintPredef dataLabel2 dataLabel1 
   = [ PredefLabel name instrs ]
     where
       name   =  "p_print_bool"                         

@@ -113,6 +113,12 @@ data Instr
   | MOV     Rd Operand2 -- Move | MOV{S} Rd, <Operand2> | Rd := Operand2
   | MOV'Reg Rd Rs       -- TODO: Comment
   | MOV'Chr Rd Char     -- TODO: Comment
+  | MOVLT   Rd Operand2 -- Move | MOV{S} Rd, <Operand2> | Rd := Operand2
+  | MOVLE   Rd Operand2 -- Move | MOV{S} Rd, <Operand2> | Rd := Operand2
+  | MOVGT   Rd Operand2 -- Move | MOV{S} Rd, <Operand2> | Rd := Operand2
+  | MOVGE   Rd Operand2 -- Move | MOV{S} Rd, <Operand2> | Rd := Operand2
+  | MOVEQ   Rd Operand2 -- Move | MOV{S} Rd, <Operand2> | Rd := Operand2
+  | MOVNE   Rd Operand2 -- Move | MOV{S} Rd, <Operand2> | Rd := Operand2
 
   -- Shifting
   | ASR    Rd Rm Rs     -- Arithmetic shift right by register | ASR{S} Rd, Rm, Rs | Rd := ASR(Rm, Rs)
@@ -129,13 +135,16 @@ data Instr
   | CMN Rn Operand2     -- Compare negative | CMN Rn, <Operand2> | Update CPSR flags on Rn + Operand2
 
   -- Logical
-  | TST Rn    Operand2  -- Test             | TST Rn,     <Operand2> | Update CPSR flags on Rn AND Operand2
-  | TEQ Rn    Operand2  -- Test equivalence | TEQ Rn,     <Operand2> | Update CPSR flags on Rn EOR Operand2
-  | AND Rd Rn Operand2  -- AND              | AND Rd, Rn, <Operand2> | Rd := Rn AND Operand2
-  | EOR Rd Rn Operand2  -- EOR              | EOR Rd, Rn, <Operand2> | Rd := Rn EOR Operand2
-  | ORR Rd Rn Operand2  -- ORR              | ORR Rd, Rn, <Operand2> | Rd := Rn OR Operand2
-  | ORN Rd Rn Operand2  -- ORN              | ORN Rd, Rn, <Operand2> | Rd := Rn OR NOT Operand2
-  | BIC Rd Rn Operand2  -- Bit Clear        | BIC Rd, Rn, <Operand2> | Rd := Rn AND NOT Operand2
+  | TST     Rn    Operand2  -- Test             | TST Rn,     <Operand2> | Update CPSR flags on Rn AND Operand2
+  | TEQ     Rn    Operand2  -- Test equivalence | TEQ Rn,     <Operand2> | Update CPSR flags on Rn EOR Operand2
+  | AND     Rd Rn Operand2  -- AND              | AND Rd, Rn, <Operand2> | Rd := Rn AND Operand2
+  | AND'Reg Rd Rn Rs        -- AND              | AND Rd, Rn, Rs         | Rd := Rn AND Rs
+  | EOR     Rd Rn Operand2  -- EOR              | EOR Rd, Rn, <Operand2> | Rd := Rn EOR Operand2
+  | EOR'Reg Rd Rn Rs        -- AND              | AND Rd, Rn, Rs         | Rd := Rn AND Rs
+  | ORR     Rd Rn Operand2  -- ORR              | ORR Rd, Rn, <Operand2> | Rd := Rn OR Operand2
+  | ORR'Reg Rd Rn Rs        -- AND              | AND Rd, Rn, Rs         | Rd := Rn AND Rs
+  | ORN     Rd Rn Operand2  -- ORN              | ORN Rd, Rn, <Operand2> | Rd := Rn OR NOT Operand2
+  | BIC     Rd Rn Operand2  -- Bit Clear        | BIC Rd, Rn, <Operand2> | Rd := Rn AND NOT Operand2
 
   -- Branching (jump)
   | B       Label  -- Branch                       | B        <label> | PC := label. label is this instruction ±32MB (T2: ±16MB, T: –252 - +256B)
@@ -267,6 +276,12 @@ instance Show Instr where
 
     show (MOV       rd  op2   ) = "\tMOV "   ++ show rd ++ ", " ++ show op2                                       
     show (MOV'Reg   rd  rs    ) = "\tMOV "   ++ show rd ++ ", " ++ show rs                                        
+    show (MOVLT     rd  op2   ) = "\tMOVLT " ++ show rd ++ ", " ++ show op2                                       
+    show (MOVGT     rd  op2   ) = "\tMOVGT " ++ show rd ++ ", " ++ show op2                                       
+    show (MOVLE     rd  op2   ) = "\tMOVLE " ++ show rd ++ ", " ++ show op2                                       
+    show (MOVGE     rd  op2   ) = "\tMOVGE " ++ show rd ++ ", " ++ show op2                                       
+    show (MOVEQ     rd  op2   ) = "\tMOVEQ " ++ show rd ++ ", " ++ show op2                                       
+    show (MOVNE     rd  op2   ) = "\tMOVNE " ++ show rd ++ ", " ++ show op2                                       
 
     show (ASR    rd rm  rs    ) = "\tASR "   ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    
     show (LSL    rd rm  rs    ) = "\tLSL "   ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    
@@ -277,15 +292,18 @@ instance Show Instr where
     show (LSR'Sh rd rm  sh    ) = "\tLSR "   ++ show rd ++ ", " ++ show rm  ++ ", " ++ show sh                    
     show (ROR'Sh rd rm  sh    ) = "\tROR "   ++ show rd ++ ", " ++ show rm  ++ ", " ++ show sh                    
 
-    show (CMP    rn op2       ) = "\tCMP "   ++ show rn ++ ", " ++ show op2                                       
-    show (CMN    rn op2       ) = "\tCMN "   ++ show rn ++ ", " ++ show op2                                       
-    show (TST    rn op2       ) = "\tTST "   ++ show rn ++ ", " ++ show op2                                       
-    show (TEQ    rn op2       ) = "\tTEQ "   ++ show rn ++ ", " ++ show op2                                       
-    show (AND    rd rn  op2   ) = "\tAND "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
-    show (EOR    rd rn  op2   ) = "\tEOR "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
-    show (ORR    rd rn  op2   ) = "\tORR "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
-    show (ORN    rd rn  op2   ) = "\tORN "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
-    show (BIC    rd rn  op2   ) = "\tBIC "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
+    show (CMP     rn op2       ) = "\tCMP "   ++ show rn ++ ", " ++ show op2                                       
+    show (CMN     rn op2       ) = "\tCMN "   ++ show rn ++ ", " ++ show op2                                       
+    show (TST     rn op2       ) = "\tTST "   ++ show rn ++ ", " ++ show op2                                       
+    show (TEQ     rn op2       ) = "\tTEQ "   ++ show rn ++ ", " ++ show op2                                       
+    show (AND     rd rn  op2   ) = "\tAND "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
+    show (AND'Reg rd rn  rs    ) = "\tAND "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rs                   
+    show (EOR     rd rn  op2   ) = "\tEOR "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
+    show (EOR'Reg rd rn  rs    ) = "\tEOR "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rs                   
+    show (ORR     rd rn  op2   ) = "\tORR "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
+    show (ORR'Reg rd rn  rs    ) = "\tORR "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rs                   
+    show (ORN     rd rn  op2   ) = "\tORN "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
+    show (BIC     rd rn  op2   ) = "\tBIC "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
 
     show (B      l            ) = "\tB "     ++ show l
     show (BL     l            ) = "\tBL "    ++ show l
