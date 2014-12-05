@@ -24,6 +24,7 @@ module Wacc.Data.SymbolTable
 ) where
 
 import Wacc.Data.DataTypes
+import Wacc.CodeGeneration.ARM11Instructions
 
 import Control.Applicative ( (<$>)                                      )
 import Data.Map            ( findWithDefault , Map (..) , insertWith
@@ -86,7 +87,7 @@ addObject name otype ctx table  =
     Empty        -> ST Empty $ insertIn empty
     ST encl dict -> ST encl  $ insertIn dict
   where
-    insertIn = insertWith onClash name ( otype , ctx )
+    insertIn = insertWith onClash name $ IdentObj otype ctx (undefined, -1) 
 
 -- | Handle case of re-declaration of a variable in the same scope
 onClash          :: ( IdentObj -> IdentObj -> IdentObj )
@@ -125,7 +126,7 @@ findEnclFunc                   :: It -> Maybe Func
 findEnclFunc      Empty         =  Nothing
 findEnclFunc ( ST Empty _    )  =  Nothing -- Global scope
 findEnclFunc ( ST encl  dict )  =
-  case filter ( ~== Function {} ) . map snd . map snd $ toList dict of
+  case filter ( ~== Function {} ) . map objCtx . map snd $ toList dict of
     []             -> findEnclFunc encl
     [ Function f ] -> Just f
     _              -> Nothing
@@ -133,19 +134,29 @@ findEnclFunc ( ST encl  dict )  =
 
 -- | Find the type of an identifier in the table provided.
 findType          :: IdentName -> It -> Maybe Type
-findType name it  =  fst <$> findIdent name it
+findType name it  =  objType <$> findIdent name it
 
 -- | Recursively find the type of an identifier in the table provided
 findType'          :: IdentName -> It -> Maybe Type
-findType' name it  =  fst <$> findIdent' name it
+findType' name it  =  objType <$> findIdent' name it
 
 -- | Find the context of an identifier in the table provided.
 findContext          :: IdentName -> It -> Maybe Context
-findContext name it  =  snd <$> findIdent name it
+findContext name it  =  objCtx <$> findIdent name it
 
 -- | Recursively finds the context of an identifier in the table provided
 findContext'          :: IdentName -> It -> Maybe Context
-findContext' name it  =  snd <$> findIdent' name it
+findContext' name it  =  objCtx <$> findIdent' name it
+
+
+-- | Recursively finds the context of an identifier in the table provided
+findLocation          :: IdentName -> It -> (Reg, Int)
+findLocation name it  =  fromJust $ objLoc <$> findIdent name it
+
+-- | Recursively finds the context of an identifier in the table provided
+findLocation'          :: IdentName -> It -> (Reg, Int)
+findLocation' name it  =  fromJust $ objLoc <$> findIdent' name it
+
 
 -- | Does the identifier exist AND refer to a Function object?
 isFunc          :: IdentName -> It -> Bool
