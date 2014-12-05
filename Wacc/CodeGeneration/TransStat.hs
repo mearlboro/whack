@@ -32,10 +32,9 @@ transStat s (FreeStat e it) = (s', freeI)
     dst         = head (freeRegs s)
     (s', exprI) = transExpr s e
     freeI       = exprI ++ [ MOV'Reg R0 dst, BL (JumpLabel freeL) ]
-    freeL       = case typeOfExpr e it of 
+    freeL       = case typeOf e it of 
                     ArrayType {} -> "p_free_array"
                     PairType  {} -> "p_free_pair"
-
 
 -- To exit we load the value of the expression into the first available reg
 -- and then move its value into register 0. then call BL exit  
@@ -71,7 +70,7 @@ transStat s (PrintStat e it)
         (s', instrs) = transExpr s e  
         (dst:_)      = freeRegs s'
         -- The print label/function called depends on the type
-        label        = case typeOfExpr e it of
+        label        = case typeOf e it of
                           IntType    -> [ BL $ JumpLabel "p_print_int"    ]
                           BoolType   -> [ BL $ JumpLabel "p_print_bool"   ]
                           CharType   -> [ BL $ JumpLabel "putchar"        ]
@@ -82,7 +81,7 @@ transStat s (PrintStat e it)
         ls  = dataLabels   s'
         ps  = predefLabels s'
         -- Updates the data and predef labels with the strings/instructions
-        (ls', ps') = case typeOfExpr e it of
+        (ls', ps') = case typeOf e it of
                        IntType    -> if not $ containsLabel "p_print_int" ps
                                          then  
                                              let ls''@(l:_)    = intDataLabels   ls   in 
@@ -115,8 +114,25 @@ transStat s (PrintlnStat e it) = error "PrintlnStat"
 -- 
 transStat s (ScopedStat stat) = transScoped s stat 
 
--- 
-transStat s (ReadStat lhs it) = error "TODO"
+--
+transStat s (ReadStat (LhsIdent id) it) = (s, readI)
+  where
+    readL = case typeOf (IdentExpr id) it of 
+              IntType  -> "p_read_int"
+              CharType -> "p_read_char"
+
+    dst = head (freeRegs s)
+    (src, off) = lookupLoc s id  
+    readI = 
+      [ ADD dst src $ Op2'ImmVal off 
+      , MOV'Reg R0 dst 
+      , BL (JumpLabel readL) ]
+
+--
+transStat s (ReadStat (LhsPairElem elem) it) = error "TODO"
+
+--
+transStat s (ReadStat (LhsArrayElem array) it) = error "TODO"
 
 -- 
 transStat s (WhileStat cond body _) = (s''', whileI)
@@ -158,7 +174,7 @@ transStat s (DeclareStat vtype vname rhs it) = (s''', declareI)
     -- Translate right hand side
     (s', rhsI) = transRhs s (rhs, it) 
     -- How many bytes does this variable take up?
-    size = sizeOf vtype
+    size = sizeOf vtype it 
     -- Work out the stack offset for this variable
     offset = stackOffset s' - size -- TODO: check s == s' here
     -- Update the stack offset for the next declaration
@@ -192,9 +208,9 @@ transStat s (AssignStat (LhsPairElem pelem) rhs it) = (s', pelemInstr)
     (src, off) = fromJust (Map.lookup (getElemId pelem) (memoryMap s'))
 
     --PairType (Just (fstType, sndType)) = fromJust (getPairElemType pelem it) 
-    pelemType = fromJust $ getPairElemType pelem it
+    pelemType = typeOf pelem it
 
-    elemSize = sizeOf pelemType -- sizeOf $ if (pelem ~== Fst {}) then fstType else sndType
+    elemSize = sizeOf pelemType it -- sizeOf $ if (pelem ~== Fst {}) then fstType else sndType
     elemOff = if (pelem ~== Fst {}) then 0 else 4
     pelemInstr 
       =  rhsInstrs 
@@ -254,6 +270,23 @@ transStat s (IfStat cond thens elses it) = (s'''', ifI)
 -- ***********************                            *********************** -- 
 -- ************************************************************************** --
 
+transPairElem                :: Assembler (PairElem, It)
+transPairElem s (pairE, it)  = 
+  case pairE of 
+    Fst e -> transPairElemExpr e 0
+    Snd e -> transPairElemExpr e 4
+  where 
+    transPairElemExpr        :: Expr -> Int -> (ArmState, [ Instr ])
+    transPairElemExpr e off  =  (s', pelemI)
+      where
+        dst = head (freeRegs s)
+        (s', exprI) = transExpr s e
+        pelemI = 
+          exprI ++
+          [ MOV'Reg R0 dst 
+          , BL (JumpLabel "p_check_null_pointer") 
+          , LDR'Off dst dst off ] 
+
 --
 transRhs :: Assembler (AssignRhs, It)
 
@@ -261,43 +294,19 @@ transRhs :: Assembler (AssignRhs, It)
 transRhs s (RhsExpr e, it) = transExpr s e  
 
 --
-transRhs s (RhsPairElem (Fst e), it) = (s', pelemInstr)
+transRhs s (RhsPairElem pairE, it) = (s', rhsI)
   where
-    (dst:_)          = freeRegs s
-    (s', exprInstrs) = transExpr s e
-
-    PairType (Just (fstType, sndType)) = typeOfExpr e it 
-    size = sizeOf fstType
-
-    pelemInstr 
-      =  exprInstrs 
-      ++ [ MOV'Reg R0 dst ]
-      ++ [ BL (JumpLabel "p_check_null_pointer") ]
-      ++ [ LDR'Reg dst dst ]
-      ++ [ ldrVar dst dst size 0 ] 
-
---
-transRhs s (RhsPairElem (Snd e), it) = (s', pelemInstr)
-  where
-    (dst:_) = freeRegs s
-    (s', exprInstrs) = transExpr s e 
-
-    PairType (Just (fstType, sndType)) = typeOfExpr e it 
-    size = sizeOf sndType
-
-    pelemInstr 
-      =  exprInstrs 
-      ++ [ MOV'Reg R0 dst                        ]
-      ++ [ BL (JumpLabel "p_check_null_pointer") ]
-      ++ [ LDR'Off dst dst 4                     ]
-      ++ [ ldrVar dst dst size 0                 ]
+    dst = head (freeRegs s)
+    (s', pelemI) = transPairElem s (pairE, it)
+    size = sizeOf pairE it 
+    rhsI = pelemI ++ [ ldrVar dst dst size 0 ]
 
 -- 
-transRhs arm (RhsArrayLiter (exprs), it) = (arm', rhsInstr)
+transRhs arm (RhsArrayLiter exprs, it) = (arm', rhsInstr)
   where
     rhsInstr = malloc ++ exprsInstr ++ lengthInstr 
     arrayLength = length exprs
-    arraySize   = sum (map (sizeOf . flip typeOfExpr it) exprs) + sizeOf (ArrayType {})
+    arraySize   = sum (map (flip sizeOf it) exprs) + sizeOf (ArrayType {}) it 
     -- Allocate memeory on the heap
     malloc = [ LDR R0 arraySize        ] ++ 
              [ BL (JumpLabel "malloc") ] ++
@@ -344,15 +353,14 @@ transRhs s (RhsCall fname params, it) = (s', callInstrs)
     -- Expression instructtion
     (s', instrs) = mapAccumR transExpr s (reverse params)
     -- Generate instructions to push params on the stack
-    sizeOfExpr = sizeOf . flip typeOfExpr it -- ex
 
-    pushArg e = let s = sizeOfExpr e in [[ strArg dst SP s (-s) ]]
+    pushArg e = let s = sizeOf e it in [[ strArg dst SP s (-s) ]]
 
     pushArgs = map pushArg params 
 
     paramInstrs = (concat . concat) (zipWith (:) instrs pushArgs)
 
-    totSize = sum (map sizeOfExpr params)
+    totSize = sum (map (flip sizeOf it) params)
 
     callInstrs 
       = paramInstrs 
@@ -383,7 +391,7 @@ transScoped arm stat = (arm'''', editStack SUB ++ statInstr ++ editStack ADD)
         -- Update stack offset
         arm' = arm { stackOffset = oldOffset + bytesNeeded }
         -- Comment later
-        allah = getBytesNeeded' stat 
+        --allah = getBytesNeeded' stat 
         -- Update variables in map, change the map
         arm'' = arm' { memoryMap = Map.map (\(r, o) -> (r, o+bytesNeeded)) oldMap }
         -- Translate the statemente after reserving space on the stack
