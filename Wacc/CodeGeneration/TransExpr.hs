@@ -164,7 +164,7 @@ transPairElemExpr s (expr, it, wott) = (s' { freeRegs = rs }, instr)
   where 
     rs@(dst:nxt:regs) = freeRegs s 
     (s', exprInstr) = transExpr s { freeRegs = nxt:regs } expr 
-    size = (sizeOf (typeOfExpr expr it))
+    size = sizeOf expr it
     instr 
       =  exprInstr 
       ++ [ LDR R0 size             ] 
@@ -196,8 +196,8 @@ transArrayElem arm (e, it, index) = (arm' { freeRegs= r } , exprInstr ++ storeIn
         (arm', exprInstr) = transExpr arm{freeRegs = nxt:regs} e
         -- At what index in the heap the elem is
         -- +4 Beause the first 4 bytes are taken up by the length
-        offset = (index * (sizeOf (typeOfExpr e it))) + 4 -- MAGIC NUMBER NOOO 
-        storeInstr = if typeOfExpr e it == BoolType  -- TODO func for CHAR 
+        offset = index * (sizeOf e it) + 4 -- MAGIC NUMBER NOOO 
+        storeInstr = if typeOf e it == BoolType  -- TODO func for CHAR 
                         then [STRB'Off nxt dst offset]
                         else [STR'Off  nxt dst offset]  
 

@@ -21,9 +21,10 @@ data Program                                     -- <program> ::=
   = Program [ Func ] Stat                        -- 'begin' <func>* <stat> 'end'
   deriving ( Eq , Ord )
 
+-- TODO rename into fType fName etc
 data Func                                         -- <func> ::=
   = Func                                          -- <type> <ident> '(' <param-list>? ')' 'is' <stat> 'end'
-  { typeOf   :: Type
+  { fType    :: Type
   , nameOf   :: IdentName
   , paramsOf :: ParamList
   , bodyOf   :: Stat

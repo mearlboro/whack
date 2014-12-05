@@ -77,7 +77,7 @@ transFunc s (Func ftype fname params body it)  =  (s'', funcI)
     putParams []     _   m = m 
     putParams (p:ps) off m = putParams ps off' m'
       where
-        off' = off + sizeOf (ptypeOf p)  
+        off' = off + sizeOf (ptypeOf p) it 
         m'   = Map.insert (pnameOf p) (SP, off') m
 
     -- Add the function parameters to the memory map

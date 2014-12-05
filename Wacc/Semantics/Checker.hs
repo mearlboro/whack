@@ -103,7 +103,7 @@ checkStat s@( ReturnStat expr it )  =
     onStat s $ if isNothing enclFunc then mainErr else enclErr
   where
     enclFunc = findEnclFunc it
-    enclErr  = checkExpr expr it nonFunction [ typeOf ( fromJust enclFunc ) ]
+    enclErr  = checkExpr expr it nonFunction [ fType ( fromJust enclFunc ) ]
     mainErr  = [ "Cannot Return From Main Function Body" ]
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
