@@ -97,15 +97,17 @@ type RegList = [ Register ]
 data Instr
 
   -- Arithemtics
-  = ADD  Rd Rn Operand2 -- Add              | ADD{S} Rd, Rn, <Operand2> | Rd := Rn + Operand2
-  | ADDS Rd Rn Rs       -- Add              | ADD{S} Rd, Rn, Rs         | Rd := Rn + Rs
-  | SUB  Rd Rn Operand2 -- Subtract         | SUB{S} Rd, Rn, <Operand2> | Rd := Rn – Operand2
-  | RSB  Rd Rn Operand2 -- Reverse Subrtract TODO: Comment
-  | RSBS Rd Rn Operand2 -- Reverse Subtract & update flags TODO: Comment
-  | MUL  Rd Rm Rs       -- Multiply         | MUL{S} Rd, Rm, Rs         | Rd := (Rm * Rs)[31:0]
-  | MLA  Rd Rm Rs Rn    -- Mul & accumulate | MLA{S} Rd, Rm, Rs, Rn     | Rd := (Rn + (Rm * Rs))[31:0]
-  | SDIV Rd Rn Rm       -- Divide signed    | SDIV   Rd, Rn, Rm         | Rd := Rn / Rm
-  | UDIV Rd Rn Rm       -- Divide unsigned  | UDIV   Rd, Rn, Rm         | Rd := Rn / Rm
+  = ADD   Rd Rn Operand2 -- Add              | ADD{S}  Rd, Rn, <Operand2> | Rd := Rn + Operand2
+  | ADDS  Rd Rn Rs       -- Add              | ADDS{S} Rd, Rn, Rs         | Rd := Rn + Rs
+  | SUB   Rd Rn Operand2 -- Subtract         | SUB{S}  Rd, Rn, <Operand2> | Rd := Rn – Operand2
+  | SUBS  Rd Rn Rs       -- Subtract         | SUBS{S} Rd, Rn, Rs         | Rd := Rn - Rs
+  | RSB   Rd Rn Operand2 -- Reverse Subrtract TODO: Comment
+  | RSBS  Rd Rn Operand2 -- Reverse Subtract & update flags TODO: Comment
+  | MUL   Rd Rm Rs       -- Multiply         | MUL{S} Rd, Rm, Rs         | Rd := (Rm * Rs)[31:0]
+  | MLA   Rd Rm Rs Rn    -- Mul & accumulate | MLA{S} Rd, Rm, Rs, Rn     | Rd := (Rn + (Rm * Rs))[31:0]
+  | SMULL Rd Rm Rs Rn    -- TODO: Comment
+  | SDIV  Rd Rn Rm       -- Divide signed    | SDIV   Rd, Rn, Rm         | Rd := Rn / Rm
+  | UDIV  Rd Rn Rm       -- Divide unsigned  | UDIV   Rd, Rn, Rm         | Rd := Rn / Rm
 
   -- Moving
   | MOV     Rd Operand2 -- Move | MOV{S} Rd, <Operand2> | Rd := Operand2
@@ -139,8 +141,9 @@ data Instr
   | B       Label  -- Branch                       | B        <label> | PC := label. label is this instruction ±32MB (T2: ±16MB, T: –252 - +256B)
   | BL      Label  -- Branch with link             | BL       <label> | LR := address of next instruction, PC := label. label is this instruction ±32MB (T2: ±16MB).
   | BLVS    Label  -- Branch if overflow TODO: Comment
-  | BEQ     Label  -- TODO: Comment 
-  | BLEQ    Label 
+  | BEQ     Label  -- Branch if equal
+  | BLEQ    Label  -- Branch if less than equal
+  | BLNE    Label  -- Branch if less than equal
   | CBZ  Rn Label  -- Compare, branch if zero      | CBZ  Rn, <label> | If Rn == 0 then PC := label. label is (this instruction + 4-130).
   | CBNZ Rn Label  -- Compare, branch if non-zero  | CBNZ Rn, <label> | If Rn != 0 then PC := label. label is (this instruction + 4-130).
   | DEFINE  Label  -- This is NOT an ARM instruction -- It is just to tell where a label is defined
@@ -255,8 +258,10 @@ instance Show Instr where
     show (ADD    rd rn  op2   ) = "\tADD "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                  
     show (ADDS   rd rn  rs    ) = "\tADD "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rs                     
     show (SUB    rd rn  op2   ) = "\tSUB "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
+    show (SUBS   rd rn  rs    ) = "\tSUB "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rs                  
     show (MUL    rd rm  rs    ) = "\tMUL "   ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    
     show (MLA    rd rm  rs rn ) = "\tMLA "   ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs ++ ", " ++ show rn 
+    show (SMULL  rd rm  rs rn ) = "\tSMULL " ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs ++ ", " ++ show rn 
     show (SDIV   rd rn  rm    ) = "\tSDI "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rm                    
     show (UDIV   rd rn  rm    ) = "\tUDI "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rm                    
 
@@ -286,6 +291,7 @@ instance Show Instr where
     show (BL     l            ) = "\tBL "    ++ show l
     show (BEQ    l            ) = "\tBEQ "   ++ show l
     show (BLEQ   l            ) = "\tBLEQ "  ++ show l
+    show (BLNE   l            ) = "\tBLNE "  ++ show l
     show (CBZ    rn l         ) = "\tCBZ "   ++ show rn ++ ", " ++ show l
     show (CBNZ   rn l         ) = "\tCBNZ "  ++ show rn ++ ", " ++ show l
     show (RSBS rd rn op2      ) = "\tRSBS "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2        
