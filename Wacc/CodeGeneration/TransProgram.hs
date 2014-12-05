@@ -39,20 +39,20 @@ evaluateProgram  =  transProgram s
 
 -- Assembles an *augmented* Program AST given an initial state
 transProgram                         :: Assembler Program
-transProgram s (Program funcs body)  =  (s'', prog'is)
+transProgram s (Program funcs body)  =  (s'', progI)
   where
     -- Translate each function 
-    (s', funcs'iss) = mapAccumL transFunc s funcs 
+    (s', funcsI) = mapAccumL transFunc s funcs 
 
     -- Main body is executed in its own scope
-    (s'', body'is) = transScoped s' body 
+    (s'', bodyI) = transScoped s' body 
 
     -- The whole program translated to assembly
-    prog'is = 
-        concat funcs'iss ++          -- mapAccumL returns list of lists, hence concat
+    progI = 
+        concat funcsI ++             -- mapAccumL returns list of lists, hence concat
       [ DEFINE ( JumpLabel "main:" ) -- Define main function label
       , PUSH [ LR ]                  -- Pushes the current return address onto the stack
-      ] ++ body'is ++                -- TODO: Comment
+      ] ++ bodyI ++                  -- TODO: Comment
       [ LDR R0 0                     -- TODO: Comment
       , POP  [ PC ]                  -- TODO: Comment
       , INDIR Ltorg ]                -- TODO: Comment
@@ -64,13 +64,13 @@ transProgram s (Program funcs body)  =  (s'', prog'is)
 -- ************************************************************************** --
 
 transFunc :: Assembler Func
-transFunc s (Func ftype fname params body it)  =  (s'', func'is)
+transFunc s (Func ftype fname params body it)  =  (s'', funcI)
   where 
     -- Save the current memory map
-    map'old = memoryMap s 
+    oldMap = memoryMap s 
 
     -- Produce a label for this function
-    label = JumpLabel ("f_" ++ fname ++ ":")
+    funcL = JumpLabel ("f_" ++ fname ++ ":")
 
     -- Insert into the memory map m the function parameter variables ps
     -- The location of each parameter on the stack is calculated as the size of 
@@ -82,19 +82,19 @@ transFunc s (Func ftype fname params body it)  =  (s'', func'is)
         m'   = Map.insert (pnameOf p) (SP, off') m
 
     -- Add the function parameters to the memory map
-    map'new = putParams params 0 map'old 
+    newMap = putParams params 0 oldMap 
 
     -- Translate the function body in its own scope using the new map
-    (s', body'is) = transScoped s { memoryMap = map'new } body
+    (s', bodyI) = transScoped s { memoryMap = newMap } body
 
     -- Restore the previous memory map
-    s'' = s' { memoryMap = map'old }
+    s'' = s' { memoryMap = oldMap }
 
     -- The instructions generated for this function
-    func'is =  
-      [ DEFINE label  -- Define label with unique function name 
+    funcI =  
+      [ DEFINE funcL  -- Define label with unique function name 
       , PUSH [ LR ]   -- Pushes current return address onto stack                       
-      ] ++ body'is ++ -- The instructions from the func body
+      ] ++ bodyI ++   -- The instructions from the func body
       [ POP  [ PC ]   -- There is always a return statementa
       , POP  [ PC ]   -- Restore program counter from the stack
       , INDIR Ltorg ] -- TODO: Comment           
