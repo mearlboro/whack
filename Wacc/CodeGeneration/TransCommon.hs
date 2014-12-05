@@ -230,7 +230,7 @@ strPrintPredef dataLabel
 -- | These functions will create the so-called predefLabels for errors. These funcs
 --   will print an error message and exit the program if necessary.
 
--- Integer overflow error 
+-- Integer overflow error, generates function label and data label for the message
 ovfErrPredef ls
   = (ovfLbl, [ PredefLabel name instrs ])
     where
@@ -245,6 +245,22 @@ ovfErrPredef ls
              ++ [ BL ( JumpLabel "p_throw_runtime_error" ) ] )
 
 
+-- Divide by zero error, generates function label and data label for the message
+divZeroErrPredef ls
+  = (divLbl, [ PredefLabel name instrs ])
+    where
+      -- Creates a data label for printing an overflow error -- TODO \n \0 label issue
+      divLbl =  newDataLabel ( "DivideByZeroError: divide or modulo by zero.")
+                ls
+      name   = "p_check_divide_by_zero"
+      -- The set of instructions calls runtime error which exits the program
+      instrs =  ( [ DEFINE $ JumpLabel name ]
+             ++ [ PUSH [ LR ] ]
+             ++ [ CMP R1 $ Op2'ImmVal 0 ]
+             ++ [ LDREQ'Lbl R0 divLbl ] 
+             ++ [ BLEQ ( JumpLabel "p_throw_runtime_error" ) ] 
+             ++ [ POP [ PC ] ] )
+
 -- Runtime error
 runtErrPredef
   = [ PredefLabel name instrs ]
@@ -255,23 +271,29 @@ runtErrPredef
              ++ [ MOV R0 $ Op2'ImmVal (-1) ]
              ++ [ BL ( JumpLabel "exit" )  ] )
 
--- | Create a new data label and return the list with the label added.
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+
+-- | Create a new data label with a given string, using the current number of labels 
+--   to name it.
 newDataLabel str ls 
   = DataLabel lName str
     where 
       lName = "msg_" ++ ( show $ length ls )
 
+-- | For naming "runtime" labels
+nextLabel :: Int -> Label
+nextLabel i = JumpLabel $ "L" ++ show i
+ 
+
+-- | Gets the label name, to be used for duplicate checks
 labelName :: Label -> LabelName
 labelName (JumpLabel   name  ) = name
 labelName (PredefLabel name _) = name
 labelName (DataLabel   name _) = name
 
--- 
+-- | Checks if a predef label was added or not in the current program
 containsLabel name ls
   = or . map (==name) $ map labelName ls
 
 
---
-nextLabel :: Int -> Label
-nextLabel i = JumpLabel $ "L" ++ show i
- 
