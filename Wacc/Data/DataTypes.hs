@@ -1,8 +1,8 @@
 module Wacc.Data.DataTypes where
 
-import Data.Map   ( Map (..)  )
+import qualified Data.Map as Map (Map)
 
-import Wacc.CodeGeneration.ARM11Instructions
+-- qualified remove objLoc
 
 -- ************************************************************************** --
 -- **************************                  ****************************** --
@@ -209,7 +209,7 @@ instance Eq' PairElem where
 -- | General purpose symbol table
 data SymbolTable k a
   = Empty
-  | ST ( SymbolTable k a ) ( Map k a )
+  | ST ( SymbolTable k a ) ( Map.Map k a )
   deriving ( Eq , Ord , Show )
 
 -- | An identifier table is a symbol table that maps identifier names to
@@ -232,13 +232,12 @@ data IdentObj
   = IdentObj
   { objType :: Type 
   , objCtx  :: Context
-  , objLoc  :: (Reg, Int) 
   } deriving (Eq, Ord)
 
 -- | Type synonym
 type It = IdentTable
 
 -- | A Dictionary maps names to identifier objects
-type Dictionary = Map IdentName IdentObj
+type Dictionary = Map.Map IdentName IdentObj
 
 
