@@ -143,6 +143,7 @@ getArrayElemType ( ident , exprs ) it  =
     deepen n ( ArrayType t )  =  deepen ( n - 1 ) t
     deepen _   t              =  t
 
+
 -- ************************************************************************** --
 -- ***********************                            *********************** --
 -- ***********************       Prettification       *********************** -- 
@@ -167,6 +168,7 @@ makePretty (s, instrs)
 
         putPredefLabel ( PredefLabel l instrs )
           = ( concat $ intersperse "\n\t" $ map show instrs ) ++ "\n"
+
 
 -- ************************************************************************** --
 -- ***********************                            *********************** --
@@ -204,7 +206,7 @@ boolPrintPredef dataLabel2 dataLabel1
              ++ [ CMP R0 $ Op2'ImmVal 0 ]
              ++ [ LDRNE'Lbl R0 dataLabel1 ]
              ++ [ LDRNQ'Lbl R0 dataLabel2 ]
-             ++ [ ADD R0 R0 $ Op2'ImmVal 4  ]  -- How do we know it's 4?
+             ++ [ ADD R0 R0 $ Op2'ImmVal 4  ]
              ++ [ BL ( JumpLabel "printf" ) ]
              ++ [ MOV R0 $ Op2'ImmVal 0 ]
              ++ [ BL ( JumpLabel "fflush" ) ]
@@ -226,6 +228,78 @@ strPrintPredef dataLabel
              ++ [ BL ( JumpLabel "fflush" ) ]
              ++ [ POP [ PC ] ] )
 
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- | These functions will create the predefLabels for read functions.
+intReadPredef dataLabel
+  = [ PredefLabel name instrs ]
+    where 
+      name   = "p_read_int"
+      instrs =  ( [ DEFINE $ JumpLabel name ]
+             ++ [ PUSH [ LR ] ]
+             ++ [ MOV'Reg R1 R0 ] 
+             ++ [ LDR'Lbl R0 dataLabel ]
+             ++ [ ADD R0  R0 $ Op2'ImmVal 4 ]
+             ++ [ BL $ JumpLabel "scanf" ]
+             ++ [ POP [ PC ] ] )
+
+
+charReadPredef dataLabel
+  = [ PredefLabel name instrs ]
+    where 
+      name   = "p_read_char"
+      instrs =  ( [ DEFINE $ JumpLabel name ]
+             ++ [ PUSH [ LR ] ]
+             ++ [ MOV'Reg R1 R0 ] 
+             ++ [ LDR'Lbl R0 dataLabel ]
+             ++ [ ADD R0  R0 $ Op2'ImmVal 4 ]
+             ++ [ BL $ JumpLabel "scanf" ]
+             ++ [ POP [ PC ] ] )
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- | These functions will create the predefLabels for free functions.
+
+-- Free array
+freeArrErrPredef ls
+  = (freeLbl, [ PredefLabel name instrs ])
+    where
+      freeLbl = newDataLabel (  "NullReferenceError: dereference a null " 
+                             ++ "reference."                            )
+                             ls
+      name    = "p_free_array"
+      instrs  =  ( [ DEFINE $ JumpLabel name ]
+              ++ [ PUSH [ LR ] ]
+              ++ [ CMP R0 $ Op2'ImmVal 0 ]
+              ++ [ LDREQ'Lbl R0 freeLbl ]
+              ++ [ BEQ $ JumpLabel "p_throw_runtime_error" ]
+              ++ [ BL  $ JumpLabel "free" ]
+              ++ [ POP [ PC ] ] )
+
+-- Free pair 
+freePairErrPredef ls
+  = (freeLbl, [ PredefLabel name instrs ])
+    where
+      freeLbl = newDataLabel (  "NullReferenceError: dereference a null "
+                             ++ "reference."                            )
+                             ls
+      name    = "p_free_pair"
+      instrs  =  ( [ DEFINE $ JumpLabel name ]
+              ++ [ PUSH [ LR ] ]
+              ++ [ CMP R0 $ Op2'ImmVal 0 ]
+              ++ [ LDREQ'Lbl R0 freeLbl ]
+              ++ [ BEQ $ JumpLabel "p_throw_runtime_error" ]
+              ++ [ PUSH [ R0 ] ]
+              ++ [ LDR'Reg R0 R0 ]
+              ++ [ BL  $ JumpLabel "free" ]
+              ++ [ LDR'Reg R0 R0 ]
+              ++ [ LDR'Reg R0 R0 ] -- TODO: [r0, #4] ??
+              ++ [ BL  $ JumpLabel "free" ]
+              ++ [ POP [ R0 ] ] 
+              ++ [ BL  $ JumpLabel "free" ]
+              ++ [ POP [ PC ] ] )
+
+
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- | These functions will create the so-called predefLabels for errors. These funcs
 --   will print an error message and exit the program if necessary.
@@ -235,9 +309,9 @@ ovfErrPredef ls
   = (ovfLbl, [ PredefLabel name instrs ])
     where
       -- Creates a data label for printing an overflow error -- TODO \n \0 label issue
-      ovfLbl =  newDataLabel ( "OverflowError: the result is too small/large" ++ 
-                               " to store in a 4-byte signed-integer."         )
-                ls
+      ovfLbl =  newDataLabel (  "OverflowError: the result is too small/large "
+                             ++ "to store in a 4-byte signed-integer."        )
+                             ls
       name   =  "p_throw_overflow_error"
       -- The set of instructions calls runtime error which exits the program
       instrs =  ( [ DEFINE $ JumpLabel name ]
@@ -245,21 +319,58 @@ ovfErrPredef ls
              ++ [ BL ( JumpLabel "p_throw_runtime_error" ) ] )
 
 
--- Divide by zero error, generates function label and data label for the message
-divZeroErrPredef ls
+-- Divide by zero check, generates function label and data label for the message
+divZeroCheckPredef ls
   = (divLbl, [ PredefLabel name instrs ])
     where
       -- Creates a data label for printing an overflow error -- TODO \n \0 label issue
-      divLbl =  newDataLabel ( "DivideByZeroError: divide or modulo by zero.")
-                ls
+      divLbl =  newDataLabel "DivideByZeroError: divide or modulo by zero."
+                             ls
       name   = "p_check_divide_by_zero"
       -- The set of instructions calls runtime error which exits the program
       instrs =  ( [ DEFINE $ JumpLabel name ]
              ++ [ PUSH [ LR ] ]
              ++ [ CMP R1 $ Op2'ImmVal 0 ]
              ++ [ LDREQ'Lbl R0 divLbl ] 
-             ++ [ BLEQ ( JumpLabel "p_throw_runtime_error" ) ] 
+             ++ [ BLEQ $ JumpLabel "p_throw_runtime_error" ] 
              ++ [ POP [ PC ] ] )
+
+
+-- Array bounds check, generates function label and data label for the message
+arrBoundsCheckPredef ls
+  = (negIndLbl:[outIndLbl], [ PredefLabel name instrs ])
+    where
+      -- Creates a data label for printing an overflow error -- TODO \n \0 label issue
+      negIndLbl =  newDataLabel "ArrayIndexOutOfBoundsError: negative index"
+                                ls
+      outIndLbl =  newDataLabel "ArrayIndexOutOfBoundsError: index too large"
+                                (negIndLbl:ls)
+
+      name   = "p_check_array_bounds"
+      -- The set of instructions calls runtime error which exits the program
+      instrs =  ( [ DEFINE $ JumpLabel name ]
+             ++ [ PUSH [ LR ] ]
+             ++ [ CMP R0 $ Op2'ImmVal 0 ]
+             ++ [ LDRLT'Lbl R0 negIndLbl ]
+             ++ [ BLLT $ JumpLabel "p_throw_runtime_error" ]
+             ++ [ LDR'Reg R1 R1 ]
+             ++ [ LDRCS'Lbl R0 outIndLbl ]
+             ++ [ BLCS $ JumpLabel "p_throw_runtime_error" ] 
+             ++ [ POP [ PC ] ] )
+
+nullPtrCheckPredef ls
+  = (nullLbl, [ PredefLabel name instrs ]) 
+    where
+      nullLbl = newDataLabel (  "NullReferenceError: dereference a null "
+                             ++ "reference."                            )
+                             ls
+      name    = "p_check_null_pointer"
+      instrs  =  ( [ DEFINE $ JumpLabel name ] 
+              ++ [ PUSH [ LR ] ]
+              ++ [ CMP R0 $ Op2'ImmVal 0 ]
+              ++ [ LDREQ'Lbl R0 nullLbl ]
+              ++ [ BLEQ $ JumpLabel "p_throw_runtime_error" ] 
+              ++ [ POP [ PC ] ] )
 
 -- Runtime error
 runtErrPredef

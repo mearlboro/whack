@@ -42,9 +42,9 @@ transStat s (FreeStat e it) = (s', freeI)
 transStat s (ExitStat e _) = (s', exitI)
   where
     -- Obtain the register that the expression value will be saved into
-    dst = head (freeRegs s)
+    (dst:_) = freeRegs s
     -- Translate the expression to exit
-    (s', exprI)  =  transExpr s expr 
+    (s', exprI) = transExpr s e
     -- Instructions for the exit statement
     exitI         
       =  exprI 

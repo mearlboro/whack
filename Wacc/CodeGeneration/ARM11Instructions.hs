@@ -149,6 +149,8 @@ data Instr
   -- Branching (jump)
   | B       Label  -- Branch                       | B        <label> | PC := label. label is this instruction ±32MB (T2: ±16MB, T: –252 - +256B)
   | BL      Label  -- Branch with link             | BL       <label> | LR := address of next instruction, PC := label. label is this instruction ±32MB (T2: ±16MB).
+  | BLLT    Label  -- TODO: Comment
+  | BLCS    Label  -- TODO: Comment
   | BLVS    Label  -- Branch if overflow TODO: Comment
   | BEQ     Label  -- Branch if equal
   | BLEQ    Label  -- Branch if less than equal
@@ -168,9 +170,11 @@ data Instr
   | STRB  Rd Int    -- TODO: Comment
 
   | LDR'Lbl    Rd Label  -- LDR rd, =label TODO: Comment
-  | LDRNE'Lbl  Rd Label  -- TODO: Comment
   | LDREQ'Lbl  Rd Label
+  | LDRNE'Lbl  Rd Label  -- TODO: Comment
   | LDRNQ'Lbl  Rd Label  -- TODO: Comment
+  | LDRLT'Lbl  Rd Label  -- TODO: Comment
+  | LDRCS'Lbl  Rd Label  -- TODO: Comment
   | STR'Lbl    Rd Label  -- TODO: Comment
   | STRB'Lbl   Rd Label  -- TODO: Comment
 
@@ -232,7 +236,7 @@ instance Show Register where
   show R10 = "r10"
   show R11 = "r11"
   show R12 = "r12"
-  show SP  = "sp" -- R13 | Stack Pointer
+  show SP  = "sp"   -- R13 | Stack Pointer
   show LR  = "{lr}" -- R14 | Link Register (which holds return addresses)
   show PC  = "{pc}" -- R15 | Program Counter
 
@@ -311,6 +315,8 @@ instance Show Instr where
     show (BEQ    l            ) = "\tBEQ "   ++ show l
     show (BLEQ   l            ) = "\tBLEQ "  ++ show l
     show (BLNE   l            ) = "\tBLNE "  ++ show l
+    show (BLLT   l            ) = "\tBLLT "  ++ show l
+    show (BLCS   l            ) = "\tBLCS "  ++ show l
     show (CBZ    rn l         ) = "\tCBZ "   ++ show rn ++ ", " ++ show l
     show (CBNZ   rn l         ) = "\tCBNZ "  ++ show rn ++ ", " ++ show l
     show (RSBS rd rn op2      ) = "\tRSBS "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2        
@@ -327,9 +333,11 @@ instance Show Instr where
     show (STRB      rd n      ) = "\tSTRB "  ++ show rd ++ ", =" ++ show n
 
     show (LDR'Lbl      rd l   ) = "\tLDR "   ++ show rd ++ ", =" ++ show l
-    show (LDRNE'Lbl    rd l   ) = "\tLDRNE " ++ show rd ++ ", =" ++ show l
     show (LDREQ'Lbl    rd l   ) = "\tLDREQ " ++ show rd ++ ", =" ++ show l
+    show (LDRNE'Lbl    rd l   ) = "\tLDRNE " ++ show rd ++ ", =" ++ show l
     show (LDRNQ'Lbl    rd l   ) = "\tLDRNQ " ++ show rd ++ ", =" ++ show l
+    show (LDRLT'Lbl    rd l   ) = "\tLDRLT " ++ show rd ++ ", =" ++ show l
+    show (LDRCS'Lbl    rd l   ) = "\tLDRCS " ++ show rd ++ ", =" ++ show l
     show (STR'Lbl      rd l   ) = "\tSTR "   ++ show rd ++ ", =" ++ show l  
     show (STRB'Lbl     rd l   ) = "\tSTRB "  ++ show rd ++ ", =" ++ show l
 

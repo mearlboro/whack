@@ -268,10 +268,10 @@ stateAddDivZeroError s
       (ls', ps')
         = if not $ containsLabel "p_check_divide_by_zero" ps 
             then
-              let l        = newDataLabel     "%.*s" ls in  
-              let p        = strPrintPredef   l         in 
-              let (l', p') = divZeroErrPredef (l:ls)    in
-              let p''      = runtErrPredef              in 
+              let l        = newDataLabel       "%.*s" ls in  
+              let p        = strPrintPredef     l         in 
+              let (l', p') = divZeroCheckPredef (l:ls)    in
+              let p''      = runtErrPredef                in 
               (l': l: ls, ps ++ p ++ p' ++ p'')
             else
               (ls,   ps)
