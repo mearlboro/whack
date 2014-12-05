@@ -27,7 +27,15 @@ transStat :: Assembler Stat
 transStat s SkipStat = (s, [])
 
 -- 
-transStat s (FreeStat e _) = error "FreeStat"
+transStat s (FreeStat e it) = (s', freeI)
+  where 
+    dst         = head (freeRegs s)
+    (s', exprI) = transExpr s e
+    freeI       = exprI ++ [ MOV'Reg R0 dst, BL (JumpLabel freeL) ]
+    freeL       = case typeOfExpr e it of 
+                    ArrayType {} -> "p_free_array"
+                    PairType  {} -> "p_free_pair"
+
 
 -- To exit we load the value of the expression into the first available reg
 -- and then move its value into register 0. then call BL exit  
@@ -108,7 +116,7 @@ transStat s (PrintlnStat e it) = error "PrintlnStat"
 transStat s (ScopedStat stat) = transScoped s stat 
 
 -- 
-transStat s (ReadStat lhs it) = error "ReadStat" 
+transStat s (ReadStat lhs it) = error "TODO"
 
 -- 
 transStat s (WhileStat cond body _) = (s''', whileI)
@@ -138,7 +146,9 @@ transStat s (WhileStat cond body _) = (s''', whileI)
         , BEQ (JumpLabel bodyL) ]  -- TODO: Comment  
 
 -- mapAccumL for the win
-transStat s (SeqStat x y) = let (s', iss) = mapAccumL transStat s [x, y] in (s', concat iss)
+transStat s (SeqStat x y) = (s', concat iss)
+  where 
+    (s', iss) = mapAccumL transStat s [x, y] 
 
 --
 transStat s (DeclareStat vtype vname rhs it) = (s''', declareI)
@@ -179,7 +189,7 @@ transStat s (AssignStat (LhsPairElem pelem) rhs it) = (s', pelemInstr)
     (dst:nxt:_) = freeRegs s 
     -- 
     (s', rhsInstrs) = transRhs s (rhs, it) 
-    (rg, off) = fromJust (Map.lookup (getElemId pelem) (memoryMap s'))
+    (src, off) = fromJust (Map.lookup (getElemId pelem) (memoryMap s'))
 
     --PairType (Just (fstType, sndType)) = fromJust (getPairElemType pelem it) 
     pelemType = fromJust $ getPairElemType pelem it
@@ -188,7 +198,7 @@ transStat s (AssignStat (LhsPairElem pelem) rhs it) = (s', pelemInstr)
     elemOff = if (pelem ~== Fst {}) then 0 else 4
     pelemInstr 
       =  rhsInstrs 
-      ++ [ ldrVar nxt rg 4 off ] 
+      ++ [ ldrVar nxt src 4 off ] 
       ++ [ MOV'Reg R0 nxt ] -- check null
       ++ [ BL (JumpLabel "p_check_null_pointer") ]
       ++ [ ldrVar nxt nxt 4  elemOff ]

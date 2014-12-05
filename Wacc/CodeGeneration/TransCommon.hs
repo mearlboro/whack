@@ -84,7 +84,7 @@ typeOfExpr ( ParenthesisedExpr e            ) it  =  typeOfExpr e it
 typeOfExpr ( IntLiterExpr      _            ) _   =  IntType   
 typeOfExpr ( StrLiterExpr      _            ) _   =  StringType
 typeOfExpr ( PairLiterExpr                  ) _   =  NullType       
-typeOfExpr ( ArrayElemExpr     arrelem      ) it  =  typeOfArrElem arrelem it     
+typeOfExpr ( ArrayElemExpr     arrelem      ) it  =  fromJust $ getArrayElemType arrelem it  
 typeOfExpr ( BinaryOperExpr    AddBinOp _ _ ) _   =  IntType
 typeOfExpr ( BinaryOperExpr    SubBinOp _ _ ) _   =  IntType
 typeOfExpr ( BinaryOperExpr    MulBinOp _ _ ) _   =  IntType
@@ -237,6 +237,24 @@ strPrintPredef dataLabel
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- | These functions will create the so-called predefLabels for errors. These funcs
 --   will print an error message and exit the program if necessary.
+
+stateAddIntOverflowError s
+  = s { dataLabels = ls', predefLabels = ps' }
+    where
+      (ls', ps')
+        = if not $ containsLabel "p_throw_overflow_error" ps
+            then
+              let l        = newDataLabel   "%.*s" ls in
+              let p        = strPrintPredef l         in
+              let (l', p') = ovfErrPredef   (l:ls)    in
+              let p''      = runtErrPredef            in
+              (l': l: ls, ps ++ p ++ p' ++ p'')
+            else
+              (ls,   ps)
+
+      ls           = dataLabels     s
+      ps           = predefLabels   s
+
 
 -- Integer overflow error 
 ovfErrPredef ls
