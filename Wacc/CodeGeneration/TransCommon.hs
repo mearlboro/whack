@@ -233,27 +233,31 @@ printlnPredef ls
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- | These functions will create the predefLabels for read functions.
-intReadPredef dataLabel
-  = [ PredefLabel name instrs ]
+intReadPredef ls
+  = (intLbl, [ PredefLabel name instrs ])
     where 
+      intLbl = newDataLabel "%d\0" ls
+    
       name   = "p_read_int"
       instrs =  ( [ DEFINE $ JumpLabel name ]
              ++ [ PUSH [ LR ] ]
              ++ [ MOV'Reg R1 R0 ] 
-             ++ [ LDR'Lbl R0 dataLabel ]
+             ++ [ LDR'Lbl R0 intLbl ]
              ++ [ ADD R0  R0 $ Op2'ImmVal 4 ]
              ++ [ BL $ JumpLabel "scanf" ]
              ++ [ POP [ PC ] ] )
 
 
-charReadPredef dataLabel
-  = [ PredefLabel name instrs ]
+charReadPredef ls
+  = (charLbl, [ PredefLabel name instrs ])
     where 
+      charLbl = newDataLabel "%c\0" ls
+
       name   = "p_read_char"
       instrs =  ( [ DEFINE $ JumpLabel name ]
              ++ [ PUSH [ LR ] ]
              ++ [ MOV'Reg R1 R0 ] 
-             ++ [ LDR'Lbl R0 dataLabel ]
+             ++ [ LDR'Lbl R0 charLbl ]
              ++ [ ADD R0  R0 $ Op2'ImmVal 4 ]
              ++ [ BL $ JumpLabel "scanf" ]
              ++ [ POP [ PC ] ] )
@@ -482,5 +486,22 @@ stateAddArrayBounds s
       ls           = dataLabels     s
       ps           = predefLabels   s
 
+
+-- Adds the check array bounds predef and data labels
+stateAddRead s name
+  = s { dataLabels = ls', predefLabels = ps' }
+    where
+      (ls', ps')
+        = if not $ containsLabel name ls 
+            then 
+              case name of
+                  "p_read_int"  -> let (l, p) = intReadPredef  ls 
+                                   in  (l:ls, ps ++ p)
+                  "p_read_char" -> let (l, p) = charReadPredef ls
+                                   in  (l:ls, ps ++ p)
+            else (ls, ps)
+                            
+      ls           = dataLabels     s
+      ps           = predefLabels   s
 
 
