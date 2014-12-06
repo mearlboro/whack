@@ -85,35 +85,42 @@ transStat s (PrintStat e it)
         ps  = predefLabels s'
         -- Updates the data and predef labels with the strings/instructions
         (ls', ps') = case typeOf e it of
-                       IntType    -> if not $ containsLabel "p_print_int" ps
+                       IntType    -> if not $ containsLabel "p_print_int"    ps
                                          then  
-                                             let ls''@(l:_)    = intDataLabels   ls   in 
-                                             let p             = intPrintPredef  l    in
-                                             (ls'', ps ++ p)
+                                              let (l, p)   = intPrintPredef  ls  in
+                                              (l:ls, ps ++ p)
                                          else (ls, ps)
-                       BoolType   -> if not $ containsLabel "p_print_bool" ps
+                       BoolType   -> if not $ containsLabel "p_print_bool"   ps
                                          then
-                                             let ls''@(l:l':_) = boolDataLabels  ls   in
-                                             let p             = boolPrintPredef l l' in
-                                             (ls'', ps ++ p)
+                                              let (ls', p) = boolPrintPredef ls  in
+                                              (ls' ++ ls, ps ++ p)
                                          else (ls, ps)
                        StringType -> if not $ containsLabel "p_print_string" ps
                                          then
-                                             let ls''@(l:_)    = strDataLabels   ls   in
-                                             let p             = strPrintPredef  l    in 
-                                             (ls'', ps ++ p)
+                                              let (l, p)   = strPrintPredef  ls  in 
+                                              (l:ls, ps ++ p)
                                          else (ls, ps)
                        _          -> (ls, ps)        
 
-        -- Generates the proper data labels for each type of the print param
-        intDataLabels  ls =           (newDataLabel "%d"    ls ):ls
-        boolDataLabels ls = let ls' = (newDataLabel "true"  ls ):ls     in
-                                      (newDataLabel "false" ls'):ls' 
-        strDataLabels  ls =           (newDataLabel "%.*s"  ls ):ls
 
 --
-transStat s (PrintlnStat e it) = (s, [])
+transStat s (PrintlnStat e it)
+  = (s'', instrs')
+    where
+      -- Println is a print, so do print first
+      (s', instrs) = transStat s (PrintStat e it) 
+      -- Get its labels from the updated state
+      ls     = dataLabels s'
+      ps     = predefLabels s'
+      -- Get the println specific labels
+      (l, p) = printlnPredef ls
 
+      -- The println instruction will be added to the set of print instrs
+      instrs' = instrs ++ [ BL ( JumpLabel "p_print_ln" ) ]
+      -- The new state will get the print and println labels
+      s''     = s' { dataLabels = l:ls, predefLabels = ps ++ p }
+
+ 
 -- 
 transStat s (ScopedStat stat) = transScoped s stat
 

@@ -149,6 +149,7 @@ data Instr
   -- Branching (jump)
   | B       Label  -- Branch                       | B        <label> | PC := label. label is this instruction ±32MB (T2: ±16MB, T: –252 - +256B)
   | BL      Label  -- Branch with link             | BL       <label> | LR := address of next instruction, PC := label. label is this instruction ±32MB (T2: ±16MB).
+  | BB      Label  -- TODO: comment 
   | BLLT    Label  -- TODO: Comment
   | BLCS    Label  -- TODO: Comment
   | BLVS    Label  -- Branch if overflow TODO: Comment
@@ -312,6 +313,7 @@ instance Show Instr where
 
     show (B      l            ) = "\tB "     ++ show l
     show (BL     l            ) = "\tBL "    ++ show l
+    show (BB     l            ) = "\tBB "    ++ show l
     show (BEQ    l            ) = "\tBEQ "   ++ show l
     show (BLEQ   l            ) = "\tBLEQ "  ++ show l
     show (BLNE   l            ) = "\tBLNE "  ++ show l

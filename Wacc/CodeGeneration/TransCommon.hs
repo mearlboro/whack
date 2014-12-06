@@ -141,7 +141,7 @@ makePretty (s, instrs)
       where
         putDataLabel ( DataLabel l str ) 
           =  l
-          ++ "\n\t.word " ++ show ( length str + 1 )
+          ++ "\n\t.word " ++ show ( length str )
           ++ "\n\t.ascii \"" ++ str  ++ "\\0\"\n"
 
         putPredefLabel ( PredefLabel l instrs )
@@ -160,14 +160,16 @@ makePretty (s, instrs)
 --   but are defined as a sub-type of Label for logic convenience, and for easing 
 --   up their use in a BL instruction.
 
-intPrintPredef dataLabel 
-  = [ PredefLabel name instrs ]
+intPrintPredef ls 
+  = (intLbl, [ PredefLabel name instrs ])
     where
+      intLbl = newDataLabel "%d\0" ls
+
       name   =  "p_print_int"                         
       instrs =  ( [ DEFINE $ JumpLabel name ] 
              ++ [ PUSH [ LR ] ]
              ++ [ MOV'Reg R1 R0 ]
-             ++ [ LDR'Lbl R0 dataLabel ]
+             ++ [ LDR'Lbl R0 intLbl ]
              ++ [ ADD R0 R0 $ Op2'ImmVal 4 ] 
              ++ [ BL ( JumpLabel "printf" ) ]
              ++ [ MOV R0 $ Op2'ImmVal 0 ]
@@ -175,15 +177,18 @@ intPrintPredef dataLabel
              ++ [ POP [ PC ] ] )
 
 
-boolPrintPredef dataLabel2 dataLabel1 
-  = [ PredefLabel name instrs ]
+boolPrintPredef ls 
+  = (falseLbl:[trueLbl], [ PredefLabel name instrs ])
     where
+      falseLbl = newDataLabel "false\0" ls
+      trueLbl  = newDataLabel "true\0"  (falseLbl:ls)
+
       name   =  "p_print_bool"                         
       instrs =  ( [ DEFINE $ JumpLabel name ]
              ++ [ PUSH [ LR ] ]
              ++ [ CMP R0 $ Op2'ImmVal 0 ]
-             ++ [ LDRNE'Lbl R0 dataLabel1 ]
-             ++ [ LDRNQ'Lbl R0 dataLabel2 ]
+             ++ [ LDRNE'Lbl R0 trueLbl  ]
+             ++ [ LDRNQ'Lbl R0 falseLbl ]
              ++ [ ADD R0 R0 $ Op2'ImmVal 4  ]
              ++ [ BL ( JumpLabel "printf" ) ]
              ++ [ MOV R0 $ Op2'ImmVal 0 ]
@@ -191,20 +196,39 @@ boolPrintPredef dataLabel2 dataLabel1
              ++ [ POP [ PC ] ] )
 
 
-strPrintPredef dataLabel
-  = [ PredefLabel name instrs ]
+strPrintPredef ls
+  = (strLbl, [ PredefLabel name instrs ])
     where
+      strLbl = newDataLabel "%.*s\0" ls
+
       name   = "p_print_string"
       instrs =  ( [ DEFINE $ JumpLabel name ]
              ++ [ PUSH [ LR ] ]
              ++ [ LDR'Reg R1 R0 ]
              ++ [ ADD R2 R0 $ Op2'ImmVal 4 ]
-             ++ [ LDR'Lbl R0 dataLabel ]
+             ++ [ LDR'Lbl R0 strLbl ]
              ++ [ ADD R0 R0$ Op2'ImmVal 4 ]
              ++ [ BL ( JumpLabel "printf" ) ]
              ++ [ MOV R0 $ Op2'ImmVal 0 ]
              ++ [ BL ( JumpLabel "fflush" ) ]
              ++ [ POP [ PC ] ] )
+
+
+printlnPredef ls
+  = (printlnLbl, [ PredefLabel name instrs ])
+    where
+      printlnLbl = newDataLabel "\0" ls 
+ 
+      name   = "p_print_ln"
+      instrs =  ( [ DEFINE $ JumpLabel name ]
+             ++ [ PUSH [ LR ] ]
+             ++ [ LDR'Lbl R0 printlnLbl ]
+             ++ [ ADD R0 R0 $ Op2'ImmVal 4 ]
+             ++ [ BL $ JumpLabel "puts" ]
+             ++ [ MOV R0 $ Op2'ImmVal 0 ]
+             ++ [ BB $ JumpLabel "fflush" ]
+             ++ [ POP [ PC ] ] )
+ 
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
@@ -243,7 +267,7 @@ freeArrErrPredef ls
   = (freeLbl, [ PredefLabel name instrs ])
     where
       freeLbl = newDataLabel (  "NullReferenceError: dereference a null " 
-                             ++ "reference."                            )
+                             ++ "reference.\0\n"                            )
                              ls
       name    = "p_free_array"
       instrs  =  ( [ DEFINE $ JumpLabel name ]
@@ -259,7 +283,7 @@ freePairErrPredef ls
   = (freeLbl, [ PredefLabel name instrs ])
     where
       freeLbl = newDataLabel (  "NullReferenceError: dereference a null "
-                             ++ "reference."                            )
+                             ++ "reference.\n"                          )
                              ls
       name    = "p_free_pair"
       instrs  =  ( [ DEFINE $ JumpLabel name ]
@@ -316,12 +340,12 @@ divZeroCheckPredef ls
 
 -- Array bounds check, generates function label and data label for the message
 arrBoundsCheckPredef ls
-  = (negIndLbl:[outIndLbl], [ PredefLabel name instrs ])
+  = (outIndLbl:[negIndLbl], [ PredefLabel name instrs ])
     where
       -- Creates a data label for printing an overflow error -- TODO \n \0 label issue
-      negIndLbl =  newDataLabel "ArrayIndexOutOfBoundsError: negative index"
+      negIndLbl =  newDataLabel "ArrayIndexOutOfBoundsError: negative index\n"
                                 ls
-      outIndLbl =  newDataLabel "ArrayIndexOutOfBoundsError: index too large"
+      outIndLbl =  newDataLabel "ArrayIndexOutOfBoundsError: index too large\n"
                                 (negIndLbl:ls)
 
       name   = "p_check_array_bounds"
@@ -340,7 +364,7 @@ nullPtrCheckPredef ls
   = (nullLbl, [ PredefLabel name instrs ]) 
     where
       nullLbl = newDataLabel (  "NullReferenceError: dereference a null "
-                             ++ "reference."                            )
+                             ++ "reference.\n"                            )
                              ls
       name    = "p_check_null_pointer"
       instrs  =  ( [ DEFINE $ JumpLabel name ] 
