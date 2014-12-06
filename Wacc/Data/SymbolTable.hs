@@ -5,8 +5,7 @@ module Wacc.Data.SymbolTable
 , addFuncs
 , addFunc
 , addVariable
-, isDefined
-, isDefined'
+, isRedefined
 , findType
 , findType'
 , findContext
@@ -98,6 +97,10 @@ onClash new old  =  new
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :: Retrieval ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
+
+-- Start looking from the exnclosed table
+isRedefined :: IdentName -> It -> Bool 
+isRedefined name it = isJust $ findIdent' name `onEncl` it 
 
 -- | Returns True iif the identifer is found in the table
 isDefined          :: IdentName -> It -> Bool

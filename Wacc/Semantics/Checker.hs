@@ -165,7 +165,7 @@ checkStat s@( DeclareStat vtype name rhs it )  =
     onStat s $ if null definedErr then rhsErr else definedErr
   where
     rhsErr         =  checkAssignRhs rhs it nonFunction [ vtype ]
-    definedErr     =  toSemErr definedErrMsg ( isDefined name it )
+    definedErr     =  toSemErr definedErrMsg ( not $ isRedefined name it )
     definedErrMsg  =  "Variable Already Defined @" ++ name
 
 

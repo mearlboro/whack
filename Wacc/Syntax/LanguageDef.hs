@@ -95,9 +95,9 @@ waccOperators :: [[Operator Char st Expr]]
 waccOperators
   -- |Unary operators have the same precedence, which is 0.
  = [ [ Prefix ( waccOperators' "!"   $ UnaryOperExpr  NotUnOp  )
-   ,   Prefix ( waccOperators' "len" $ UnaryOperExpr  LenUnOp  )
-   ,   Prefix ( waccOperators' "ord" $ UnaryOperExpr  OrdUnOp  )
-   ,   Prefix ( waccOperators' "chr" $ UnaryOperExpr  ChrUnOp  )
+   ,   Prefix ( waccOperators' "len " $ UnaryOperExpr  LenUnOp  )
+   ,   Prefix ( waccOperators' "ord " $ UnaryOperExpr  OrdUnOp  )
+   ,   Prefix ( waccOperators' "chr " $ UnaryOperExpr  ChrUnOp  )
    ,   Prefix ( waccOperators' "-"   $ UnaryOperExpr  NegUnOp  )           ]
 
   -- |Arithmetic operators *, /, % have precedence 1.
