@@ -4,6 +4,8 @@ import qualified Data.Map as Map (Map, insert, lookup)
 import           Data.List       (intersperse, intercalate)
 import           Data.Maybe      (fromJust)
 
+import Data.List (intersperse, intercalate)
+
 -- Added Bytes type. Added Offset type.
 -- Changed stackMap to memoryMap
 -- added insertLoc and findLoc
@@ -95,20 +97,28 @@ type RegList = [ Register ]
 data Instr
 
   -- Arithemtics
-  = ADD  Rd Rn Operand2 -- Add              | ADD{S} Rd, Rn, <Operand2> | Rd := Rn + Operand2
-  | ADDS Rd Rn Rs       -- Add              | ADD{S} Rd, Rn, Rs         | Rd := Rn + Rs
-  | SUB  Rd Rn Operand2 -- Subtract         | SUB{S} Rd, Rn, <Operand2> | Rd := Rn – Operand2
-  | RSB  Rd Rn Operand2 -- Reverse Subrtract TODO: Comment
-  | RSBS Rd Rn Operand2 -- Reverse Subtract & update flags TODO: Comment
-  | MUL  Rd Rm Rs       -- Multiply         | MUL{S} Rd, Rm, Rs         | Rd := (Rm * Rs)[31:0]
-  | MLA  Rd Rm Rs Rn    -- Mul & accumulate | MLA{S} Rd, Rm, Rs, Rn     | Rd := (Rn + (Rm * Rs))[31:0]
-  | SDIV Rd Rn Rm       -- Divide signed    | SDIV   Rd, Rn, Rm         | Rd := Rn / Rm
-  | UDIV Rd Rn Rm       -- Divide unsigned  | UDIV   Rd, Rn, Rm         | Rd := Rn / Rm
+  = ADD   Rd Rn Operand2 -- Add              | ADD{S}  Rd, Rn, <Operand2> | Rd := Rn + Operand2
+  | ADDS  Rd Rn Rs       -- Add              | ADDS{S} Rd, Rn, Rs         | Rd := Rn + Rs
+  | SUB   Rd Rn Operand2 -- Subtract         | SUB{S}  Rd, Rn, <Operand2> | Rd := Rn – Operand2
+  | SUBS  Rd Rn Rs       -- Subtract         | SUBS{S} Rd, Rn, Rs         | Rd := Rn - Rs
+  | RSB   Rd Rn Operand2 -- Reverse Subrtract TODO: Comment
+  | RSBS  Rd Rn Operand2 -- Reverse Subtract & update flags TODO: Comment
+  | MUL   Rd Rm Rs       -- Multiply         | MUL{S} Rd, Rm, Rs         | Rd := (Rm * Rs)[31:0]
+  | MLA   Rd Rm Rs Rn    -- Mul & accumulate | MLA{S} Rd, Rm, Rs, Rn     | Rd := (Rn + (Rm * Rs))[31:0]
+  | SMULL Rd Rm Rs Rn    -- TODO: Comment
+  | SDIV  Rd Rn Rm       -- Divide signed    | SDIV   Rd, Rn, Rm         | Rd := Rn / Rm
+  | UDIV  Rd Rn Rm       -- Divide unsigned  | UDIV   Rd, Rn, Rm         | Rd := Rn / Rm
 
   -- Moving
   | MOV     Rd Operand2 -- Move | MOV{S} Rd, <Operand2> | Rd := Operand2
   | MOV'Reg Rd Rs       -- TODO: Comment
   | MOV'Chr Rd Char     -- TODO: Comment
+  | MOVLT   Rd Operand2 -- Move | MOV{S} Rd, <Operand2> | Rd := Operand2
+  | MOVLE   Rd Operand2 -- Move | MOV{S} Rd, <Operand2> | Rd := Operand2
+  | MOVGT   Rd Operand2 -- Move | MOV{S} Rd, <Operand2> | Rd := Operand2
+  | MOVGE   Rd Operand2 -- Move | MOV{S} Rd, <Operand2> | Rd := Operand2
+  | MOVEQ   Rd Operand2 -- Move | MOV{S} Rd, <Operand2> | Rd := Operand2
+  | MOVNE   Rd Operand2 -- Move | MOV{S} Rd, <Operand2> | Rd := Operand2
 
   -- Shifting
   | ASR    Rd Rm Rs     -- Arithmetic shift right by register | ASR{S} Rd, Rm, Rs | Rd := ASR(Rm, Rs)
@@ -125,20 +135,26 @@ data Instr
   | CMN Rn Operand2     -- Compare negative | CMN Rn, <Operand2> | Update CPSR flags on Rn + Operand2
 
   -- Logical
-  | TST Rn    Operand2  -- Test             | TST Rn,     <Operand2> | Update CPSR flags on Rn AND Operand2
-  | TEQ Rn    Operand2  -- Test equivalence | TEQ Rn,     <Operand2> | Update CPSR flags on Rn EOR Operand2
-  | AND Rd Rn Operand2  -- AND              | AND Rd, Rn, <Operand2> | Rd := Rn AND Operand2
-  | EOR Rd Rn Operand2  -- EOR              | EOR Rd, Rn, <Operand2> | Rd := Rn EOR Operand2
-  | ORR Rd Rn Operand2  -- ORR              | ORR Rd, Rn, <Operand2> | Rd := Rn OR Operand2
-  | ORN Rd Rn Operand2  -- ORN              | ORN Rd, Rn, <Operand2> | Rd := Rn OR NOT Operand2
-  | BIC Rd Rn Operand2  -- Bit Clear        | BIC Rd, Rn, <Operand2> | Rd := Rn AND NOT Operand2
+  | TST     Rn    Operand2  -- Test             | TST Rn,     <Operand2> | Update CPSR flags on Rn AND Operand2
+  | TEQ     Rn    Operand2  -- Test equivalence | TEQ Rn,     <Operand2> | Update CPSR flags on Rn EOR Operand2
+  | AND     Rd Rn Operand2  -- AND              | AND Rd, Rn, <Operand2> | Rd := Rn AND Operand2
+  | AND'Reg Rd Rn Rs        -- AND              | AND Rd, Rn, Rs         | Rd := Rn AND Rs
+  | EOR     Rd Rn Operand2  -- EOR              | EOR Rd, Rn, <Operand2> | Rd := Rn EOR Operand2
+  | EOR'Reg Rd Rn Rs        -- AND              | AND Rd, Rn, Rs         | Rd := Rn AND Rs
+  | ORR     Rd Rn Operand2  -- ORR              | ORR Rd, Rn, <Operand2> | Rd := Rn OR Operand2
+  | ORR'Reg Rd Rn Rs        -- AND              | AND Rd, Rn, Rs         | Rd := Rn AND Rs
+  | ORN     Rd Rn Operand2  -- ORN              | ORN Rd, Rn, <Operand2> | Rd := Rn OR NOT Operand2
+  | BIC     Rd Rn Operand2  -- Bit Clear        | BIC Rd, Rn, <Operand2> | Rd := Rn AND NOT Operand2
 
   -- Branching (jump)
   | B       Label  -- Branch                       | B        <label> | PC := label. label is this instruction ±32MB (T2: ±16MB, T: –252 - +256B)
   | BL      Label  -- Branch with link             | BL       <label> | LR := address of next instruction, PC := label. label is this instruction ±32MB (T2: ±16MB).
+  | BLLT    Label  -- TODO: Comment
+  | BLCS    Label  -- TODO: Comment
   | BLVS    Label  -- Branch if overflow TODO: Comment
-  | BEQ     Label  -- TODO: Comment 
-  | BLEQ    Label 
+  | BEQ     Label  -- Branch if equal
+  | BLEQ    Label  -- Branch if less than equal
+  | BLNE    Label  -- Branch if less than equal
   | CBZ  Rn Label  -- Compare, branch if zero      | CBZ  Rn, <label> | If Rn == 0 then PC := label. label is (this instruction + 4-130).
   | CBNZ Rn Label  -- Compare, branch if non-zero  | CBNZ Rn, <label> | If Rn != 0 then PC := label. label is (this instruction + 4-130).
   | DEFINE  Label  -- This is NOT an ARM instruction -- It is just to tell where a label is defined
@@ -154,9 +170,11 @@ data Instr
   | STRB  Rd Int    -- TODO: Comment
 
   | LDR'Lbl    Rd Label  -- LDR rd, =label TODO: Comment
-  | LDRNE'Lbl  Rd Label  -- TODO: Comment
   | LDREQ'Lbl  Rd Label
+  | LDRNE'Lbl  Rd Label  -- TODO: Comment
   | LDRNQ'Lbl  Rd Label  -- TODO: Comment
+  | LDRLT'Lbl  Rd Label  -- TODO: Comment
+  | LDRCS'Lbl  Rd Label  -- TODO: Comment
   | STR'Lbl    Rd Label  -- TODO: Comment
   | STRB'Lbl   Rd Label  -- TODO: Comment
 
@@ -172,8 +190,9 @@ data Instr
 
   | STR'Arg   Rd Rn Int
   | STRB'Arg  Rd Rn Int  
+
   -- Directive
-  | INDIR Directive -- TODO: Comment Do we need this?
+  | INDIR Directive -- TODO: Comment
   deriving (Eq)
 
 -- This is used as an operand in many instructions
@@ -217,7 +236,7 @@ instance Show Register where
   show R10 = "r10"
   show R11 = "r11"
   show R12 = "r12"
-  show SP  = "sp" -- R13 | Stack Pointer
+  show SP  = "sp"   -- R13 | Stack Pointer
   show LR  = "{lr}" -- R14 | Link Register (which holds return addresses)
   show PC  = "{pc}" -- R15 | Program Counter
 
@@ -253,13 +272,21 @@ instance Show Instr where
     show (ADD    rd rn  op2   ) = "\tADD "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                  
     show (ADDS   rd rn  rs    ) = "\tADD "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rs                     
     show (SUB    rd rn  op2   ) = "\tSUB "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
+    show (SUBS   rd rn  rs    ) = "\tSUB "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rs                  
     show (MUL    rd rm  rs    ) = "\tMUL "   ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    
     show (MLA    rd rm  rs rn ) = "\tMLA "   ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs ++ ", " ++ show rn 
+    show (SMULL  rd rm  rs rn ) = "\tSMULL " ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs ++ ", " ++ show rn 
     show (SDIV   rd rn  rm    ) = "\tSDI "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rm                    
     show (UDIV   rd rn  rm    ) = "\tUDI "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rm                    
 
     show (MOV       rd  op2   ) = "\tMOV "   ++ show rd ++ ", " ++ show op2                                       
     show (MOV'Reg   rd  rs    ) = "\tMOV "   ++ show rd ++ ", " ++ show rs                                        
+    show (MOVLT     rd  op2   ) = "\tMOVLT " ++ show rd ++ ", " ++ show op2                                       
+    show (MOVGT     rd  op2   ) = "\tMOVGT " ++ show rd ++ ", " ++ show op2                                       
+    show (MOVLE     rd  op2   ) = "\tMOVLE " ++ show rd ++ ", " ++ show op2                                       
+    show (MOVGE     rd  op2   ) = "\tMOVGE " ++ show rd ++ ", " ++ show op2                                       
+    show (MOVEQ     rd  op2   ) = "\tMOVEQ " ++ show rd ++ ", " ++ show op2                                       
+    show (MOVNE     rd  op2   ) = "\tMOVNE " ++ show rd ++ ", " ++ show op2                                       
 
     show (ASR    rd rm  rs    ) = "\tASR "   ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    
     show (LSL    rd rm  rs    ) = "\tLSL "   ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    
@@ -270,20 +297,26 @@ instance Show Instr where
     show (LSR'Sh rd rm  sh    ) = "\tLSR "   ++ show rd ++ ", " ++ show rm  ++ ", " ++ show sh                    
     show (ROR'Sh rd rm  sh    ) = "\tROR "   ++ show rd ++ ", " ++ show rm  ++ ", " ++ show sh                    
 
-    show (CMP    rn op2       ) = "\tCMP "   ++ show rn ++ ", " ++ show op2                                       
-    show (CMN    rn op2       ) = "\tCMN "   ++ show rn ++ ", " ++ show op2                                       
-    show (TST    rn op2       ) = "\tTST "   ++ show rn ++ ", " ++ show op2                                       
-    show (TEQ    rn op2       ) = "\tTEQ "   ++ show rn ++ ", " ++ show op2                                       
-    show (AND    rd rn  op2   ) = "\tAND "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
-    show (EOR    rd rn  op2   ) = "\tEOR "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
-    show (ORR    rd rn  op2   ) = "\tORR "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
-    show (ORN    rd rn  op2   ) = "\tORN "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
-    show (BIC    rd rn  op2   ) = "\tBIC "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
+    show (CMP     rn op2       ) = "\tCMP "   ++ show rn ++ ", " ++ show op2                                       
+    show (CMN     rn op2       ) = "\tCMN "   ++ show rn ++ ", " ++ show op2                                       
+    show (TST     rn op2       ) = "\tTST "   ++ show rn ++ ", " ++ show op2                                       
+    show (TEQ     rn op2       ) = "\tTEQ "   ++ show rn ++ ", " ++ show op2                                       
+    show (AND     rd rn  op2   ) = "\tAND "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
+    show (AND'Reg rd rn  rs    ) = "\tAND "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rs                   
+    show (EOR     rd rn  op2   ) = "\tEOR "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
+    show (EOR'Reg rd rn  rs    ) = "\tEOR "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rs                   
+    show (ORR     rd rn  op2   ) = "\tORR "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
+    show (ORR'Reg rd rn  rs    ) = "\tORR "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rs                   
+    show (ORN     rd rn  op2   ) = "\tORN "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
+    show (BIC     rd rn  op2   ) = "\tBIC "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
 
     show (B      l            ) = "\tB "     ++ show l
     show (BL     l            ) = "\tBL "    ++ show l
     show (BEQ    l            ) = "\tBEQ "   ++ show l
     show (BLEQ   l            ) = "\tBLEQ "  ++ show l
+    show (BLNE   l            ) = "\tBLNE "  ++ show l
+    show (BLLT   l            ) = "\tBLLT "  ++ show l
+    show (BLCS   l            ) = "\tBLCS "  ++ show l
     show (CBZ    rn l         ) = "\tCBZ "   ++ show rn ++ ", " ++ show l
     show (CBNZ   rn l         ) = "\tCBNZ "  ++ show rn ++ ", " ++ show l
     show (RSBS rd rn op2      ) = "\tRSBS "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2        
@@ -300,21 +333,23 @@ instance Show Instr where
     show (STRB      rd n      ) = "\tSTRB "  ++ show rd ++ ", =" ++ show n
 
     show (LDR'Lbl      rd l   ) = "\tLDR "   ++ show rd ++ ", =" ++ show l
-    show (LDRNE'Lbl    rd l   ) = "\tLDRNE " ++ show rd ++ ", =" ++ show l
     show (LDREQ'Lbl    rd l   ) = "\tLDREQ " ++ show rd ++ ", =" ++ show l
+    show (LDRNE'Lbl    rd l   ) = "\tLDRNE " ++ show rd ++ ", =" ++ show l
     show (LDRNQ'Lbl    rd l   ) = "\tLDRNQ " ++ show rd ++ ", =" ++ show l
+    show (LDRLT'Lbl    rd l   ) = "\tLDRLT " ++ show rd ++ ", =" ++ show l
+    show (LDRCS'Lbl    rd l   ) = "\tLDRCS " ++ show rd ++ ", =" ++ show l
     show (STR'Lbl      rd l   ) = "\tSTR "   ++ show rd ++ ", =" ++ show l  
     show (STRB'Lbl     rd l   ) = "\tSTRB "  ++ show rd ++ ", =" ++ show l
 
-    show (LDR'Reg      rd rs   )   = "\tLDR "   ++ show rd ++ ", [" ++ show rs ++ "]" 
+    show (LDR'Reg      rd rs  ) = "\tLDR "   ++ show rd ++ ", [" ++ show rs ++ "]" 
     show (LDRSB'Reg    rd rs  ) = "\tLDRSB "   ++ show rd ++ ", [" ++ show rs ++ "]" 
-    show (STR'Reg      rd rs    )   = "\tSTR "   ++ show rd ++ ", [" ++ show rs ++ "]" 
-    show (STRB'Reg     rd rs  )   = "\tSTRB "  ++ show rd ++ ", [" ++ show rs ++ "]" 
+    show (STR'Reg      rd rs  ) = "\tSTR "   ++ show rd ++ ", [" ++ show rs ++ "]" 
+    show (STRB'Reg     rd rs  ) = "\tSTRB "  ++ show rd ++ ", [" ++ show rs ++ "]" 
 
-    show (LDR'Off  rd rn off  ) = "\tLDR "  ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]" -- TODO: Comment
-    show (LDRSB'Off  rd rn off  ) = "\tLDRSB "  ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]" -- TODO: Comment
-    show (STR'Off  rd rn off  ) = "\tSTR "  ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]" -- TODO: Comment
-    show (STRB'Off rd rn off  ) = "\tSTRB " ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]" -- TODO: Comment
+    show (LDR'Off   rd rn off ) = "\tLDR "  ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]" -- TODO: Comment
+    show (LDRSB'Off rd rn off ) = "\tLDRSB "  ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]" -- TODO: Comment
+    show (STR'Off   rd rn off ) = "\tSTR "  ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]" -- TODO: Comment
+    show (STRB'Off  rd rn off ) = "\tSTRB " ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]" -- TODO: Comment
 
     show (STR'Arg   rd rn off ) = "\tSTR "  ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]!" -- TODO: Comment
     show (STRB'Arg  rd rn off ) = "\tSTRB " ++ show rd ++ ", [" ++ show rn ++ ", #" ++ show off ++ "]!" -- TODO: Comment 

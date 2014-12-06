@@ -102,8 +102,8 @@ transUnOp s NotUnOp
 transUnOp s LenUnOp
   = (s, unopInstrs)
     where 
-      unopInstrs =  [ LDR'Lbl dst l ]  -- stores in dst the adrress of a string
-                 ++ [ LDR'Reg dst dst ]-- puts into dst the length of the addr,
+      unopInstrs =  [ LDR'Lbl dst l ]   -- stores in dst the adrress of a string
+                 ++ [ LDR'Reg dst dst ] -- puts into dst the length of the addr,
                                         -- meaning the legth of the string
                   -- REDO comment
       (l:_)      =  dataLabels s
@@ -118,24 +118,135 @@ transUnOp s ChrUnOp = (s, [])
 transUnOp s NegUnOp 
   = (s', negUnOpInstrs)
     where 
-      s'            = stateAddIntOverflowError s
+      s'            =  stateAddIntOverflowError s
       negUnOpInstrs =  [ RSBS dst dst $ Op2'ImmVal 0]  -- reverse subtract | dst := 0 - dst
                     ++ [ BLVS ( JumpLabel "p_throw_overflow_error") ]
 
       (dst:_)    =  freeRegs s
 
+
+
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
--- | Generate instructions for a unary operator
+-- | Generate instructions for a binary operator
 transBinOp :: Assembler BinaryOper 
+
+-- | Arithmetic operators
 transBinOp s AddBinOp 
   = ( s', instrs )
     where
-      s'       =  s { dataLabels = ls', predefLabels = ps' }
+      s'       =  stateAddIntOverflowError s 
 
       instrs   =  ( [ ADDS r r r' ] 
                ++ [ BLVS ( JumpLabel "p_throw_overflow_error") ] )
       (r:r':_) =  freeRegs s
 
+transBinOp s SubBinOp 
+  = ( s', instrs )
+    where
+      s'       =  stateAddIntOverflowError s 
+
+      instrs   =  ( [ SUBS r r r' ] 
+               ++ [ BLVS ( JumpLabel "p_throw_overflow_error") ] )
+      (r:r':_) =  freeRegs s
+
+transBinOp s MulBinOp 
+  = ( s', instrs )
+    where
+      s'       =  stateAddIntOverflowError s 
+
+      instrs   =  ( [ SMULL r r' r r' ]
+               ++ [ CMP r' $ Op2'ASR'Sh r 31 ]
+               ++ [ BLNE ( JumpLabel "p_throw_overflow_error") ] )
+      (r:r':_) =  freeRegs s
+
+transBinOp s DivBinOp 
+  = ( s', instrs )
+    where
+      s'       =  stateAddDivZeroError s 
+
+      instrs   =  ( [ MOV'Reg R0 r ]
+                 ++ [ MOV'Reg R1 r'] 
+                 ++ [ BL  ( JumpLabel "p_check_divide_by_zero" ) ]
+                 ++ [ BL  ( JumpLabel " __aeabi_idiv" ) ]
+                 ++ [ MOV'Reg r R0 ] )
+      (r:r':_) =  freeRegs s
+
+transBinOp s ModBinOp 
+  = ( s', instrs )
+    where
+      s'       =  stateAddDivZeroError s 
+
+      instrs   =  ( [ MOV'Reg R0 r ]
+                 ++ [ MOV'Reg R1 r'] 
+                 ++ [ BL  ( JumpLabel "p_check_divide_by_zero" ) ]
+                 ++ [ BL  ( JumpLabel " __aeabi_idivmod" ) ]
+                 ++ [ MOV'Reg r R0 ] )
+      (r:r':_) =  freeRegs s
+
+
+-- | Logic operators
+transBinOp s AndBinOp
+  = ( s, instrs )
+    where
+      instrs   = ( [ AND'Reg r r r' ] )
+      (r:r':_) = freeRegs s
+
+transBinOp s OrrBinOp
+  = ( s, instrs )
+    where
+      instrs   = ( [ ORR'Reg r r r' ] )
+      (r:r':_) = freeRegs s
+
+-- | Relational operators
+transBinOp s LsBinOp  -- less than <
+  = ( s, instrs )
+    where
+      instrs   = ( [ MOVLT r $ Op2'ImmVal 1 ]
+               ++  [ MOVGE r $ Op2'ImmVal 0 ] )
+      (r:r':_) = freeRegs s
+
+transBinOp s GtBinOp  -- greater than >
+  = ( s, instrs )
+    where
+      instrs   = ( [ MOVGT r $ Op2'ImmVal 1 ]
+               ++  [ MOVLE r $ Op2'ImmVal 0 ] )
+      (r:r':_) = freeRegs s
+
+transBinOp s LEBinOp -- less equal <=
+  = ( s, instrs )
+    where
+      instrs   = ( [ MOVLE r $ Op2'ImmVal 1 ]
+               ++  [ MOVGT r $ Op2'ImmVal 0 ] )
+      (r:r':_) = freeRegs s
+
+transBinOp s GEBinOp -- greater equal >=
+  = ( s, instrs )
+    where
+      instrs   = ( [ MOVGE r $ Op2'ImmVal 1 ]
+               ++  [ MOVLT r $ Op2'ImmVal 0 ] )
+      (r:r':_) = freeRegs s
+
+transBinOp s EqBinOp -- equal ==
+  = ( s, instrs )
+    where
+      instrs   = ( [ MOVEQ r $ Op2'ImmVal 1 ]
+               ++  [ MOVNE r $ Op2'ImmVal 0 ] )
+      (r:r':_) = freeRegs s
+
+transBinOp s NEBinOp -- not equal !=
+  = ( s, instrs )
+    where
+      instrs   = ( [ MOVNE r $ Op2'ImmVal 1 ]
+               ++  [ MOVEQ r $ Op2'ImmVal 0 ] )
+      (r:r':_) = freeRegs s
+
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- Adds the overflow error data and predef labels as needed for all integers
+stateAddIntOverflowError s 
+  = s { dataLabels = ls', predefLabels = ps' }
+    where
       (ls', ps') 
         = if not $ containsLabel "p_throw_overflow_error" ps 
             then
@@ -150,6 +261,23 @@ transBinOp s AddBinOp
       ls           = dataLabels     s
       ps           = predefLabels   s
 
+
+stateAddDivZeroError s
+  = s { dataLabels = ls', predefLabels = ps' }
+    where
+      (ls', ps')
+        = if not $ containsLabel "p_check_divide_by_zero" ps 
+            then
+              let l        = newDataLabel       "%.*s" ls in  
+              let p        = strPrintPredef     l         in 
+              let (l', p') = divZeroCheckPredef (l:ls)    in
+              let p''      = runtErrPredef                in 
+              (l': l: ls, ps ++ p ++ p' ++ p'')
+            else
+              (ls,   ps)
+
+      ls           = dataLabels     s
+      ps           = predefLabels   s
 
 -- ************************************************************************** --
 -- ****************                                         ***************** --

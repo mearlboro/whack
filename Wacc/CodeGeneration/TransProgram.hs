@@ -13,6 +13,7 @@ import Wacc.Data.DataTypes
 import qualified Data.Map  as Map (Map, empty, insert)
 import           Data.List        (mapAccumL)
 
+
 -- ************************************************************************** --
 -- ***********************                            *********************** --
 -- ***********************     Program Translation    *********************** --
