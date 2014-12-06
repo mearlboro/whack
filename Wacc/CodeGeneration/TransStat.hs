@@ -218,9 +218,9 @@ transStat s (WhileStat cond body _) = (s''', whileI)
       -- Obtain the next free label
       currL = numJumpLabels s
       -- We need two labels: one for the condition
-      condL = "while_cond_" ++ show currL ++ ":"
+      condL = "while_cond_" ++ show currL 
       -- And one for the body
-      bodyL = "while_body_" ++ show (currL + 1) ++ ":"
+      bodyL = "while_body_" ++ show (currL + 1)
       -- Obtain the register that the cond expression value will be saved into
       dst = head (freeRegs s)
       -- We have used up 2 labels so we need to update the state
@@ -232,9 +232,9 @@ transStat s (WhileStat cond body _) = (s''', whileI)
       -- Now concatenate everything together
       whileI =  
         [ B (JumpLabel condL)      -- TODO: Comment        
-        , DEFINE (JumpLabel bodyL) -- TODO: Comment       
+        , DEFINE (JumpLabel $ bodyL ++ ":") -- TODO: Comment       
         ] ++ bodyI ++              
-        [ DEFINE (JumpLabel condL) -- TODO: Comment       
+        [ DEFINE (JumpLabel condL ++ ":") -- TODO: Comment       
         ] ++ condI ++            
         [ CMP dst $ Op2'ImmVal 0   
         , BEQ (JumpLabel bodyL) ]  -- TODO: Comment  
@@ -323,9 +323,9 @@ transStat s (IfStat cond thens elses it) = (s'''', ifI)
     -- Obtain next free label
     currL = numJumpLabels s
     -- We need 2 labels: one for the else branch
-    elseL = "if_else_" ++ show currL ++ ":"
+    elseL = "if_else_" ++ show currL 
     -- And one for after the if
-    endifL = "if_end_" ++ show (currL + 1) ++ ":"
+    endifL = "if_end_" ++ show (currL + 1)
     -- Obtain the register that the cond expression value will be saved into
     dst = head (freeRegs s)
     -- We have used up 2 labels so we need to update the arm state
@@ -340,12 +340,12 @@ transStat s (IfStat cond thens elses it) = (s'''', ifI)
     ifI =  
       condI ++                          
       [ CMP dst $ Op2'ImmVal 0      -- If condition false?
-      , BEQ (JumpLabel elseL)       -- If so go to else
+      , BEQ (JumpLabel $ elseL ++ ":" )       -- If so go to else
       ] ++ thenI ++ 
-      [ B (JumpLabel endifL) 
-      , DEFINE (JumpLabel elseL)         
+      [ B (JumpLabel $ endifL ++ ":" ) 
+      , DEFINE (JumpLabel $ elseL ++ ":")         
       ] ++ elseI ++ 
-      [ DEFINE (JumpLabel endifL) ]
+      [ DEFINE (JumpLabel $ endifL ++ ":") ]
 
 
 
