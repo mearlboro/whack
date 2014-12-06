@@ -118,22 +118,22 @@ transStat s (PrintStat e it)
         ps  = predefLabels s'
         -- Updates the data and predef labels with the strings/instructions
         (ls', ps') = case typeOf e it of
-                       IntType    -> if not $ containsLabel "p_print_int"    ps
+                       IntType    -> if not $ containsLabel "p_print_int:"    ps
                                          then  
                                               let (l, p)   = intPrintPredef  ls  in
                                               (l:ls, ps ++ p)
                                          else (ls, ps)
-                       BoolType   -> if not $ containsLabel "p_print_bool"   ps
+                       BoolType   -> if not $ containsLabel "p_print_bool:"   ps
                                          then
                                               let (ls', p) = boolPrintPredef ls  in
                                               (ls' ++ ls, ps ++ p)
                                          else (ls, ps)
-                       StringType -> if not $ containsLabel "p_print_string" ps
+                       StringType -> if not $ containsLabel "p_print_string:" ps
                                          then
                                               let (l, p)   = strPrintPredef  ls  in 
                                               (l:ls, ps ++ p)
                                          else (ls, ps)
-                       _          -> if not $ containsLabel "p_print_reference" ps
+                       _          -> if not $ containsLabel "p_print_reference:" ps
                                          then 
                                               let (l, p)   = refPrintPredef  ls  in
                                               (l:ls, ps ++ p)
@@ -218,9 +218,9 @@ transStat s (WhileStat cond body _) = (s''', whileI)
       -- Obtain the next free label
       currL = numJumpLabels s
       -- We need two labels: one for the condition
-      condL = "while_cond_" ++ show currL
+      condL = "while_cond_" ++ show currL ++ ":"
       -- And one for the body
-      bodyL = "while_body_" ++ show (currL + 1)
+      bodyL = "while_body_" ++ show (currL + 1) ++ ":"
       -- Obtain the register that the cond expression value will be saved into
       dst = head (freeRegs s)
       -- We have used up 2 labels so we need to update the state
@@ -323,9 +323,9 @@ transStat s (IfStat cond thens elses it) = (s'''', ifI)
     -- Obtain next free label
     currL = numJumpLabels s
     -- We need 2 labels: one for the else branch
-    elseL = "if_else_" ++ show currL
+    elseL = "if_else_" ++ show currL ++ ":"
     -- And one for after the if
-    endifL = "if_end_" ++ show (currL + 1)
+    endifL = "if_end_" ++ show (currL + 1) ++ ":"
     -- Obtain the register that the cond expression value will be saved into
     dst = head (freeRegs s)
     -- We have used up 2 labels so we need to update the arm state
