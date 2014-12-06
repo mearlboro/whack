@@ -53,22 +53,25 @@ transExpr s PairLiterExpr
   = (s, [ LDR R0 8] ++ [ BL $ JumpLabel "malloc" ])
 
 
--- | TODO make ArrayElem a type synonym PLSSSSSSS
+-- | 
 transExpr s (ArrayElemExpr (id, exprs))
-  =    (s, addI
-          ++ concat ( map (transExpr') exprs )
-          ++ [ LDR'Reg dst dst ] )
-          -- ++ [ STR'Reg dst SP ] )
+  = (s'', instrs)
     
       where 
-
-        (src, off) = lookupLoc s id  
-        addI =  [ ADD dst src $ Op2'ImmVal off ] 
-
+        -- Adds the array bounds labels to the state
+        s''            = stateAddArrayBounds s
+        
+        -- Updates the registers in the state
+        -- s'             = s { freeRegs = nxt:regs }
         (dst:nxt:regs) = freeRegs s
 
-        s' = s { freeRegs = nxt:regs }
+        (src, off) = lookupLoc s id  
+        -- The set of instructions 
+        instrs =  [ ADD dst src $ Op2'ImmVal off ] 
+               ++ concat ( map (transExpr') exprs )
+               ++ [ LDR'Reg dst dst ] 
 
+        -- Translates each
         transExpr' e = snd ( transExpr s' e )
                       ++ [ LDR'Reg dst dst ]
                       ++ [ MOV'Reg R0 nxt ]
@@ -78,9 +81,6 @@ transExpr s (ArrayElemExpr (id, exprs))
                       ++ [ ADD dst dst $ Op2'LSL'Sh nxt 2 ]
 
 
-
-
--- TODO! TEST!
 -- | Lookup what register variable @id@ is in, and copy its content in @dst@
 transExpr s (IdentExpr id) 
   = (s, pushDst) -- TODO LOL
@@ -116,6 +116,7 @@ transExpr s (BinaryOperExpr op e e')
       s''    = s' { freeRegs = rs }
       (r:rs) = freeRegs s'
 
+
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- | Generate instructions for a unary operator
 transUnOp :: Assembler UnaryOper 
@@ -146,7 +147,7 @@ transUnOp s NegUnOp
   = (s', negUnOpInstrs)
     where 
       s'            =  stateAddIntOverflowError s
-      negUnOpInstrs =  [ RSBS dst dst $ Op2'ImmVal 0]  -- reverse subtract | dst := 0 - dst
+      negUnOpInstrs =  [ RSBS dst dst $ Op2'ImmVal 0]
                     ++ [ BLVS ( JumpLabel "p_throw_overflow_error") ]
 
       (dst:_)    =  freeRegs s
@@ -277,8 +278,7 @@ stateAddIntOverflowError s
       (ls', ps') 
         = if not $ containsLabel "p_throw_overflow_error" ps 
             then
-              let l        = newDataLabel   "%.*s" ls in  
-              let p        = strPrintPredef l         in 
+              let (l , p ) = strPrintPredef ls        in 
               let (l', p') = ovfErrPredef   (l:ls)    in
               let p''      = runtErrPredef            in 
               (l': l: ls, ps ++ p ++ p' ++ p'')
@@ -295,8 +295,7 @@ stateAddDivZeroError s
       (ls', ps')
         = if not $ containsLabel "p_check_divide_by_zero" ps 
             then
-              let l        = newDataLabel       "%.*s" ls in  
-              let p        = strPrintPredef     l         in 
+              let (l,  p ) = strPrintPredef     ls        in 
               let (l', p') = divZeroCheckPredef (l:ls)    in
               let p''      = runtErrPredef                in 
               (l': l: ls, ps ++ p ++ p' ++ p'')
@@ -305,6 +304,24 @@ stateAddDivZeroError s
 
       ls           = dataLabels     s
       ps           = predefLabels   s
+
+
+stateAddArrayBounds s
+  = s { dataLabels = ls', predefLabels = ps' }
+    where
+      (ls', ps')
+        = if not $ containsLabel "p_check_array_bounds" ps
+            then
+              let (l,  p  ) = strPrintPredef        ls     in 
+              let (ls', p') = arrBoundsCheckPredef  l:ls   in 
+              let p''       = runtErrPredef                in 
+              (ls' ++ (l:ls), ps ++ p ++ p' ++ p'')
+            else
+              (ls,   ps)
+
+      ls           = dataLabels     s
+      ps           = predefLabels   s
+
 
 -- ************************************************************************** --
 -- ****************                                         ***************** --
