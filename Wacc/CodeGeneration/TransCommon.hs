@@ -510,10 +510,10 @@ stateAddRead s name
         = if not $ containsLabel name ls 
             then 
               case name of
-                  "p_read_int:"  -> let (l, p) = intReadPredef  ls 
-                                    in  (l:ls, ps ++ p)
-                  "p_read_char:" -> let (l, p) = charReadPredef ls
-                                    in  (l:ls, ps ++ p)
+                  "p_read_int"  -> let (l, p) = intReadPredef  ls 
+                                   in  (l:ls, ps ++ p)
+                  "p_read_char" -> let (l, p) = charReadPredef ls
+                                   in  (l:ls, ps ++ p)
             else (ls, ps)
                             
       ls           = dataLabels     s
