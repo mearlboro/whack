@@ -87,7 +87,7 @@ augmentStat stat prevIt  =
     -- |We have the previous table and we need to return the table for the next
     --  statement. This is the only case where the table is updated, since we
     --  just introduced a new variable that can be used by subsequent statements
-    augmentDeclare                                    :: Stat -> ( It , Stat )
+    augmentDeclare                                   :: Stat -> ( It , Stat )
     augmentDeclare ( DeclareStat itype name rhs _ )  =
       let nextIt  =  addVariable name itype $ encloseIn prevIt
       in  ( nextIt , DeclareStat itype name rhs nextIt )
