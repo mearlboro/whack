@@ -3,8 +3,9 @@ module Main where
 import System.Directory
 import System.Environment
 import System.Exit
-import System.FilePath.Posix
+import System.FilePath.Posix 
 
+import Wacc.Data.DataTypes
 import Wacc.Syntax.Parser
 import Wacc.Semantics.Checker
 import Wacc.CodeGeneration.TransProgram
@@ -19,7 +20,7 @@ main = do
     if valid
         then do
             program <- readFile f
-            parse program
+            parse program f
         else putStrLn f
 
 -------------------------------------------------------------------------------
@@ -55,21 +56,22 @@ verifyArgs args = do
 -- exit 100 : #syntax_error#
 -- exit 200 : #semantic_error#
 
-parse :: FilePath -> IO ()
-parse source = do
+parse :: String -> FilePath -> IO ()
+parse source path = do
 
   -- Parse source file
   let result = parseWithEof pProgram source
 
   -- Get the result and act accordingly
   case result of
-      Right r -> check r
+      Right r -> check r path
       Left  e -> do
         putStrLn $ show e
         exitWith $ ExitFailure 100
 
 -- TODO: type signature
-check program = do
+check :: Program -> FilePath -> IO ()
+check program path = do
   -- Takes a program AST and gets a list of error
   let (program', errs) = checkProgram program
 
@@ -79,5 +81,16 @@ check program = do
         putStrLn $ unlines errs
         exitWith $ ExitFailure 200
     else do
-        putStrLn $ makePretty $ evaluateProgram program'
+        let assembled = makePretty (evaluateProgram program')
+        -- Write the assembly file 
+        saveAssembled path assembled
+        -- putStrLn assemble
         exitWith   ExitSuccess
+
+
+saveAssembled :: FilePath -> String -> IO ()
+saveAssembled path src = do 
+  pwd <- getCurrentDirectory 
+  writeFile (pwd ++ "/" ++ takeBaseName path ++ ".s") src 
+
+

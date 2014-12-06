@@ -54,13 +54,17 @@ transExpr s PairLiterExpr
 
 
 -- | TODO make ArrayElem a type synonym PLSSSSSSS
-transExpr s (ArrayElemExpr (ident, exprs))
-  =    (s, [ ADD dst SP $ Op2'ImmVal 4 ] 
+transExpr s (ArrayElemExpr (id, exprs))
+  =    (s, addI
           ++ concat ( map (transExpr') exprs )
-          ++ [ LDR'Reg dst dst ]
-          ++ [ STR'Reg dst SP ] )
+          ++ [ LDR'Reg dst dst ] )
+          -- ++ [ STR'Reg dst SP ] )
     
       where 
+
+        (src, off) = lookupLoc s id  
+        addI =  [ ADD dst src $ Op2'ImmVal off ] 
+
         (dst:nxt:regs) = freeRegs s
 
         s' = s { freeRegs = nxt:regs }
