@@ -270,59 +270,6 @@ transBinOp s NEBinOp -- not equal !=
 
 
 
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
--- Adds the overflow error data and predef labels as needed for all integers
-stateAddIntOverflowError s 
-  = s { dataLabels = ls', predefLabels = ps' }
-    where
-      (ls', ps') 
-        = if not $ containsLabel "p_throw_overflow_error" ps 
-            then
-              let (l , p ) = strPrintPredef ls        in 
-              let (l', p') = ovfErrPredef   (l:ls)    in
-              let p''      = runtErrPredef            in 
-              (l': l: ls, ps ++ p ++ p' ++ p'')
-            else
-              (ls,   ps)
-
-      ls           = dataLabels     s
-      ps           = predefLabels   s
-
-
-stateAddDivZeroError s
-  = s { dataLabels = ls', predefLabels = ps' }
-    where
-      (ls', ps')
-        = if not $ containsLabel "p_check_divide_by_zero" ps 
-            then
-              let (l,  p ) = strPrintPredef     ls        in 
-              let (l', p') = divZeroCheckPredef (l:ls)    in
-              let p''      = runtErrPredef                in 
-              (l': l: ls, ps ++ p ++ p' ++ p'')
-            else
-              (ls,   ps)
-
-      ls           = dataLabels     s
-      ps           = predefLabels   s
-
-
-stateAddArrayBounds s
-  = s { dataLabels = ls', predefLabels = ps' }
-    where
-      (ls', ps')
-        = if not $ containsLabel "p_check_array_bounds" ps
-            then
-              let (l,  p  ) = strPrintPredef        ls     in 
-              let (ls', p') = arrBoundsCheckPredef  (l:ls) in 
-              let p''       = runtErrPredef                in 
-              (ls' ++ (l:ls), ps ++ p ++ p' ++ p'')
-            else
-              (ls,   ps)
-
-      ls           = dataLabels     s
-      ps           = predefLabels   s
-
-
 -- ************************************************************************** --
 -- ****************                                         ***************** --
 -- ****************   Complicated Expression Translation    ***************** --
@@ -332,17 +279,20 @@ stateAddArrayBounds s
 -- TODO oemge refecter ples
 type WhichOfTheTwo = Int 
 transPairElemExpr :: Assembler (Expr, It, WhichOfTheTwo) 
-transPairElemExpr s (expr, it, wott) = (s' { freeRegs = rs }, instr)
-  where 
-    rs@(dst:nxt:regs) = freeRegs s 
-    (s', exprInstr) = transExpr s { freeRegs = nxt:regs } expr 
-    size = sizeOf expr it
-    instr 
-      =  exprInstr 
-      ++ [ LDR R0 size             ] 
-      ++ [ BL (JumpLabel "malloc") ]
-      ++ [ strVar nxt R0 size 0    ]
-      ++ [ strVar R0 dst 4 (wott * 4) ]
+transPairElemExpr s (expr, it, wott) 
+  = (s'' { freeRegs = rs }, instr)
+    where 
+      rs@(dst:nxt:regs) = freeRegs s 
+      (s', exprInstr) = transExpr s { freeRegs = nxt:regs } expr 
+      size = sizeOf expr it
+      instr 
+        =  exprInstr 
+        ++ [ LDR R0 size             ] 
+        ++ [ BL (JumpLabel "malloc") ]
+        ++ [ strVar nxt R0 size 0    ]
+        ++ [ strVar R0 dst 4 (wott * 4) ]
+
+      s'' = stateAddCheckNullPtr s'
 
 -- TODO oemge refecter ples
 -- Translates an array 
