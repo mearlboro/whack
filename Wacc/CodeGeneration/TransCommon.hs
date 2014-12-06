@@ -213,6 +213,22 @@ strPrintPredef ls
              ++ [ BL ( JumpLabel "fflush" ) ]
              ++ [ POP [ PC ] ] )
 
+refPrintPredef ls
+  = (refLbl, [ PredefLabel name instrs ])
+    where
+        refLbl = newDataLabel "%p\0" ls
+        
+        name   = "p_print_reference"
+        instrs =  ( [ DEFINE $ JumpLabel name ]
+               ++ [ PUSH [ LR ] ]
+               ++ [ MOV'Reg R1 R0 ]
+               ++ [ LDR'Lbl R0 refLbl ]  
+               ++ [ ADD R0 R0 $ Op2'ImmVal 4]
+               ++ [ BL $ JumpLabel "printf" ]
+               ++ [ MOV'Reg R0 R0 ]
+               ++ [ BL $ JumpLabel "fflush" ]
+               ++ [ POP [ PC ] ] )
+
 
 printlnPredef ls
   = (printlnLbl, [ PredefLabel name instrs ])
@@ -229,7 +245,6 @@ printlnPredef ls
              ++ [ BB $ JumpLabel "fflush" ]
              ++ [ POP [ PC ] ] )
  
-
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- | These functions will create the predefLabels for read functions.
