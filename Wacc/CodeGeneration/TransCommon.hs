@@ -142,7 +142,7 @@ makePretty (s, instrs)
         putDataLabel ( DataLabel l str ) 
           =  "\t" ++ l ++ ":"
           ++ "\n\t\t.word " ++ show ( length str )
-          ++ "\n\t\t.ascii \"" ++ str  ++ "\\0\"\n"
+          ++ "\n\t\t.ascii \"" ++ str  ++ "\"\n"
 
         putPredefLabel ( PredefLabel l instrs )
           = ( concat $ intersperse "\n\t" $ map show instrs ) ++ "\n"
