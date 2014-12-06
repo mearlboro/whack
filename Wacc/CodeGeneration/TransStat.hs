@@ -104,7 +104,7 @@ transStat s (PrintStat e it)
         -- First gets the instructions for the expr, then adds the print
         instrs'      = instrs ++ [ MOV'Reg R0 dst ] ++ label
         (s', instrs) = transExpr s e  
-        (dst:_)      = freeRegs s'
+        (dst:_)      = freeRegs s
         -- The print label/function called depends on the type
         label        = case typeOf e it of
                           IntType    -> [ BL $ JumpLabel "p_print_int"    ]
