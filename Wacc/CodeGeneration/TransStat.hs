@@ -112,7 +112,7 @@ transStat s (PrintStat e it)
         strDataLabels  ls =           (newDataLabel "%.*s"  ls ):ls
 
 --
-transStat s (PrintlnStat e it) = error "PrintlnStat"
+transStat s (PrintlnStat e it) = (s, [])
 
 -- 
 transStat s (ScopedStat stat) = transScoped s stat

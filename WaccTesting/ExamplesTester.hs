@@ -46,7 +46,7 @@ getRecursiveContents dir = do
 testOne :: FilePath -> IO ()
 testOne path = do 
   -- Read source file 
-  source <- readFile $ "wacc_examples/" ++ path -- putStrLn $ source
+  source <- readFile $ "WaccTesting/wacc_examples/" ++ path -- putStrLn $ source
   -- Parse source file
   let result = parseWithEof pProgram source
 
@@ -89,7 +89,7 @@ parseOne shouldPass ( name , path ) = do
         -- Performs semantic check
         Right r -> if shouldPass
             then do 
-                let errs = unlines ( checkProgram r )
+                let errs = (unlines . snd) (checkProgram r)
                 -- when ( length errs > 0 ) ( do  
                 --     putTestDetails name
                 --     putStrLn ("Exit: 200\nSemantic Errors: " )
@@ -108,6 +108,7 @@ parseOne shouldPass ( name , path ) = do
 
 
 --------------------------------------------------------------------------------
+
 
 parseGroup shouldPass dir = do 
     -- Is the file at file path a Wacc file?
@@ -131,7 +132,7 @@ parseGroup shouldPass dir = do
 
 main = do
   -- ../WaccCompiler.hs_directory/wacc_examples
-  pwd <- flip (++) "/wacc_examples/" <$> getCurrentDirectory 
+  pwd <- flip (++) "/WaccTesting/wacc_examples/" <$> getCurrentDirectory 
   -- Check valid programs
   parseGroup True  ( pwd ++ "valid"       ) 
 
