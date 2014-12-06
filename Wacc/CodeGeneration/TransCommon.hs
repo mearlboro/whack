@@ -132,17 +132,17 @@ getBytesNeeded _                          =  0
 makePretty :: ( ArmState, [ Instr ] ) -- computed by transProgram
            ->   String                -- printable compiled program
 makePretty (s, instrs) 
-    =  show ( INDIR Data )  ++ "\n"
+    =  "\t" ++ show ( INDIR Data )  ++ "\n"
     ++ concatMap putDataLabel ( reverse ( dataLabels s ) )
-    ++ show ( INDIR Text )  ++ "\n"                  
-    ++ show ( INDIR ( Global ( "main" ) ) ) ++ "\n"
-    ++ ( concat $ intersperse "\n" $ map show instrs ) ++ "\n"
+    ++ "\t" ++ show ( INDIR Text )  ++ "\n"                  
+    ++ "\t" ++ show ( INDIR ( Global ( "main" ) ) ) ++ "\n"
+    ++ ( concat $ intersperse "\n\t" $ map show instrs ) ++ "\n"
     ++ concatMap putPredefLabel ( predefLabels s )
       where
         putDataLabel ( DataLabel l str ) 
-          =  l
-          ++ "\n\t.word " ++ show ( length str )
-          ++ "\n\t.ascii \"" ++ str  ++ "\\0\"\n"
+          =  "\t" ++ l
+          ++ "\n\t\t.word " ++ show ( length str )
+          ++ "\n\t\t.ascii \"" ++ str  ++ "\\0\"\n"
 
         putPredefLabel ( PredefLabel l instrs )
           = ( concat $ intersperse "\n\t" $ map show instrs ) ++ "\n"
@@ -165,7 +165,7 @@ intPrintPredef ls
     where
       intLbl = newDataLabel "%d\0" ls
 
-      name   =  "p_print_int"                         
+      name   =  "p_print_int:"                         
       instrs =  ( [ DEFINE $ JumpLabel name ] 
              ++ [ PUSH [ LR ] ]
              ++ [ MOV'Reg R1 R0 ]
@@ -183,7 +183,7 @@ boolPrintPredef ls
       falseLbl = newDataLabel "false\0" ls
       trueLbl  = newDataLabel "true\0"  (falseLbl:ls)
 
-      name   =  "p_print_bool"                         
+      name   =  "p_print_bool:"                         
       instrs =  ( [ DEFINE $ JumpLabel name ]
              ++ [ PUSH [ LR ] ]
              ++ [ CMP R0 $ Op2'ImmVal 0 ]
@@ -201,7 +201,7 @@ strPrintPredef ls
     where
       strLbl = newDataLabel "%.*s\0" ls
 
-      name   = "p_print_string"
+      name   = "p_print_string:"
       instrs =  ( [ DEFINE $ JumpLabel name ]
              ++ [ PUSH [ LR ] ]
              ++ [ LDR'Reg R1 R0 ]
@@ -218,7 +218,7 @@ refPrintPredef ls
     where
         refLbl = newDataLabel "%p\0" ls
         
-        name   = "p_print_reference"
+        name   = "p_print_reference:"
         instrs =  ( [ DEFINE $ JumpLabel name ]
                ++ [ PUSH [ LR ] ]
                ++ [ MOV'Reg R1 R0 ]
@@ -235,7 +235,7 @@ printlnPredef ls
     where
       printlnLbl = newDataLabel "\0" ls 
  
-      name   = "p_print_ln"
+      name   = "p_print_ln:"
       instrs =  ( [ DEFINE $ JumpLabel name ]
              ++ [ PUSH [ LR ] ]
              ++ [ LDR'Lbl R0 printlnLbl ]
@@ -253,7 +253,7 @@ intReadPredef ls
     where 
       intLbl = newDataLabel "%d\0" ls
     
-      name   = "p_read_int"
+      name   = "p_read_int:"
       instrs =  ( [ DEFINE $ JumpLabel name ]
              ++ [ PUSH [ LR ] ]
              ++ [ MOV'Reg R1 R0 ] 
@@ -268,7 +268,7 @@ charReadPredef ls
     where 
       charLbl = newDataLabel "%c\0" ls
 
-      name   = "p_read_char"
+      name   = "p_read_char:"
       instrs =  ( [ DEFINE $ JumpLabel name ]
              ++ [ PUSH [ LR ] ]
              ++ [ MOV'Reg R1 R0 ] 
@@ -288,7 +288,7 @@ freeArrPredef ls
       freeLbl = newDataLabel (  "NullReferenceError: dereference a null " 
                              ++ "reference.\0\n"                            )
                              ls
-      name    = "p_free_array"
+      name    = "p_free_array:"
       instrs  =  ( [ DEFINE $ JumpLabel name ]
               ++ [ PUSH [ LR ] ]
               ++ [ CMP R0 $ Op2'ImmVal 0 ]
@@ -304,7 +304,7 @@ freePairPredef ls
       freeLbl = newDataLabel (  "NullReferenceError: dereference a null "
                              ++ "reference.\n"                          )
                              ls
-      name    = "p_free_pair"
+      name    = "p_free_pair:"
       instrs  =  ( [ DEFINE $ JumpLabel name ]
               ++ [ PUSH [ LR ] ]
               ++ [ CMP R0 $ Op2'ImmVal 0 ]
@@ -333,7 +333,7 @@ ovfErrPredef ls
       ovfLbl =  newDataLabel (  "OverflowError: the result is too small/large "
                              ++ "to store in a 4-byte signed-integer."        )
                              ls
-      name   =  "p_throw_overflow_error"
+      name   =  "p_throw_overflow_error:"
       -- The set of instructions calls runtime error which exits the program
       instrs =  ( [ DEFINE $ JumpLabel name ]
              ++ [ LDR'Lbl R0 ovfLbl ]
@@ -347,7 +347,7 @@ divZeroCheckPredef ls
       -- Creates a data label for printing an overflow error -- TODO \n \0 label issue
       divLbl =  newDataLabel "DivideByZeroError: divide or modulo by zero."
                              ls
-      name   = "p_check_divide_by_zero"
+      name   = "p_check_divide_by_zero:"
       -- The set of instructions calls runtime error which exits the program
       instrs =  ( [ DEFINE $ JumpLabel name ]
              ++ [ PUSH [ LR ] ]
@@ -367,7 +367,7 @@ arrBoundsCheckPredef ls
       outIndLbl =  newDataLabel "ArrayIndexOutOfBoundsError: index too large\n"
                                 (negIndLbl:ls)
 
-      name   = "p_check_array_bounds"
+      name   = "p_check_array_bounds:"
       -- The set of instructions calls runtime error which exits the program
       instrs =  ( [ DEFINE $ JumpLabel name ]
              ++ [ PUSH [ LR ] ]
@@ -386,7 +386,7 @@ nullPtrCheckPredef ls
       nullLbl = newDataLabel (  "NullReferenceError: dereference a null "
                              ++ "reference.\n"                            )
                              ls
-      name    = "p_check_null_pointer"
+      name    = "p_check_null_pointer:"
       instrs  =  ( [ DEFINE $ JumpLabel name ] 
               ++ [ PUSH [ LR ] ]
               ++ [ CMP R0 $ Op2'ImmVal 0 ]
@@ -398,7 +398,7 @@ nullPtrCheckPredef ls
 runtErrPredef
   = [ PredefLabel name instrs ]
     where
-      name   = "p_throw_runtime_error"
+      name   = "p_throw_runtime_error:"
       instrs =  ( [ DEFINE $ JumpLabel name ] 
              ++ [ BL $ JumpLabel "p_print_string" ] 
              ++ [ MOV R0 $ Op2'ImmVal (-1) ]
@@ -412,7 +412,7 @@ runtErrPredef
 newDataLabel str ls 
   = DataLabel lName str
     where 
-      lName = "msg_" ++ ( show $ length ls )
+      lName = "msg_" ++ ( show $ length ls ) ++ ":"
 
 -- | For naming "runtime" labels
 nextLabel :: Int -> Label
@@ -436,7 +436,7 @@ stateAddCheckNullPtr s
   = s { dataLabels = ls', predefLabels = ps' }
     where
       (ls', ps') 
-        = if not $ containsLabel "p_check_null_pointer" ps
+        = if not $ containsLabel "p_check_null_pointer:" ps
             then 
               let (l,  p ) = strPrintPredef     ls     in  
               let (l', p') = nullPtrCheckPredef (l:ls) in
@@ -453,7 +453,7 @@ stateAddIntOverflowError s
   = s { dataLabels = ls', predefLabels = ps' }
     where
       (ls', ps') 
-        = if not $ containsLabel "p_throw_overflow_error" ps  
+        = if not $ containsLabel "p_throw_overflow_error:" ps  
             then
               let (l , p ) = strPrintPredef ls        in  
               let (l', p') = ovfErrPredef   (l:ls)    in  
@@ -471,7 +471,7 @@ stateAddDivZeroError s
   = s { dataLabels = ls', predefLabels = ps' }
     where
       (ls', ps')
-        = if not $ containsLabel "p_check_divide_by_zero" ps
+        = if not $ containsLabel "p_check_divide_by_zero:" ps
             then
               let (l,  p ) = strPrintPredef     ls        in
               let (l', p') = divZeroCheckPredef (l:ls)    in
@@ -489,7 +489,7 @@ stateAddArrayBounds s
   = s { dataLabels = ls', predefLabels = ps' }
     where
       (ls', ps')
-        = if not $ containsLabel "p_check_array_bounds" ps
+        = if not $ containsLabel "p_check_array_bounds:" ps
             then
               let (l,  p  ) = strPrintPredef        ls     in
               let (ls', p') = arrBoundsCheckPredef  (l:ls) in
@@ -510,10 +510,10 @@ stateAddRead s name
         = if not $ containsLabel name ls 
             then 
               case name of
-                  "p_read_int"  -> let (l, p) = intReadPredef  ls 
-                                   in  (l:ls, ps ++ p)
-                  "p_read_char" -> let (l, p) = charReadPredef ls
-                                   in  (l:ls, ps ++ p)
+                  "p_read_int:"  -> let (l, p) = intReadPredef  ls 
+                                    in  (l:ls, ps ++ p)
+                  "p_read_char:" -> let (l, p) = charReadPredef ls
+                                    in  (l:ls, ps ++ p)
             else (ls, ps)
                             
       ls           = dataLabels     s
