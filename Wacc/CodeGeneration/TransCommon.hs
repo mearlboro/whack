@@ -263,7 +263,7 @@ charReadPredef dataLabel
 -- | These functions will create the predefLabels for free functions.
 
 -- Free array
-freeArrErrPredef ls
+freeArrPredef ls
   = (freeLbl, [ PredefLabel name instrs ])
     where
       freeLbl = newDataLabel (  "NullReferenceError: dereference a null " 
@@ -279,7 +279,7 @@ freeArrErrPredef ls
               ++ [ POP [ PC ] ] )
 
 -- Free pair 
-freePairErrPredef ls
+freePairPredef ls
   = (freeLbl, [ PredefLabel name instrs ])
     where
       freeLbl = newDataLabel (  "NullReferenceError: dereference a null "
@@ -295,7 +295,7 @@ freePairErrPredef ls
               ++ [ LDR'Reg R0 R0 ]
               ++ [ BL  $ JumpLabel "free" ]
               ++ [ LDR'Reg R0 R0 ]
-              ++ [ LDR'Reg R0 R0 ] -- TODO: [r0, #4] ??
+              ++ [ ldrVar R0 R0 4 4]
               ++ [ BL  $ JumpLabel "free" ]
               ++ [ POP [ R0 ] ] 
               ++ [ BL  $ JumpLabel "free" ]

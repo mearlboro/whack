@@ -238,8 +238,8 @@ instance Show Register where
   show R11 = "r11"
   show R12 = "r12"
   show SP  = "sp"   -- R13 | Stack Pointer
-  show LR  = "{lr}" -- R14 | Link Register (which holds return addresses)
-  show PC  = "{pc}" -- R15 | Program Counter
+  show LR  = "lr"   -- R14 | Link Register (which holds return addresses)
+  show PC  = "pc"   -- R15 | Program Counter
 
 instance Show Directive where
   show Text       = ".text"
@@ -325,8 +325,8 @@ instance Show Instr where
     show (BLVS   l            ) = "\tBLVS "  ++ show l
     show (DEFINE l            ) = "\t"       ++ show l 
 
-    show (PUSH   regs         ) = "\tPUSH "  ++ intercalate ", " (map show regs) 
-    show (POP    regs         ) = "\tPOP "   ++ intercalate ", " (map show regs)
+    show (PUSH   regs         ) = "\tPUSH {" ++ intercalate ", " (map show regs) ++ "}"
+    show (POP    regs         ) = "\tPOP {"  ++ intercalate ", " (map show regs) ++ "}"
 
     -- LDR STR constant
     show (LDR       rd n      ) = "\tLDR "   ++ show rd ++ ", =" ++ show n

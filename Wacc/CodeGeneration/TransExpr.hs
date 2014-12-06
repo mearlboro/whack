@@ -62,7 +62,7 @@ transExpr s (ArrayElemExpr (id, exprs))
         s''            = stateAddArrayBounds s
         
         -- Updates the registers in the state
-        -- s'             = s { freeRegs = nxt:regs }
+        s'             = s { freeRegs = nxt:regs }
         (dst:nxt:regs) = freeRegs s
 
         (src, off) = lookupLoc s id  
@@ -313,7 +313,7 @@ stateAddArrayBounds s
         = if not $ containsLabel "p_check_array_bounds" ps
             then
               let (l,  p  ) = strPrintPredef        ls     in 
-              let (ls', p') = arrBoundsCheckPredef  l:ls   in 
+              let (ls', p') = arrBoundsCheckPredef  (l:ls) in 
               let p''       = runtErrPredef                in 
               (ls' ++ (l:ls), ps ++ p ++ p' ++ p'')
             else
