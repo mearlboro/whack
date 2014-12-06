@@ -102,7 +102,7 @@ transFunc s (Func ftype fname params body it)  =  (s'', funcI)
 -- ************************************************************************** --
 
 {-
--- This demonstrates just how awesome mapAccumL is 
+-- This demonstrates just how awesome mapAccumL is \\GOTO: this.line(44)
 transFuncs :: [ Func ] -> ArmState -> (ArmState, [Instr])
 transFuncs fs arm = transFuncs' fs (arm, [])
   where

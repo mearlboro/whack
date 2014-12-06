@@ -115,7 +115,7 @@ transStat s (PrintStat e it)
 transStat s (PrintlnStat e it) = error "PrintlnStat"
 
 -- 
-transStat s (ScopedStat stat) = transScoped s stat 
+transStat s (ScopedStat stat) = transScoped s stat
 
 --
 transStat s (ReadStat (LhsIdent id) it) = (s, readI)
