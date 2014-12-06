@@ -158,45 +158,55 @@ transStat s (PrintlnStat e it)
 transStat s (ScopedStat stat) = transScoped s stat
 
 --
-transStat s (ReadStat (LhsIdent id) it) = (s, readI)
-  where
-    readL = case typeOf (IdentExpr id) it of 
-              IntType  -> "p_read_int"
-              CharType -> "p_read_char"
-
-    dst = head (freeRegs s)
-    (src, off) = lookupLoc s id  
-    readI = 
-      [ ADD dst src $ Op2'ImmVal off 
-      , MOV'Reg R0 dst 
-      , BL (JumpLabel readL) ]
-
---
-transStat s (ReadStat (LhsPairElem pairE) it) = (s', readI)
-  where
-    readL = case typeOf pairE it of 
-              IntType  -> "p_read_int"
-              CharType -> "p_read_char"
-
-    dst         = head (freeRegs s)
-    (s', pairI) = transPairElem s (pairE, it)
-    readI       =  
-      pairI ++ 
-      [ MOV'Reg R0 dst 
-      , BL (JumpLabel readL) ]
---
-transStat s (ReadStat (LhsArrayElem arrayE) it) = (s', readI)
-  where
-    readL = case typeOf arrayE it of 
+transStat s (ReadStat (LhsIdent id) it) 
+  = (s', readI)
+    where
+      readL = case typeOf (IdentExpr id) it of 
                 IntType  -> "p_read_int"
                 CharType -> "p_read_char"
   
-    dst          = head (freeRegs s)
-    (s', arrayI) = transExpr s (ArrayElemExpr arrayE)
-    readI       =  
-      arrayI ++ 
-      [ MOV'Reg R0 dst 
-      , BL (JumpLabel readL) ]
+      dst = head (freeRegs s)
+      (src, off) = lookupLoc s id  
+      readI = 
+        [ ADD dst src $ Op2'ImmVal off 
+        , MOV'Reg R0 dst 
+        , BL (JumpLabel readL) ]
+  
+      s' = stateAddRead s readL
+
+--
+transStat s (ReadStat (LhsPairElem pairE) it) 
+  = (s'', readI)
+    where
+      readL = case typeOf pairE it of 
+                IntType  -> "p_read_int"
+                CharType -> "p_read_char"
+  
+      dst         = head (freeRegs s)
+      (s', pairI) = transPairElem s (pairE, it)
+      readI       =  
+        pairI ++ 
+        [ MOV'Reg R0 dst 
+        , BL (JumpLabel readL) ]
+  
+      s'' = stateAddRead s' readL
+
+--
+transStat s (ReadStat (LhsArrayElem arrayE) it) 
+  = (s'', readI)
+    where
+      readL = case typeOf arrayE it of 
+                  IntType  -> "p_read_int"
+                  CharType -> "p_read_char"
+    
+      dst          = head (freeRegs s)
+      (s', arrayI) = transExpr s (ArrayElemExpr arrayE)
+      readI       =  
+        arrayI ++ 
+        [ MOV'Reg R0 dst 
+        , BL (JumpLabel readL) ]
+  
+      s'' = stateAddRead s' readL
 
 -- 
 transStat s (WhileStat cond body _) = (s''', whileI)
@@ -341,26 +351,27 @@ transStat s (IfStat cond thens elses it) = (s'''', ifI)
 -- ***********************                            *********************** -- 
 -- ************************************************************************** --
 
-transPairElem                :: Assembler (PairElem, It)
-transPairElem s (pairE, it)  = 
-  case pairE of 
-    Fst e -> transPairElemExpr e 0
-    Snd e -> transPairElemExpr e 4
-  where 
-    transPairElemExpr        :: Expr -> Int -> (ArmState, [ Instr ])
-    transPairElemExpr e off  =  (s'', pelemI)
-      where
-        s''         = stateAddCheckNullPtr s'
+transPairElem :: Assembler (PairElem, It)
 
-        (dst:_)     = freeRegs  s
-        (s', exprI) = transExpr s e
-
-        size = sizeOf pairE it 
-        pelemI = 
-          exprI ++
-          [ MOV'Reg R0 dst 
-          , BL (JumpLabel "p_check_null_pointer") 
-          , ldrVar dst dst size off ] 
+transPairElem s (pairE, it)
+  = case pairE of 
+      Fst e -> transPairElemExpr e 0
+      Snd e -> transPairElemExpr e 4
+    where 
+      transPairElemExpr        :: Expr -> Int -> (ArmState, [ Instr ])
+      transPairElemExpr e off  =  (s'', pelemI)
+        where
+          s''         = stateAddCheckNullPtr s'
+  
+          (dst:_)     = freeRegs  s
+          (s', exprI) = transExpr s e
+  
+          size = sizeOf pairE it 
+          pelemI = 
+            exprI ++
+            [ MOV'Reg R0 dst 
+            , BL (JumpLabel "p_check_null_pointer") 
+            , ldrVar dst dst size off ] 
 
 --
 transRhs :: Assembler (AssignRhs, It)
@@ -369,79 +380,82 @@ transRhs :: Assembler (AssignRhs, It)
 transRhs s (RhsExpr e, it) = transExpr s e  
 
 --
-transRhs s (RhsPairElem pairE, it) = (s', rhsI)
-  where
-    dst = head (freeRegs s)
-    (s', pelemI) = transPairElem s (pairE, it)
-    size = sizeOf pairE it 
-    rhsI = pelemI ++ [ ldrVar dst dst size 0 ]
+transRhs s (RhsPairElem pairE, it) 
+  = (s', rhsI)
+    where
+      dst = head (freeRegs s)
+      (s', pelemI) = transPairElem s (pairE, it)
+      size = sizeOf pairE it 
+      rhsI = pelemI ++ [ ldrVar dst dst size 0 ]
 
 -- 
-transRhs arm (RhsArrayLiter exprs, it) = (arm', rhsInstr)
-  where
-    rhsInstr = malloc ++ exprsInstr ++ lengthInstr 
-    arrayLength = length exprs
-    arraySize   = sum (map (flip sizeOf it) exprs) + sizeOf (ArrayType {}) it 
-    -- Allocate memeory on the heap
-    malloc = [ LDR R0 arraySize        ] ++ 
-             [ BL (JumpLabel "malloc") ] ++
-             [ MOV dst (Op2'Reg R0)    ]
-    (dst:nxt:_) = freeRegs arm
-    -- Add to heap each elem of the array 
-    (arm' , exprsInstr) = transArrayLitExpr arm (exprs, it) 
-    -- Add the length of the array to the heap  
-    --offset = stackOffset arm' - sizeOf (ArrayType {})
-    lengthInstr = [ LDR nxt arrayLength   ] ++ 
-                  [ STR'Reg nxt dst       ] -- ++ 
-                  -- [ STR'Off dst SP offset ]
-    --finalArm = arm' { stackOffset = offset }
+transRhs arm (RhsArrayLiter exprs, it) 
+  = (arm', rhsInstr)
+    where
+      rhsInstr = malloc ++ exprsInstr ++ lengthInstr 
+      arrayLength = length exprs
+      arraySize   = sum (map (flip sizeOf it) exprs) + sizeOf (ArrayType {}) it 
+      -- Allocate memeory on the heap
+      malloc = [ LDR R0 arraySize        ] ++ 
+               [ BL (JumpLabel "malloc") ] ++
+               [ MOV dst (Op2'Reg R0)    ]
+      (dst:nxt:_) = freeRegs arm
+      -- Add to heap each elem of the array 
+      (arm' , exprsInstr) = transArrayLitExpr arm (exprs, it) 
+      -- Add the length of the array to the heap  
+      --offset = stackOffset arm' - sizeOf (ArrayType {})
+      lengthInstr = [ LDR nxt arrayLength   ] ++ 
+                    [ STR'Reg nxt dst       ] -- ++ 
 
 -- 
-transRhs s (RhsNewPair fstExpr sndExpr, it) = (s'',  newPairInstrs )
-  where
-    pairAdrSize = 8
-
-    (dst:nxt:_) = freeRegs s
-
-    (s',  fstInstrs) = transPairElemExpr s  (fstExpr, it, 0)
-    (s'', sndInstrs) = transPairElemExpr s' (sndExpr, it, 1)
-
-    -- To store the address of the pair onto the stack
-    offset = stackOffset s'' 
-
-    -- Reserved 8 bytes for the 2 addresses
-    newPairInstrs 
-      =  [ LDR R0 pairAdrSize      ] 
-      ++ [ BL (JumpLabel "malloc") ] 
-      ++ [ MOV'Reg dst R0          ]
-      ++ fstInstrs
-      ++ sndInstrs
-      -- TODO magic pair
+transRhs s (RhsNewPair fstExpr sndExpr, it) 
+  = (s'', newPairInstrs )
+    where
+      pairAdrSize = 8
+  
+      (dst:nxt:_) = freeRegs s
+  
+      (s',  fstInstrs) = transPairElemExpr s  (fstExpr, it, 0)
+      (s'', sndInstrs) = transPairElemExpr s' (sndExpr, it, 1)
+  
+      -- To store the address of the pair onto the stack
+      offset = stackOffset s'' 
+  
+      -- Reserved 8 bytes for the 2 addresses
+      newPairInstrs 
+        =  [ LDR R0 pairAdrSize      ] 
+        ++ [ BL (JumpLabel "malloc") ] 
+        ++ [ MOV'Reg dst R0          ]
+        ++ fstInstrs
+        ++ sndInstrs
+        -- TODO magic pair
 
 -- 
-transRhs s (RhsCall fname params, it) = (s', callInstrs)
-  where
-    -- mapAccumR :: (acc -> x -> (acc, y)) -> acc -> [x] -> (acc, [y])
-    -- x = Expr 
-    --transFuncts :: -> ParamList -> (ArmState, [[Instr]])
-    (dst:_) = freeRegs s
-    -- Expression instructtion
-    (s', instrs) = mapAccumR transExpr s (reverse params)
-    -- Generate instructions to push params on the stack
+transRhs s (RhsCall fname params, it)
+  = (s', callInstrs)
+    where
+      -- mapAccumR :: (acc -> x -> (acc, y)) -> acc -> [x] -> (acc, [y])
+      -- x = Expr 
+      --transFuncts :: -> ParamList -> (ArmState, [[Instr]])
+      (dst:_) = freeRegs s
+      -- Expression instructtion
+      (s', instrs) = mapAccumR transExpr s (reverse params)
+      -- Generate instructions to push params on the stack
+  
+      pushArg e = let s = sizeOf e it in [[ strArg dst SP s (-s) ]]
+  
+      pushArgs = map pushArg params 
+  
+      paramInstrs = (concat . concat) (zipWith (:) instrs pushArgs)
+  
+      totSize = sum (map (flip sizeOf it) params)
+  
+      callInstrs 
+        = paramInstrs 
+        ++ [ BL (JumpLabel ("f_" ++ fname ++ ":")) ]
+        ++ (if totSize == 0 then [] else [ ADD SP SP $ Op2'ImmVal totSize ]) 
+        ++ [ MOV'Reg dst R0 ] -- TODO
 
-    pushArg e = let s = sizeOf e it in [[ strArg dst SP s (-s) ]]
-
-    pushArgs = map pushArg params 
-
-    paramInstrs = (concat . concat) (zipWith (:) instrs pushArgs)
-
-    totSize = sum (map (flip sizeOf it) params)
-
-    callInstrs 
-      = paramInstrs 
-      ++ [ BL (JumpLabel ("f_" ++ fname ++ ":")) ]
-      ++ (if totSize == 0 then [] else [ ADD SP SP $ Op2'ImmVal totSize ]) 
-      ++ [ MOV'Reg dst R0 ] -- TODO
 
 -- ************************************************************************** --
 -- ***********************                            *********************** --
