@@ -27,38 +27,70 @@ transStat :: Assembler Stat
 transStat s SkipStat = (s, [])
 
 -- 
-transStat s (FreeStat e it) = (s', freeI)
-  where 
-    dst         = head (freeRegs s)
-    (s', exprI) = transExpr s e
-    freeI       = exprI ++ [ MOV'Reg R0 dst, BL (JumpLabel freeL) ]
-    freeL       = case typeOf e it of 
-                    ArrayType {} -> "p_free_array"
-                    PairType  {} -> "p_free_pair"
+transStat s (FreeStat e it) 
+  = (s'', freeI)
+    where
+      -- First translates the expressions
+      (s', exprI) = transExpr s e
+
+      -- Then sets the instructions for free
+      freeI       = exprI ++ [ MOV'Reg R0 dst, BL (JumpLabel label) ]
+      label       = case typeOf e it of 
+                      ArrayType {} -> "p_free_array"
+                      PairType  {} -> "p_free_pair"
+      (dst:_)     = freeRegs s
+
+      -- Also add the data labels and predef functions to the state
+      s''  = s' { dataLabels = ls', predefLabels = ps' }
+
+      -- Labels depend on the type of the expression to be freed
+      (ls', ps') = case typeOf e it of 
+           ArrayType {} -> if not $ containsLabel "p_free_array" ps
+                             then 
+                               let (l,  p ) = strPrintPredef  ls      in
+                               let (l', p') = freeArrPredef   (l:ls)  in
+                               let p''      = runtErrPredef           in
+                               (l':l:ls, ps ++ p ++ p' ++ p'')
+                             else 
+                               (ls, ps) 
+           PairType  {} -> if not $ containsLabel "p_free_pair"  ps
+                             then 
+                               let (l,  p ) = strPrintPredef  ls      in
+                               let (l', p') = freePairPredef  (l:ls)  in
+                               let p''      = runtErrPredef           in
+                               (l':l:ls, ps ++ p ++ p' ++ p'')
+                             else 
+                               (ls, ps) 
+
+      ls   = dataLabels   s'
+      ps   = predefLabels s'
+
 
 -- To exit we load the value of the expression into the first available reg
 -- and then move its value into register 0. then call BL exit  
-transStat s (ExitStat e _) = (s', exitI)
-  where
-    -- Obtain the register that the expression value will be saved into
-    (dst:_) = freeRegs s
-    -- Translate the expression to exit
-    (s', exprI) = transExpr s e
-    -- Instructions for the exit statement
-    exitI         
-      =  exprI 
-      ++ [ MOV R0 $ Op2'Reg dst  ] -- TODO: Comment
-      ++ [ BL (JumpLabel "exit") ] -- TODO: Comment
+transStat s (ExitStat e _) 
+  = (s', exitI)
+    where
+      -- Obtain the register that the expression value will be saved into
+      (dst:_) = freeRegs s
+      -- Translate the expression to exit
+      (s', exprI) = transExpr s e
+      -- Instructions for the exit statement
+      exitI         
+        =  exprI 
+        ++ [ MOV R0 $ Op2'Reg dst  ] -- TODO: Comment
+        ++ [ BL (JumpLabel "exit") ] -- TODO: Comment
 
 -- 
-transStat s (ReturnStat e _) = (s', returnI)
-  where
-    -- Obtain the register that the expression value will be saved into
-    (dst:_)  =  freeRegs s
-    -- Translate the expression to return
-    (s', exprI) = transExpr s e 
-    -- Move result of expression from dst into return register R0
-    returnI = exprI ++ [ MOV'Reg R0 dst ] 
+transStat s (ReturnStat e _) 
+  = (s', returnI)
+    where
+      -- Obtain the register that the expression value will be saved into
+      (dst:_)  =  freeRegs s
+      -- Translate the expression to return
+      (s', exprI) = transExpr s e 
+      -- Move result of expression from dst into return register R0
+      returnI = exprI ++ [ MOV'Reg R0 dst ] 
 
 ---- TODO: to implement arrays, pairs (printing an address)
 transStat s (PrintStat e it) 
@@ -293,6 +325,7 @@ transStat s (IfStat cond thens elses it) = (s'''', ifI)
       , DEFINE (JumpLabel elseL)         
       ] ++ elseI ++ 
       [ DEFINE (JumpLabel endifL) ]
+
 
 
 -- ************************************************************************** --
