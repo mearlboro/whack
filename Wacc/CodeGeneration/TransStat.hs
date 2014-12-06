@@ -111,7 +111,7 @@ transStat s (PrintStat e it)
                           BoolType   -> [ BL $ JumpLabel "p_print_bool"   ]
                           CharType   -> [ BL $ JumpLabel "putchar"        ]
                           StringType -> [ BL $ JumpLabel "p_print_string" ]  
-                          _          -> error "unimplemented print function"
+                          _          -> [ BL $ JumpLabel "p_print_reference" ] 
 
 
         ls  = dataLabels   s'
@@ -133,7 +133,11 @@ transStat s (PrintStat e it)
                                               let (l, p)   = strPrintPredef  ls  in 
                                               (l:ls, ps ++ p)
                                          else (ls, ps)
-                       _          -> (ls, ps)        
+                       _          -> if not $ containsLabel "p_print_reference" ps
+                                         then 
+                                              let (l, p)   = refPrintPredef  ls  in
+                                              (l:ls, ps ++ p)
+                                        else  (ls, ps)        
 
 
 --
