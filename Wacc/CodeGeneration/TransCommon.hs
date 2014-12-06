@@ -140,7 +140,7 @@ makePretty (s, instrs)
     ++ concatMap putPredefLabel ( predefLabels s )
       where
         putDataLabel ( DataLabel l str ) 
-          =  "\t" ++ l
+          =  "\t" ++ l ++ ":"
           ++ "\n\t\t.word " ++ show ( length str )
           ++ "\n\t\t.ascii \"" ++ str  ++ "\\0\"\n"
 
@@ -412,7 +412,7 @@ runtErrPredef
 newDataLabel str ls 
   = DataLabel lName str
     where 
-      lName = "msg_" ++ ( show $ length ls ) ++ ":"
+      lName = "msg_" ++ ( show $ length ls ) 
 
 -- | For naming "runtime" labels
 nextLabel :: Int -> Label
