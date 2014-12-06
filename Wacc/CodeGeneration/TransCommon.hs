@@ -338,7 +338,7 @@ divZeroCheckPredef ls
              ++ [ POP [ PC ] ] )
 
 
--- Array bounds check, generates function label and data label for the message
+-- Array bounds check, generates function label and data label
 arrBoundsCheckPredef ls
   = (outIndLbl:[negIndLbl], [ PredefLabel name instrs ])
     where
@@ -360,6 +360,7 @@ arrBoundsCheckPredef ls
              ++ [ BLCS $ JumpLabel "p_throw_runtime_error" ] 
              ++ [ POP [ PC ] ] )
 
+-- Null pointer check, generates function and data label
 nullPtrCheckPredef ls
   = (nullLbl, [ PredefLabel name instrs ]) 
     where
@@ -408,5 +409,78 @@ labelName (DataLabel   name _) = name
 -- | Checks if a predef label was added or not in the current program
 containsLabel name ls
   = or . map (==name) $ map labelName ls
+
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- Adds the null pointer checker and its needed data labels to the state
+stateAddCheckNullPtr s
+  = s { dataLabels = ls', predefLabels = ps' }
+    where
+      (ls', ps') 
+        = if not $ containsLabel "p_check_null_pointer" ps
+            then 
+              let (l,  p ) = strPrintPredef     ls     in  
+              let (l', p') = nullPtrCheckPredef (l:ls) in
+              let p''      = runtErrPredef             in  
+              (l:l':ls, ps ++ p ++ p' ++ p'')
+            else
+              (ls, ps) 
+
+      ls = dataLabels s
+      ps = predefLabels s
+
+-- Adds the overflow error data and predef labels as needed for all integers
+stateAddIntOverflowError s 
+  = s { dataLabels = ls', predefLabels = ps' }
+    where
+      (ls', ps') 
+        = if not $ containsLabel "p_throw_overflow_error" ps  
+            then
+              let (l , p ) = strPrintPredef ls        in  
+              let (l', p') = ovfErrPredef   (l:ls)    in  
+              let p''      = runtErrPredef            in  
+              (l': l: ls, ps ++ p ++ p' ++ p'')
+            else
+              (ls,   ps) 
+
+      ls           = dataLabels     s   
+      ps           = predefLabels   s   
+      
+
+-- Adds the divide by zero check as needed by DIV and MOD      
+stateAddDivZeroError s
+  = s { dataLabels = ls', predefLabels = ps' }
+    where
+      (ls', ps')
+        = if not $ containsLabel "p_check_divide_by_zero" ps
+            then
+              let (l,  p ) = strPrintPredef     ls        in
+              let (l', p') = divZeroCheckPredef (l:ls)    in
+              let p''      = runtErrPredef                in
+              (l': l: ls, ps ++ p ++ p' ++ p'')
+            else
+              (ls,   ps)
+
+      ls           = dataLabels     s
+      ps           = predefLabels   s
+
+      
+-- Adds the check array bounds predef and data labels
+stateAddArrayBounds s
+  = s { dataLabels = ls', predefLabels = ps' }
+    where
+      (ls', ps')
+        = if not $ containsLabel "p_check_array_bounds" ps
+            then
+              let (l,  p  ) = strPrintPredef        ls     in
+              let (ls', p') = arrBoundsCheckPredef  (l:ls) in
+              let p''       = runtErrPredef                in
+              (ls' ++ (l:ls), ps ++ p ++ p' ++ p'')
+            else
+              (ls,   ps)
+
+      ls           = dataLabels     s
+      ps           = predefLabels   s
+
 
 

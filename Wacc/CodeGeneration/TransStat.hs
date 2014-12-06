@@ -14,6 +14,7 @@ import           Data.Maybe        (fromJust)
 import           Data.List         (mapAccumL, mapAccumR) 
 import           Data.Tuple        (swap)
 
+
 -- ************************************************************************** --
 -- ***********************                            *********************** --
 -- ***********************    Statement Translation   *********************** --
@@ -262,35 +263,41 @@ transStat s (AssignStat (LhsIdent id) rhs it) = (s', assignI)
     assignI = rhsI ++ [ strVar dst src magic4 off ]
 
 -- We are assigning the first or second element of a pair to a new value
-transStat s (AssignStat (LhsPairElem pelem) rhs it) = (s', pelemInstr)
-  where
-    -- Obtain the free registers
-    (dst:nxt:_) = freeRegs s 
-    -- 
-    (s', rhsInstrs) = transRhs s (rhs, it) 
-    (src, off) = fromJust (Map.lookup (getElemId pelem) (memoryMap s'))
+transStat s (AssignStat (LhsPairElem pelem) rhs it) 
+  = (s'', pelemInstr)
+    where
+      -- Obtain the free registers
+      (dst:nxt:_) = freeRegs s 
+      -- 
+      (s', rhsInstrs) = transRhs s (rhs, it)
+ 
+      (src, off) = fromJust (Map.lookup (getElemId pelem) (memoryMap s'))
+  
+      pelemType  = typeOf pelem it
+      elemSize   = sizeOf pelemType it
+      elemOff    = if (pelem ~== Fst {}) then 0 else 4
 
-    --PairType (Just (fstType, sndType)) = fromJust (getPairElemType pelem it) 
-    pelemType = typeOf pelem it
+      pelemInstr 
+        =  rhsInstrs 
+        ++ [ ldrVar nxt src 4 off ] 
+        ++ [ MOV'Reg R0 nxt ] -- check null
+        ++ [ BL (JumpLabel "p_check_null_pointer") ]
+        ++ [ ldrVar nxt nxt 4  elemOff ]
+        ++ [ strVar dst nxt elemSize 0 ]
+  
+      -- Helper functions
+      getElemId :: PairElem -> IdentName
+      getElemId (Fst e) = fromJust $ getIdent e
+      getElemId (Snd e) = fromJust $ getIdent e
+  
+      getIdent                                  :: Expr -> Maybe IdentName
+      getIdent ( IdentExpr       ident       )  =  Just ident
+      getIdent ( ArrayElemExpr ( ident , _ ) )  =  Just ident
+      getIdent                           _      =  Nothing
 
-    elemSize = sizeOf pelemType it -- sizeOf $ if (pelem ~== Fst {}) then fstType else sndType
-    elemOff = if (pelem ~== Fst {}) then 0 else 4
-    pelemInstr 
-      =  rhsInstrs 
-      ++ [ ldrVar nxt src 4 off ] 
-      ++ [ MOV'Reg R0 nxt ] -- check null
-      ++ [ BL (JumpLabel "p_check_null_pointer") ]
-      ++ [ ldrVar nxt nxt 4  elemOff ]
-      ++ [ strVar dst nxt elemSize 0 ]
-
-    getElemId :: PairElem -> IdentName
-    getElemId (Fst e) = fromJust $ getIdent e
-    getElemId (Snd e) = fromJust $ getIdent e
-
-    getIdent                                  :: Expr -> Maybe IdentName
-    getIdent ( IdentExpr       ident       )  =  Just ident
-    getIdent ( ArrayElemExpr ( ident , _ ) )  =  Just ident
-    getIdent                           _      =  Nothing
+      -- Now update the state with
+      s'' = stateAddCheckNullPtr s'
+      -- the labels and functions for checking null pointer error
 
 
 transStat s (AssignStat (LhsArrayElem (id, exprs)) rhs it) = error "TODO"
@@ -314,7 +321,7 @@ transStat s (IfStat cond thens elses it) = (s'''', ifI)
     -- Now for the then end else branch, in its own scope
     (s''', thenI) = transScoped s'' thens 
     -- Now for the else branch, also in its own scope
-    (s'''', elseI) = transScoped s'''' elses 
+    (s'''', elseI) = transScoped s''' elses 
     -- Now concatenate everything together
     ifI =  
       condI ++                          
@@ -341,10 +348,13 @@ transPairElem s (pairE, it)  =
     Snd e -> transPairElemExpr e 4
   where 
     transPairElemExpr        :: Expr -> Int -> (ArmState, [ Instr ])
-    transPairElemExpr e off  =  (s', pelemI)
+    transPairElemExpr e off  =  (s'', pelemI)
       where
-        dst = head (freeRegs s)
+        s''         = stateAddCheckNullPtr s'
+
+        (dst:_)     = freeRegs  s
         (s', exprI) = transExpr s e
+
         size = sizeOf pairE it 
         pelemI = 
           exprI ++
