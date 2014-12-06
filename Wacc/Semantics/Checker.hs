@@ -245,42 +245,6 @@ getPairElemType pElem it  =
 
 
 
-getPairTypeFromPairElem :: PairElem -> It -> Maybe Type 
-getPairTypeFromPairElem pElem it =
-  case pElem of
-
-    Fst expr -> getPairElemType' expr fst
-    Snd expr -> getPairElemType' expr snd
-
-  where
-
-    getIdent                                  :: Expr -> Maybe IdentName
-    getIdent ( IdentExpr       ident       )  =  Just ident
-    getIdent ( ArrayElemExpr ( ident , _ ) )  =  Just ident
-    getIdent                           _      =  Nothing
-
-    getType _     ( PairType   Nothing      )  =  NullType
-    getType which ( PairType ( Just types ) )  =  which types
-    getType _       _                          =  error "Unexpected"
-
-
-    getPairElemType' expr which  =
-
-        if isValidPair then Just pairType else Nothing
-
-      where
-
-        pairIdent             =  getIdent expr
-
-        pairObj               =  findIdent' ( fromJust pairIdent ) it
-
-        IdentObj pairType pairCtx =  fromJust pairObj
-
-        isValidPair           =  isJust pairObj          &&
-                                 ( pairType ~== PairType {} ||
-                                   pairType  == NullType  ) &&
-                                   pairCtx ~/= Function {}
-
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- Get the type of an array element.
@@ -528,7 +492,7 @@ checkType t ts  =  toSemErr errMsg ( null ts || any ( ~== t ) ts )
 checkCtx      :: Context -> [ Context ] -> [ SemanticErr ]
 checkCtx c cs =  toSemErr errMsg ( null cs || any ( ~== c ) cs )
   where
-    errMsg  =  "Expecting Contexts: " ++ show cs ++ " | Found Context: " ++ str c
+    errMsg  =  "Expecting Contexts: " ++ concatMap str cs ++ " | Found Context: " ++ str c
 
     str   Variable      =  "Variable"  -- TODO eventually remove and derive Show
     str   Parameter     =  "Parameter"
