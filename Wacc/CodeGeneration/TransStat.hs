@@ -132,10 +132,31 @@ transStat s (ReadStat (LhsIdent id) it) = (s, readI)
       , BL (JumpLabel readL) ]
 
 --
-transStat s (ReadStat (LhsPairElem elem) it) = error "TODO"
+transStat s (ReadStat (LhsPairElem pairE) it) = (s', readI)
+  where
+    readL = case typeOf pairE it of 
+              IntType  -> "p_read_int"
+              CharType -> "p_read_char"
 
+    dst         = head (freeRegs s)
+    (s', pairI) = transPairElem s (pairE, it)
+    readI       =  
+      pairI ++ 
+      [ MOV'Reg R0 dst 
+      , BL (JumpLabel readL) ]
 --
-transStat s (ReadStat (LhsArrayElem array) it) = error "TODO"
+transStat s (ReadStat (LhsArrayElem arrayE) it) = (s', readI)
+  where
+    readL = case typeOf arrayE it of 
+                IntType  -> "p_read_int"
+                CharType -> "p_read_char"
+  
+    dst          = head (freeRegs s)
+    (s', arrayI) = transExpr s (ArrayElemExpr arrayE)
+    readI       =  
+      arrayI ++ 
+      [ MOV'Reg R0 dst 
+      , BL (JumpLabel readL) ]
 
 -- 
 transStat s (WhileStat cond body _) = (s''', whileI)
@@ -284,11 +305,12 @@ transPairElem s (pairE, it)  =
       where
         dst = head (freeRegs s)
         (s', exprI) = transExpr s e
+        size = sizeOf pairE it 
         pelemI = 
           exprI ++
           [ MOV'Reg R0 dst 
           , BL (JumpLabel "p_check_null_pointer") 
-          , LDR'Off dst dst off ] 
+          , ldrVar dst dst size off ] 
 
 --
 transRhs :: Assembler (AssignRhs, It)
