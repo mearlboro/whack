@@ -52,11 +52,32 @@ transExpr s PairLiterExpr
 
 
 -- | TODO make ArrayElem a type synonym PLSSSSSSS
-transExpr s (ArrayElemExpr (ident, exprs)) = error "ArrayElemExpr"  
+transExpr s (ArrayElemExpr (ident, exprs))
+  =    (s, [ ADD dst SP $ Op2'ImmVal 4 ] 
+          ++ concat ( map (transExpr') exprs )
+          ++ [ LDR'Reg dst dst ]
+          ++ [ STR'Reg dst SP ] )
+    
+      where 
+        (dst:nxt:regs) = freeRegs s
+
+        s' = s { freeRegs = nxt:regs }
+
+        transExpr' e = snd ( transExpr s' e )
+                      ++ [ LDR'Reg dst dst ]
+                      ++ [ MOV'Reg R0 nxt ]
+                      ++ [ MOV'Reg R1 dst ]
+                      ++ [ BL $ JumpLabel "p_check_array_bounds" ]
+                      ++ [ ADD dst dst $ Op2'ImmVal 4 ]
+                      ++ [ ADD dst dst $ Op2'LSL'Sh nxt 2 ]
+
+
+
 
 -- TODO! TEST!
 -- | Lookup what register variable @id@ is in, and copy its content in @dst@
-transExpr s (IdentExpr id) = (s, pushDst) -- TODO LOL
+transExpr s (IdentExpr id) 
+  = (s, pushDst) -- TODO LOL
     where
       (dst:_) = freeRegs s
       (src, off) = lookupLoc s id
@@ -299,34 +320,35 @@ transPairElemExpr s (expr, it, wott) = (s' { freeRegs = rs }, instr)
       ++ [ BL (JumpLabel "malloc") ]
       ++ [ strVar nxt R0 size 0    ]
       ++ [ strVar R0 dst 4 (wott * 4) ]
-  
+
 -- TODO oemge refecter ples
 -- Translates an array 
 transArrayLitExpr :: Assembler ([ Expr ], It)
-transArrayLitExpr arm (es, it) = transArray' es 0 (arm, [])
-      where
-        transArray' :: [ Expr ] -> Int -> (ArmState, [Instr]) -> (ArmState, [ Instr ])
-        transArray' [] _ result            = result
-        transArray' (e:es) index (arm, is) = (arm'', is ++ is'')
-          where
-            s@(arm', _is') = transArrayElem arm (e, it, index) 
-            (arm'', is'') = transArray' es (index+1) s
+transArrayLitExpr arm (es, it) = 
+  transArray' es 0 (arm, [])
+    where
+      transArray' :: [ Expr ] -> Int -> (ArmState, [Instr]) -> (ArmState, [ Instr ])
+      transArray' [] _ result            = result
+      transArray' (e:es) index (arm, is) = (arm'', is ++ is'')
+        where
+          s@(arm', _is') = transArrayElem arm (e, it, index) 
+          (arm'', is'') = transArray' es (index+1) s
 
 -- TODO oemge refecter ples
 --Translates an array elem 
 transArrayElem :: Assembler (Expr, It, Int) 
-transArrayElem arm (e, it, index) = (arm' { freeRegs= r } , exprInstr ++ storeInstr)
+transArrayElem arm (e, it, index) = 
+  (arm' { freeRegs= r } , exprInstr ++ storeInstr)
     where
-        
-        r@(dst:nxt:regs) = freeRegs arm 
+      r@(dst:nxt:regs) = freeRegs arm 
 
-        -- Translate the expression 
-        (arm', exprInstr) = transExpr arm{freeRegs = nxt:regs} e
-        -- At what index in the heap the elem is
-        -- +4 Beause the first 4 bytes are taken up by the length
-        offset = index * (sizeOf e it) + 4 -- MAGIC NUMBER NOOO 
-        storeInstr = if typeOf e it == BoolType  -- TODO func for CHAR 
-                        then [STRB'Off nxt dst offset]
-                        else [STR'Off  nxt dst offset]  
+      -- Translate the expression 
+      (arm', exprInstr) = transExpr arm{freeRegs = nxt:regs} e
+      -- At what index in the heap the elem is
+      -- +4 Beause the first 4 bytes are taken up by the length
+      offset = (index * (sizeOf e it)) + 4 -- MAGIC NUMBER NOOO 
+      storeInstr = if typeOf e it == BoolType  -- TODO func for CHAR 
+                      then [STRB'Off nxt dst offset]
+                      else [STR'Off  nxt dst offset]  
 
 
