@@ -332,7 +332,7 @@ ovfErrPredef ls
     where
       -- Creates a data label for printing an overflow error -- TODO \n \0 label issue
       ovfLbl =  newDataLabel (  "OverflowError: the result is too small/large "
-                             ++ "to store in a 4-byte signed-integer.\\n\\0"  )
+                             ++ "to store in a 4-byte signed-integer.\\n"  )
                              ls
       name   =  "p_throw_overflow_error:"
       -- The set of instructions calls runtime error which exits the program
@@ -376,6 +376,7 @@ arrBoundsCheckPredef ls
              ++ [ LDRLT'Lbl R0 negIndLbl ]
              ++ [ BLLT $ JumpLabel "p_throw_runtime_error" ]
              ++ [ LDR'Reg R1 R1 ]
+             ++ [ CMP R0 $ Op2'Reg R1 ]
              ++ [ LDRCS'Lbl R0 outIndLbl ]
              ++ [ BLCS $ JumpLabel "p_throw_runtime_error" ] 
              ++ [ POP [ PC ] ] )

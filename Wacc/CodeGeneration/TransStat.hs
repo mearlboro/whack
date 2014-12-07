@@ -193,7 +193,7 @@ transStat s (WhileStat cond body it) = (s''', whileI)
         ] ++ bodyI ++              
         [ DEFINE (JumpLabel $ condL ++ ":") -- TODO: Comment       
         ] ++ condI ++            
-        [ CMP dst $ Op2'ImmVal 0   
+        [ CMP dst $ Op2'ImmVal 1   
         , BEQ (JumpLabel bodyL) ]  -- TODO: Comment  
 
 
@@ -274,7 +274,7 @@ transStat s (AssignStat (LhsPairElem pelem) rhs it)
       s'' = stateAddCheckNullPtr s'
 
 
-transStat s (AssignStat (LhsArrayElem (id, exprs)) rhs it) = (s'', assignI)
+transStat s (AssignStat (LhsArrayElem (id, exprs)) rhs it) = (s''', assignI)
   where
     (dst:nxt:rs) = freeRegs s 
     (s', rhsI)   = transRhs s (rhs, it)
@@ -283,7 +283,7 @@ transStat s (AssignStat (LhsArrayElem (id, exprs)) rhs it) = (s'', assignI)
     --arrelemI     = [ ADD dst src off ] ++ 
     (s'', elemI) = transExpr s' { freeRegs=nxt:rs } (ArrayElemExpr (id, exprs), it)
 --    (s'', elemI) = transExpr s' {freeRegs = nxt:rs }  (ArrayElemExpr (id, exprs))
-  
+    s''' = s'' { freeRegs = dst:(freeRegs s'') }
     -- We use init to remove the last load from transAraryElem
     assignI      = rhsI ++ (init elemI) ++ [ strVar dst nxt size 0 ]
 
