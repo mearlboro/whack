@@ -9,8 +9,6 @@ import Wacc.CodeGeneration.TransCommon
 
 import Wacc.Data.DataTypes
 
--- git checkout master --> git reset --hard <branch_name>
-
 -- ************************************************************************** --
 -- ***********************                            *********************** --
 -- ***********************   Expression Translation   *********************** --
