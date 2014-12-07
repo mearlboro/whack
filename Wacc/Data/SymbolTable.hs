@@ -5,6 +5,7 @@ module Wacc.Data.SymbolTable
 , addFuncs
 , addFunc
 , addVariable
+, isDefined
 , isRedefined
 , findType
 , findType'
@@ -47,12 +48,12 @@ import Prelude hiding      ( lookup )--, empty                             )
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- | The global identifier table (global scope) that has no enclosing table
 emptyTable  :: It
-emptyTable  =  ST Empty empty
+emptyTable  =  ST Empty empty True
 
 
 -- | Create a new table enclosed by the given parent table
-encloseIn         :: It -> It
-encloseIn parent  =  ST parent empty
+encloseIn                     :: It -> BeginsScope -> It
+encloseIn parent beginsScope  =  ST parent empty beginsScope
 
 
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
@@ -83,8 +84,8 @@ addVariable name vtype  =  addObject name vtype Variable
 addObject                       :: IdentName -> Type -> Context -> It -> It
 addObject name otype ctx table  =
   case table of
-    Empty        -> ST Empty $ insertIn empty
-    ST encl dict -> ST encl  $ insertIn dict
+    -- Empty             -> ST Empty (insertIn empty TODO -- 
+    ST encl dict bs   -> ST encl  (insertIn dict) bs
   where
     insertIn = insertWith onClash name $ IdentObj otype ctx -- (undefined, -1) 
 
@@ -99,8 +100,25 @@ onClash new old  =  new
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
 -- Start looking from the exnclosed table
-isRedefined :: IdentName -> It -> Bool 
-isRedefined name it = isJust $ findIdent' name `onEncl` it 
+-- We want to start cehcking for redefinitions starting from the previoust 
+-- statemetn (hence encl table)
+isRedefined         :: IdentName -> It -> Bool 
+isRedefined name it = isRedefined' (getEncl it) 
+  where
+    isRedefined'   Empty             =  False 
+    isRedefined' ( ST _ dict True )  =  isJust $ lookup name dict 
+    isRedefined'   it                =  case lookup name (getDict it) of 
+                                          Nothing -> isRedefined' (getEncl it)
+                                          Just _  -> True
+
+getEncl                  :: It -> It 
+getEncl   Empty          =  Empty
+getEncl ( ST encl _ _ )  =  encl
+
+getDict                  :: It -> Dictionary
+getDict   Empty          =  error "NOOOOO"
+getDict ( ST _ dict _ )  =  dict 
+
 
 -- | Returns True iif the identifer is found in the table
 isDefined          :: IdentName -> It -> Bool
@@ -125,10 +143,10 @@ findIdent' name it  =
 --   The only case findEnclFunc should fail is when the table given is the
 --   global scope or an empty table, otherwise it should always be able to
 --   find the enclosing function.
-findEnclFunc                   :: It -> Maybe Func
-findEnclFunc      Empty         =  Nothing
-findEnclFunc ( ST Empty _    )  =  Nothing -- Global scope
-findEnclFunc ( ST encl  dict )  =
+findEnclFunc                       :: It -> Maybe Func
+findEnclFunc      Empty            =  Nothing
+findEnclFunc ( ST Empty _    _  )  =  Nothing -- Global scope
+findEnclFunc ( ST encl  dict _  )  =
   case filter ( ~== Function {} ) . map objCtx . map snd $ toList dict of
     []             -> findEnclFunc encl
     [ Function f ] -> Just f
@@ -186,14 +204,14 @@ isParam'          :: IdentName -> It -> Bool
 isParam' name it  =  findContext' name it == Just Parameter
 
 -- | Performs a retrieval operation on the table's dictionary
-onDict                   :: ( Dictionary -> Maybe a ) -> It -> Maybe a
-f `onDict` Empty         =  Nothing
-f `onDict` ST    _ dict  =  f dict
+onDict                     :: ( Dictionary -> Maybe a ) -> It -> Maybe a
+f `onDict` Empty           =  Nothing
+f `onDict` ST    _ dict _  =  f dict
 
 -- | Performs a retrieval operation on the table's enclosed table
-onEncl                   :: ( It -> Maybe a ) -> It -> Maybe a
-f `onEncl` Empty         =  Nothing
-f `onEncl` ST    encl _  =  f encl
+onEncl                     :: ( It -> Maybe a ) -> It -> Maybe a
+f `onEncl` Empty           =  Nothing
+f `onEncl` ST    encl _ _  =  f encl
 
 -- | Matches any context except a Function
 nonFunction  :: [ Context ]

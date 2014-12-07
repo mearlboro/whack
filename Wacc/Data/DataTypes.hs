@@ -207,11 +207,12 @@ instance Eq' PairElem where
 -- **************************                  ****************************** --
 -- ************************************************************************** --
 
+type BeginsScope = Bool 
 
 -- | General purpose symbol table
 data SymbolTable k a
   = Empty
-  | ST ( SymbolTable k a ) ( Map.Map k a ) 
+  | ST ( SymbolTable k a ) ( Map.Map k a ) BeginsScope
   deriving ( Eq , Ord , Show )
 
 -- | An identifier table is a symbol table that maps identifier names to

@@ -11,6 +11,8 @@ import Wacc.Data.SymbolTable
 -- ********************                           *************************** --
 -- ************************************************************************** --
 
+
+
 augmentProgram
   :: Program -- | The Program AST
   -> Program -- | The agumented Program AST
@@ -25,7 +27,8 @@ augmentProgram
 --      from within the function body
 augmentProgram ( Program funcs main )  =  Program funcs' main'
   where
-    globalScope    =  addFuncs funcs emptyTable
+    fakeScope      =  addFuncs funcs emptyTable
+    globalScope    =  encloseIn fakeScope True
     ( _ , main' )  =  augmentStat main globalScope
     funcs'         =  map ( augmentFunc globalScope ) funcs
 
@@ -43,12 +46,12 @@ augmentFunc
 augmentFunc globalScope func@( Func ftype name params body _ )  =  func'
   where
     -- Function scope contains only function name
-    funcScope      =  addFunc func $ encloseIn globalScope
+    funcScope      =  addFunc func $ encloseIn globalScope True
 
     -- Parameter scope contains the func args and is enclosed by func scope
-    paramsScope    =  addParams params $ encloseIn funcScope
+    paramsScope    =  addParams params $ encloseIn funcScope True
 
-    ( _ , body' )  =  augmentStat body paramsScope
+    ( _ , body' )  =  augmentStat body $ encloseIn paramsScope True
 
     func'          =  Func ftype name params body' funcScope
 
@@ -64,11 +67,11 @@ augmentStat
 -- | Given a statement and the table of identifiers of the *previous*
 --   statement, return the table of identifiers for the *next* statement
 --   together with the augmented Stat
-augmentStat stat prevIt  =
+augmentStat stat prevIt  = 
 
   case stat of
 
-    SkipStat              -> (,) prevIt   $ SkipStat
+    SkipStat              -> (,) prevIt   $ SkipStat            
     FreeStat    expr    _ -> (,) prevIt   $ FreeStat    expr    prevIt
     ReturnStat  expr    _ -> (,) prevIt   $ ReturnStat  expr    prevIt
     ExitStat    expr    _ -> (,) prevIt   $ ExitStat    expr    prevIt
@@ -89,26 +92,27 @@ augmentStat stat prevIt  =
     --  just introduced a new variable that can be used by subsequent statements
     augmentDeclare                                   :: Stat -> ( It , Stat )
     augmentDeclare ( DeclareStat itype name rhs _ )  =
-      let nextIt  =  addVariable name itype $ encloseIn prevIt
+      let nextIt  =  addVariable name itype $ encloseIn prevIt False
       in  ( nextIt , DeclareStat itype name rhs nextIt )
 
 
     augmentScoped                      :: Stat -> ( It , Stat )
     augmentScoped ( ScopedStat body )  =
-      let ( _ , body' )  =  augmentStat body prevIt
+      -- Need to tell that the first statement in body is inside a new scope
+      let ( _ , body' )  =  augmentStat body (encloseIn prevIt True) -- Begins a new scope
       in  ( prevIt  , ScopedStat body' )
 
 
     augmentWhile                            :: Stat -> ( It , Stat )
     augmentWhile ( WhileStat expr body _ )  =
-      let ( _ , body' )  =  augmentStat body prevIt
+      let ( _ , body' )  =  augmentStat body (encloseIn prevIt True)
       in  ( prevIt , WhileStat expr body' prevIt )
 
 
     augmentIf                                 :: Stat -> ( It , Stat )
     augmentIf ( IfStat expr tbody ebody _  )  =
-      let ( _ , tbody' )  =  augmentStat tbody prevIt
-          ( _ , ebody' )  =  augmentStat ebody prevIt
+      let ( _ , tbody' )  =  augmentStat tbody (encloseIn prevIt True)
+          ( _ , ebody' )  =  augmentStat ebody (encloseIn prevIt True)
       in  ( prevIt , IfStat expr tbody' ebody' prevIt )
 
 
@@ -118,3 +122,6 @@ augmentStat stat prevIt  =
       let ( nextIt  , first'  )  =  augmentStat first  prevIt
           ( nextIt' , second' )  =  augmentStat second nextIt
       in  ( nextIt' , SeqStat first' second' )
+
+
+
