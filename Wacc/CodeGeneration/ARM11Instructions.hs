@@ -253,17 +253,18 @@ instance Show Label where
   show ( PredefLabel l _ ) = l
 
 instance Show Operand2 where
-  show (Op2'ImmVal imm8m) = "#" ++ show imm8m     -- #<imm8m>
-  show (Op2'ImmChr c    ) = "#" ++ show c         -- #'c'
-  show (Op2'Reg    rm   ) = show rm               -- Rm
-  show (Op2'LSL    rm rs) = showOp2 rm "LSL "  rs -- Rm, LSL Rs
-  show (Op2'LSR    rm rs) = showOp2 rm "LSR "  rs -- Rm, LSR Rs
-  show (Op2'ASR    rm rs) = showOp2 rm "ASR "  rs -- Rm, ASR Rs
-  show (Op2'ROR    rm rs) = showOp2 rm "ROR "  rs -- Rm, ROR Rs
-  show (Op2'LSL'Sh rm sh) = showOp2 rm "LSL #" sh -- Rm, LSL #<shift> | Allowed shifts 0-31
-  show (Op2'LSR'Sh rm sh) = showOp2 rm "LSR #" sh -- Rm, LSR #<shift> | Allowed shifts 1-32
-  show (Op2'ASR'Sh rm sh) = showOp2 rm "ASR #" sh -- Rm, ASR #<shift> | Allowed shifts 1-32
-  show (Op2'ROR'Sh rm sh) = showOp2 rm "ROR #" sh -- Rm, ROR #<shift> | Allowed shifts 1-31
+  show (Op2'ImmVal imm8m)  = "#" ++ show imm8m    -- #<imm8m>
+  show (Op2'ImmChr '\NUL') = "#\'0\'"             -- #'c'
+  show (Op2'ImmChr c    )  = "#\'" ++ [c] ++ "\'" -- #'c'
+  show (Op2'Reg    rm   )  = show rm               -- Rm
+  show (Op2'LSL    rm rs)  = showOp2 rm "LSL "  rs -- Rm, LSL Rs
+  show (Op2'LSR    rm rs)  = showOp2 rm "LSR "  rs -- Rm, LSR Rs
+  show (Op2'ASR    rm rs)  = showOp2 rm "ASR "  rs -- Rm, ASR Rs
+  show (Op2'ROR    rm rs)  = showOp2 rm "ROR "  rs -- Rm, ROR Rs
+  show (Op2'LSL'Sh rm sh)  = showOp2 rm "LSL #" sh -- Rm, LSL #<shift> | Allowed shifts 0-31
+  show (Op2'LSR'Sh rm sh)  = showOp2 rm "LSR #" sh -- Rm, LSR #<shift> | Allowed shifts 1-32
+  show (Op2'ASR'Sh rm sh)  = showOp2 rm "ASR #" sh -- Rm, ASR #<shift> | Allowed shifts 1-32
+  show (Op2'ROR'Sh rm sh)  = showOp2 rm "ROR #" sh -- Rm, ROR #<shift> | Allowed shifts 1-31
 
 showOp2             :: (Show a, Show b) => a -> String -> b -> String
 showOp2 op mne op'  =  show op ++ ", " ++ mne ++ show op'
@@ -271,7 +272,7 @@ showOp2 op mne op'  =  show op ++ ", " ++ mne ++ show op'
 
 instance Show Instr where
     show (ADD    rd rn  op2   ) = "\tADD "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                  
-    show (ADDS   rd rn  rs    ) = "\tADDS "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rs                     
+    show (ADDS   rd rn  rs    ) = "\tADDS "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rs                     
     show (SUB    rd rn  op2   ) = "\tSUB "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
     show (SUBS   rd rn  rs    ) = "\tSUB "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rs                  
     show (MUL    rd rm  rs    ) = "\tMUL "   ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    
