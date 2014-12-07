@@ -120,6 +120,10 @@ getBytesNeeded (DeclareStat vtype _ _ _)  =  sizeOf vtype undefined
 getBytesNeeded _                          =  0 
 
 
+fixQuotes           :: String -> String
+fixQuotes      ""   =  ""
+fixQuotes ('"':cs)  =  "\\\"" ++ fixQuotes cs
+fixQuotes   (c:cs)  =  c:(fixQuotes cs) 
 
 
 -- ************************************************************************** --
@@ -142,7 +146,7 @@ makePretty (s, instrs)
         putDataLabel ( DataLabel l str ) 
           =  "\t" ++ l ++ ":"
           ++ "\n\t\t.word "    ++ show length' 
-          ++ "\n\t\t.ascii \"" ++ str  ++ "\"\n"
+          ++ "\n\t\t.ascii \"" ++ (fixQuotes str)  ++ "\"\n"
             where
                 length' = length str - ((length . filter (\x -> x == '\\')) str)
 
