@@ -233,7 +233,7 @@ transBinOp s ModBinOp
                  ++ [ MOV'Reg R1 r'] 
                  ++ [ BL  ( JumpLabel "p_check_divide_by_zero" ) ]
                  ++ [ BL  ( JumpLabel " __aeabi_idivmod" ) ]
-                 ++ [ MOV'Reg r R0 ] )
+                 ++ [ MOV'Reg r R1 ] )
       (r:r':_) =  freeRegs s
 
 
