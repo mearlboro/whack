@@ -28,15 +28,14 @@ assembleProgram  =  snd . evaluateProgram
 evaluateProgram  :: Program -> (ArmState, [ Instr ])
 evaluateProgram  =  transProgram s  
   where
-    (dl, pl) = printlnPredef undefined
     -- The initial state
     s = ArmState 
       { memoryMap     = Map.empty
       , stackOffset   = 0 
       , freeRegs      = [ R4 .. R10 ]
       , numJumpLabels = 0
-      , dataLabels    = [dl] 
-      , predefLabels  = pl }
+      , dataLabels    = [] 
+      , predefLabels  = [] }
 
 -- Assembles an *augmented* Program AST given an initial state
 transProgram                         :: Assembler Program
