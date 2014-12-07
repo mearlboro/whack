@@ -106,12 +106,13 @@ transExpr s (ArrayElemExpr (id, exprs), it) = (s', addI ++ elemsI ++ [ ldrVar ds
 
 
 -- | Lookup what register variable @id@ is in, and copy its content in @dst@
-transExpr s (IdentExpr id, _) 
+transExpr s (IdentExpr id, it) 
   = (s, pushDst) -- TODO LOL
     where
       (dst:_) = freeRegs s
       (src, off) = lookupLoc s id
-      pushDst = [ LDR'Off dst src off ] -- [sp, #<off>] where 
+      size = sizeOf (IdentExpr id) it 
+      pushDst = [ ldrVar dst src size off ] --LDR'Off dst src off ] -- [sp, #<off>] where 
 
 -- |
 transExpr s (ParenthesisedExpr e, it) 

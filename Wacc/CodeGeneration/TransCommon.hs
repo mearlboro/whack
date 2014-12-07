@@ -190,7 +190,7 @@ boolPrintPredef ls
              ++ [ PUSH [ LR ] ]
              ++ [ CMP R0 $ Op2'ImmVal 0 ]
              ++ [ LDRNE'Lbl R0 trueLbl  ]
-             ++ [ LDRNQ'Lbl R0 falseLbl ]
+             ++ [ LDREQ'Lbl R0 falseLbl ]
              ++ [ ADD R0 R0 $ Op2'ImmVal 4  ]
              ++ [ BL ( JumpLabel "printf" ) ]
              ++ [ MOV R0 $ Op2'ImmVal 0 ]
