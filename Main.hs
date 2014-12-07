@@ -82,8 +82,9 @@ check program path = do
         exitWith $ ExitFailure 200
     else do
         let assembled = makePretty (evaluateProgram program')
-        -- Write the assembly file 
-        saveAssembled path assembled
+        -- Write the assembly file
+        putStrLn assembled 
+        --saveAssembled path assembled
         -- putStrLn assemble
         exitWith   ExitSuccess
 
