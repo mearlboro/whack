@@ -231,21 +231,35 @@ refPrintPredef ls
                ++ [ POP [ PC ] ] )
 
 
-printlnPredef ls
-  = (printlnLbl, [ PredefLabel name instrs ])
-    where
-      printlnLbl = newDataLabel "\\0" ls 
+--printlnPredef ls
+--  = (printlnLbl, [ PredefLabel name instrs ])
+--    where
+--      printlnLbl = newDataLabel "\\0" ls 
  
+--      name   = "p_print_ln:"
+--      instrs =  ( [ DEFINE $ JumpLabel name ]
+--             ++ [ PUSH [ LR ] ]
+--             ++ [ LDR'Lbl R0 printlnLbl ]
+--             ++ [ ADD R0 R0 $ Op2'ImmVal 4 ]
+--             ++ [ BL $ JumpLabel "puts" ]
+--             ++ [ MOV R0 $ Op2'ImmVal 0 ]
+--             ++ [ BL $ JumpLabel "fflush" ]
+--             ++ [ POP [ PC ] ] )
+ 
+printlnPredef ls
+  = (printlnMsg, [ PredefLabel name instrs ])
+    where
+      --printlnLbl = newDataLabel "\\0" ls 
+      printlnMsg = DataLabel "empty_char" "\0"
       name   = "p_print_ln:"
       instrs =  ( [ DEFINE $ JumpLabel name ]
              ++ [ PUSH [ LR ] ]
-             ++ [ LDR'Lbl R0 printlnLbl ]
+             ++ [ LDR'Lbl R0 printlnMsg ]
              ++ [ ADD R0 R0 $ Op2'ImmVal 4 ]
              ++ [ BL $ JumpLabel "puts" ]
              ++ [ MOV R0 $ Op2'ImmVal 0 ]
              ++ [ BL $ JumpLabel "fflush" ]
              ++ [ POP [ PC ] ] )
- 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- | These functions will create the predefLabels for read functions.
