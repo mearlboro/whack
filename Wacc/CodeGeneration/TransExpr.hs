@@ -9,8 +9,6 @@ import Wacc.CodeGeneration.TransCommon
 
 import Wacc.Data.DataTypes
 
--- git checkout master --> git reset --hard <branch_name>
-
 -- ************************************************************************** --
 -- ***********************                            *********************** --
 -- ***********************   Expression Translation   *********************** --
@@ -107,7 +105,6 @@ transExpr s (ArrayElemExpr (id, exprs), it) = (s', addI ++ elemsI ++ [ ldrVar ds
           if isLast then [ finalAddI ] else [ ADD dst dst $ Op2'LSL'Sh nxt 2 ]
 
 
--- TODO! TEST!
 -- | Lookup what register variable @id@ is in, and copy its content in @dst@
 transExpr s (IdentExpr id, _) 
   = (s, pushDst) -- TODO LOL
@@ -143,6 +140,7 @@ transExpr s (BinaryOperExpr op e e', it)
       s''    = s' { freeRegs = rs }
       (r:rs) = freeRegs s'
 
+
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- | Generate instructions for a unary operator
 transUnOp :: Assembler UnaryOper 
@@ -173,7 +171,7 @@ transUnOp s NegUnOp
   = (s', negUnOpInstrs)
     where 
       s'            =  stateAddIntOverflowError s
-      negUnOpInstrs =  [ RSBS dst dst $ Op2'ImmVal 0]  -- reverse subtract | dst := 0 - dst
+      negUnOpInstrs =  [ RSBS dst dst $ Op2'ImmVal 0]
                     ++ [ BLVS ( JumpLabel "p_throw_overflow_error") ]
 
       (dst:_)    =  freeRegs s
@@ -296,43 +294,6 @@ transBinOp s NEBinOp -- not equal !=
 
 
 
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
--- Adds the overflow error data and predef labels as needed for all integers
-stateAddIntOverflowError s 
-  = s { dataLabels = ls', predefLabels = ps' }
-    where
-      (ls', ps') 
-        = if not $ containsLabel "p_throw_overflow_error" ps 
-            then
-              let l        = newDataLabel   "%.*s" ls in  
-              let p        = strPrintPredef l         in 
-              let (l', p') = ovfErrPredef   (l:ls)    in
-              let p''      = runtErrPredef            in 
-              (l': l: ls, ps ++ p ++ p' ++ p'')
-            else
-              (ls,   ps)
-
-      ls           = dataLabels     s
-      ps           = predefLabels   s
-
-
-stateAddDivZeroError s
-  = s { dataLabels = ls', predefLabels = ps' }
-    where
-      (ls', ps')
-        = if not $ containsLabel "p_check_divide_by_zero" ps 
-            then
-              let l        = newDataLabel       "%.*s" ls in  
-              let p        = strPrintPredef     l         in 
-              let (l', p') = divZeroCheckPredef (l:ls)    in
-              let p''      = runtErrPredef                in 
-              (l': l: ls, ps ++ p ++ p' ++ p'')
-            else
-              (ls,   ps)
-
-      ls           = dataLabels     s
-      ps           = predefLabels   s
-
 -- ************************************************************************** --
 -- ****************                                         ***************** --
 -- ****************   Complicated Expression Translation    ***************** --
@@ -342,17 +303,20 @@ stateAddDivZeroError s
 -- TODO oemge refecter ples
 type WhichOfTheTwo = Int 
 transPairElemExpr :: Assembler (Expr, It, WhichOfTheTwo) 
-transPairElemExpr s (expr, it, wott) = (s' { freeRegs = rs }, instr)
-  where 
-    rs@(dst:nxt:regs) = freeRegs s 
-    (s', exprInstr) = transExpr s { freeRegs = nxt:regs } (expr, it) 
-    size = sizeOf expr it
-    instr 
-      =  exprInstr 
-      ++ [ LDR R0 size             ] 
-      ++ [ BL (JumpLabel "malloc") ]
-      ++ [ strVar nxt R0 size 0    ]
-      ++ [ strVar R0 dst 4 (wott * 4) ]
+transPairElemExpr s (expr, it, wott) 
+  = (s'' { freeRegs = rs }, instr)
+    where 
+      rs@(dst:nxt:regs) = freeRegs s 
+      (s', exprInstr) = transExpr s { freeRegs = nxt:regs } (expr, it) 
+      size = sizeOf expr it
+      instr 
+        =  exprInstr 
+        ++ [ LDR R0 size             ] 
+        ++ [ BL (JumpLabel "malloc") ]
+        ++ [ strVar nxt R0 size 0    ]
+        ++ [ strVar R0 dst 4 (wott * 4) ]
+
+      s'' = stateAddCheckNullPtr s'
 
 -- TODO oemge refecter ples
 -- Translates an array 
