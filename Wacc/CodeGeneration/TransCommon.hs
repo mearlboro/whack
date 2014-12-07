@@ -243,7 +243,7 @@ printlnPredef ls
              ++ [ ADD R0 R0 $ Op2'ImmVal 4 ]
              ++ [ BL $ JumpLabel "puts" ]
              ++ [ MOV R0 $ Op2'ImmVal 0 ]
-             ++ [ BB $ JumpLabel "fflush" ]
+             ++ [ BL $ JumpLabel "fflush" ]
              ++ [ POP [ PC ] ] )
  
 
