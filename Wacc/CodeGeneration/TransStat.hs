@@ -41,27 +41,11 @@ transStat s (FreeStat e it)
                       PairType  {} -> "p_free_pair"
       (dst:_)     = freeRegs s
 
-      -- Also add the data labels and predef functions to the state
-      s''  = s' { dataLabels = ls', predefLabels = ps' }
-
+      -- Also update the state 
       -- Labels depend on the type of the expression to be freed
-      (ls', ps') = case typeOf e it of 
-           ArrayType {} -> if not $ containsLabel "p_free_array" ps
-                             then 
-                               let (l,  p ) = strPrintPredef  ls      in
-                               let (l', p') = freeArrPredef   (l:ls)  in
-                               let p''      = runtErrPredef           in
-                               (l':l:ls, ps ++ p ++ p' ++ p'')
-                             else 
-                               (ls, ps) 
-           PairType  {} -> if not $ containsLabel "p_free_pair"  ps
-                             then 
-                               let (l,  p ) = strPrintPredef  ls      in
-                               let (l', p') = freePairPredef  (l:ls)  in
-                               let p''      = runtErrPredef           in
-                               (l':l:ls, ps ++ p ++ p' ++ p'')
-                             else 
-                               (ls, ps) 
+      s'' = case typeOf e it of 
+           ArrayType {} -> stateAddFreeArr  s'  
+           PairType  {} -> stateAddFreePair s' 
 
       ls   = dataLabels   s'
       ps   = predefLabels s'
@@ -93,7 +77,7 @@ transStat s (ReturnStat e _)
       -- Move result of expression from dst into return register R0
       returnI = exprI ++ [ MOV'Reg R0 dst ] 
 
----- TODO: to implement arrays, pairs (printing an address)
+--
 transStat s (PrintStat e it) 
   = ( s'', instrs')
     where
@@ -216,6 +200,7 @@ transStat s (ReadStat (LhsArrayElem arrayE) it)
   
       s'' = stateAddRead s' readL
 
+
 -- 
 transStat s (WhileStat cond body _) = (s''', whileI)
     where
@@ -243,10 +228,12 @@ transStat s (WhileStat cond body _) = (s''', whileI)
         [ CMP dst $ Op2'ImmVal 0   
         , BEQ (JumpLabel bodyL) ]  -- TODO: Comment  
 
+
 -- mapAccumL for the win
 transStat s (SeqStat x y) = (s', concat iss)
   where 
     (s', iss) = mapAccumL transStat s [x, y] 
+
 
 --
 transStat s (DeclareStat vtype vname rhs it) = (s''', declareI)
@@ -266,6 +253,7 @@ transStat s (DeclareStat vtype vname rhs it) = (s''', declareI)
     -- We now need to push the value in dst reg onto the stack
     declareI = rhsI ++ [ strVar dst SP size offset ]  
 
+
 -- We are assigning a variable to a new value
 transStat s (AssignStat (LhsIdent id) rhs it) = (s', assignI)
   where
@@ -279,6 +267,7 @@ transStat s (AssignStat (LhsIdent id) rhs it) = (s', assignI)
     (src, off) = lookupLoc s' id  -- TODO check s == s' 
     -- TODO comment
     assignI = rhsI ++ [ strVar dst src magic4 off ]
+
 
 -- We are assigning the first or second element of a pair to a new value
 transStat s (AssignStat (LhsPairElem pelem) rhs it) 
@@ -313,11 +302,11 @@ transStat s (AssignStat (LhsPairElem pelem) rhs it)
       getIdent ( ArrayElemExpr ( ident , _ ) )  =  Just ident
       getIdent                           _      =  Nothing
 
-      -- Now update the state with
+      -- Now update the state with the labels and functions for checking null pointer error
       s'' = stateAddCheckNullPtr s'
-      -- the labels and functions for checking null pointer error
 
 
+--
 transStat s (AssignStat (LhsArrayElem (id, exprs)) rhs it) = error "TODO"
 
 
@@ -344,9 +333,9 @@ transStat s (IfStat cond thens elses it) = (s'''', ifI)
     ifI =  
       condI ++                          
       [ CMP dst $ Op2'ImmVal 0      -- If condition false?
-      , BEQ (JumpLabel $ elseL ++ ":" )       -- If so go to else
+      , BEQ (JumpLabel elseL)       -- If so go to else
       ] ++ thenI ++ 
-      [ B (JumpLabel $ endifL ++ ":" ) 
+      [ B (JumpLabel endifL) 
       , DEFINE (JumpLabel $ elseL ++ ":")         
       ] ++ elseI ++ 
       [ DEFINE (JumpLabel $ endifL ++ ":") ]
@@ -460,7 +449,7 @@ transRhs s (RhsCall fname params, it)
   
       callInstrs 
         = paramInstrs 
-        ++ [ BL (JumpLabel ("f_" ++ fname ++ ":")) ]
+        ++ [ BL (JumpLabel ("f_" ++ fname)) ]
         ++ (if totSize == 0 then [] else [ ADD SP SP $ Op2'ImmVal totSize ]) 
         ++ [ MOV'Reg dst R0 ] -- TODO
 

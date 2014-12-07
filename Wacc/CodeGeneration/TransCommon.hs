@@ -197,7 +197,6 @@ boolPrintPredef ls
              ++ [ BL ( JumpLabel "fflush" ) ]
              ++ [ POP [ PC ] ] )
 
-
 strPrintPredef ls
   = (strLbl, [ PredefLabel name instrs ])
     where
@@ -285,7 +284,7 @@ charReadPredef ls
 
 -- Free array
 freeArrPredef ls
-  = (freeLbl, [ PredefLabel name instrs ])
+  = ( [ freeLbl ], [ PredefLabel name instrs ])
     where
       freeLbl = newDataLabel (  "NullReferenceError: dereference a null " 
                              ++ "reference.\\0\n"                            )
@@ -301,7 +300,7 @@ freeArrPredef ls
 
 -- Free pair 
 freePairPredef ls
-  = (freeLbl, [ PredefLabel name instrs ])
+  = ( [ freeLbl ], [ PredefLabel name instrs ])
     where
       freeLbl = newDataLabel (  "NullReferenceError: dereference a null "
                              ++ "reference.\\n"                          )
@@ -329,7 +328,7 @@ freePairPredef ls
 
 -- Integer overflow error, generates function label and data label for the message
 ovfErrPredef ls
-  = (ovfLbl, [ PredefLabel name instrs ])
+  = ([ ovfLbl ], [ PredefLabel name instrs ])
     where
       -- Creates a data label for printing an overflow error -- TODO \n \0 label issue
       ovfLbl =  newDataLabel (  "OverflowError: the result is too small/large "
@@ -344,7 +343,7 @@ ovfErrPredef ls
 
 -- Divide by zero check, generates function label and data label for the message
 divZeroCheckPredef ls
-  = (divLbl, [ PredefLabel name instrs ])
+  = ([ divLbl ], [ PredefLabel name instrs ])
     where
       -- Creates a data label for printing an overflow error -- TODO \n \0 label issue
       divLbl =  newDataLabel "DivideByZeroError: divide or modulo by zero.\\n\\0"
@@ -361,7 +360,7 @@ divZeroCheckPredef ls
 
 -- Array bounds check, generates function label and data label
 arrBoundsCheckPredef ls
-  = (outIndLbl:[negIndLbl], [ PredefLabel name instrs ])
+  = ([ outIndLbl, negIndLbl ], [ PredefLabel name instrs ])
     where
       -- Creates a data label for printing an overflow error -- TODO \n \0 label issue
       negIndLbl =  newDataLabel "ArrayIndexOutOfBoundsError: negative index\\n\\0"
@@ -383,7 +382,7 @@ arrBoundsCheckPredef ls
 
 -- Null pointer check, generates function and data label
 nullPtrCheckPredef ls
-  = (nullLbl, [ PredefLabel name instrs ]) 
+  = ([ nullLbl ], [ PredefLabel name instrs ]) 
     where
       nullLbl = newDataLabel (  "NullReferenceError: dereference a null "
                              ++ "reference.\\n\\0"                      )
@@ -433,78 +432,7 @@ containsLabel name ls
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
--- Adds the null pointer checker and its needed data labels to the state
-stateAddCheckNullPtr s
-  = s { dataLabels = ls', predefLabels = ps' }
-    where
-      (ls', ps') 
-        = if not $ containsLabel "p_check_null_pointer:" ps
-            then 
-              let (l,  p ) = strPrintPredef     ls     in  
-              let (l', p') = nullPtrCheckPredef (l:ls) in
-              let p''      = runtErrPredef             in  
-              (l:l':ls, ps ++ p ++ p' ++ p'')
-            else
-              (ls, ps) 
-
-      ls = dataLabels s
-      ps = predefLabels s
-
--- Adds the overflow error data and predef labels as needed for all integers
-stateAddIntOverflowError s 
-  = s { dataLabels = ls', predefLabels = ps' }
-    where
-      (ls', ps') 
-        = if not $ containsLabel "p_throw_overflow_error:" ps  
-            then
-              let (l , p ) = strPrintPredef ls        in  
-              let (l', p') = ovfErrPredef   (l:ls)    in  
-              let p''      = runtErrPredef            in  
-              (l': l: ls, ps ++ p ++ p' ++ p'')
-            else
-              (ls,   ps) 
-
-      ls           = dataLabels     s   
-      ps           = predefLabels   s   
-      
-
--- Adds the divide by zero check as needed by DIV and MOD      
-stateAddDivZeroError s
-  = s { dataLabels = ls', predefLabels = ps' }
-    where
-      (ls', ps')
-        = if not $ containsLabel "p_check_divide_by_zero:" ps
-            then
-              let (l,  p ) = strPrintPredef     ls        in
-              let (l', p') = divZeroCheckPredef (l:ls)    in
-              let p''      = runtErrPredef                in
-              (l': l: ls, ps ++ p ++ p' ++ p'')
-            else
-              (ls,   ps)
-
-      ls           = dataLabels     s
-      ps           = predefLabels   s
-
-      
--- Adds the check array bounds predef and data labels
-stateAddArrayBounds s
-  = s { dataLabels = ls', predefLabels = ps' }
-    where
-      (ls', ps')
-        = if not $ containsLabel "p_check_array_bounds:" ps
-            then
-              let (l,  p  ) = strPrintPredef        ls     in
-              let (ls', p') = arrBoundsCheckPredef  (l:ls) in
-              let p''       = runtErrPredef                in
-              (ls' ++ (l:ls), ps ++ p ++ p' ++ p'')
-            else
-              (ls,   ps)
-
-      ls           = dataLabels     s
-      ps           = predefLabels   s
-
-
--- Adds the check array bounds predef and data labels
+-- Adds the read labels and functions
 stateAddRead s name
   = s { dataLabels = ls', predefLabels = ps' }
     where
@@ -521,4 +449,51 @@ stateAddRead s name
       ls           = dataLabels     s
       ps           = predefLabels   s
 
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- Adds the null pointer checker and its needed data labels to the state
+stateAddCheckNullPtr s
+  = stateAddError s "p_check_null_pointer:" nullPtrCheckPredef 
+
+-- Adds the overflow error data and predef labels as needed for all integers
+stateAddIntOverflowError s 
+  = stateAddError s "p_throw_overflow_error:" ovfErrPredef 
+        
+-- Adds the divide by zero check as needed by DIV and MOD      
+stateAddDivZeroError s
+  = stateAddError s "p_check_divide_by_zero:" divZeroCheckPredef
+      
+-- Adds the check array bounds predef and data labels
+stateAddArrayBounds s
+  = stateAddError s "p_check_array_bounds:" arrBoundsCheckPredef 
+
+stateAddFreeArr s
+  = stateAddError s "p_free_array:" freeArrPredef
+
+stateAddFreePair s
+  = stateAddError s "p_free_pair:" freePairPredef
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- Helper function to add string print and runtime error
+stateAddError s name function
+  = s { dataLabels = ls', predefLabels = ps' }
+    where
+      (ls', ps')
+        = if not $ containsLabel name ps
+            then 
+                let (l, p)   = if not $ containsLabel "p_print_string:" ps 
+                                 then let (l,  p) = strPrintPredef ls in ([l], p)
+                                 else ([], [])          
+                in
+                let (l', p') = function (l ++ ls)  
+                in
+                let  p''     = if not $ containsLabel "p_throw_runtime_error:" ps 
+                                 then runtErrPredef
+                                 else []
+                in
+                (l' ++ l ++ ls, ps ++ p ++ p' ++ p'')
+            else (ls,   ps)
+
+      ls           = dataLabels     s
+      ps           = predefLabels   s
 
