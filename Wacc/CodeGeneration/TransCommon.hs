@@ -163,7 +163,7 @@ makePretty (s, instrs)
 --   up their use in a BL instruction.
 
 intPrintPredef ls 
-  = (intLbl, [ PredefLabel name instrs ])
+  = ([ intLbl ], [ PredefLabel name instrs ])
     where
       intLbl = newDataLabel "%d\\0" ls
 
@@ -180,7 +180,7 @@ intPrintPredef ls
 
 
 boolPrintPredef ls 
-  = (falseLbl:[trueLbl], [ PredefLabel name instrs ])
+  = ([ falseLbl, trueLbl ], [ PredefLabel name instrs ])
     where
       falseLbl = newDataLabel "false\\0" ls
       trueLbl  = newDataLabel "true\\0"  (falseLbl:ls)
@@ -198,7 +198,7 @@ boolPrintPredef ls
              ++ [ POP [ PC ] ] )
 
 strPrintPredef ls
-  = (strLbl, [ PredefLabel name instrs ])
+  = ([ strLbl ], [ PredefLabel name instrs ])
     where
       strLbl = newDataLabel "%.*s\\0" ls
 
@@ -215,7 +215,7 @@ strPrintPredef ls
              ++ [ POP [ PC ] ] )
 
 refPrintPredef ls
-  = (refLbl, [ PredefLabel name instrs ])
+  = ([ refLbl ], [ PredefLabel name instrs ])
     where
         refLbl = newDataLabel "%p\\0" ls
         
@@ -224,47 +224,33 @@ refPrintPredef ls
                ++ [ PUSH [ LR ] ]
                ++ [ MOV'Reg R1 R0 ]
                ++ [ LDR'Lbl R0 refLbl ]  
-               ++ [ ADD R0 R0 $ Op2'ImmVal 4]
+               ++ [ ADD R0 R0 $ Op2'ImmVal 4 ]
                ++ [ BL $ JumpLabel "printf" ]
                ++ [ MOV'Reg R0 R0 ]
                ++ [ BL $ JumpLabel "fflush" ]
                ++ [ POP [ PC ] ] )
 
 
---printlnPredef ls
---  = (printlnLbl, [ PredefLabel name instrs ])
---    where
---      printlnLbl = newDataLabel "\\0" ls 
- 
---      name   = "p_print_ln:"
---      instrs =  ( [ DEFINE $ JumpLabel name ]
---             ++ [ PUSH [ LR ] ]
---             ++ [ LDR'Lbl R0 printlnLbl ]
---             ++ [ ADD R0 R0 $ Op2'ImmVal 4 ]
---             ++ [ BL $ JumpLabel "puts" ]
---             ++ [ MOV R0 $ Op2'ImmVal 0 ]
---             ++ [ BL $ JumpLabel "fflush" ]
---             ++ [ POP [ PC ] ] )
- 
 printlnPredef ls
-  = (printlnMsg, [ PredefLabel name instrs ])
+  = ([ printlnLbl ], [ PredefLabel name instrs ])
     where
-      --printlnLbl = newDataLabel "\\0" ls 
-      printlnMsg = DataLabel "empty_char" "\0"
+      printlnLbl = newDataLabel "\\0" ls 
+
       name   = "p_print_ln:"
       instrs =  ( [ DEFINE $ JumpLabel name ]
              ++ [ PUSH [ LR ] ]
-             ++ [ LDR'Lbl R0 printlnMsg ]
+             ++ [ LDR'Lbl R0 printlnLbl ]
              ++ [ ADD R0 R0 $ Op2'ImmVal 4 ]
              ++ [ BL $ JumpLabel "puts" ]
              ++ [ MOV R0 $ Op2'ImmVal 0 ]
              ++ [ BL $ JumpLabel "fflush" ]
              ++ [ POP [ PC ] ] )
+ 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- | These functions will create the predefLabels for read functions.
 intReadPredef ls
-  = (intLbl, [ PredefLabel name instrs ])
+  = ([ intLbl ], [ PredefLabel name instrs ])
     where 
       intLbl = newDataLabel "%d\\0" ls
     
@@ -279,7 +265,7 @@ intReadPredef ls
 
 
 charReadPredef ls
-  = (charLbl, [ PredefLabel name instrs ])
+  = ([ charLbl ], [ PredefLabel name instrs ])
     where 
       charLbl = newDataLabel "%c\\0" ls
 
@@ -298,7 +284,7 @@ charReadPredef ls
 
 -- Free array
 freeArrPredef ls
-  = ( [ freeLbl ], [ PredefLabel name instrs ])
+  = ([ freeLbl ], [ PredefLabel name instrs ])
     where
       freeLbl = newDataLabel (  "NullReferenceError: dereference a null " 
                              ++ "reference.\\0\n"                            )
@@ -314,7 +300,7 @@ freeArrPredef ls
 
 -- Free pair 
 freePairPredef ls
-  = ( [ freeLbl ], [ PredefLabel name instrs ])
+  = ([ freeLbl ], [ PredefLabel name instrs ])
     where
       freeLbl = newDataLabel (  "NullReferenceError: dereference a null "
                              ++ "reference.\\n"                          )
@@ -420,6 +406,7 @@ runtErrPredef
              ++ [ BL ( JumpLabel "exit" )  ] )
 
 
+
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
 -- | Create a new data label with a given string, using the current number of labels 
@@ -442,42 +429,60 @@ labelName (DataLabel   name _) = name
 
 -- | Checks if a predef label was added or not in the current program
 containsLabel name ls
-  = or . map (==name) $ map labelName ls
+  = or . map (== name) $ map labelName ls
+
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
--- Adds the read labels and functions
+-- Updates the state with the read labels and functions 
 stateAddRead s name
-  = s { dataLabels = ls', predefLabels = ps' }
+  = if not $ containsLabel (name ++ ":") ps 
+      then 
+        case name of
+            "p_read_int"  -> stateAddRead' intReadPredef  
+            "p_read_char" -> stateAddRead' charReadPredef
+      else s 
+
     where
-      (ls', ps')
-        = if not $ containsLabel (name ++ ":") ls 
-            then 
-              case name of
-                  "p_read_int"  -> let (l, p) = intReadPredef  ls 
-                                   in  (l:ls, ps ++ p)
-                  "p_read_char" -> let (l, p) = charReadPredef ls
-                                   in  (l:ls, ps ++ p)
-            else (ls, ps)
+      stateAddRead' function = let (l, p) = function ls
+                               in s { dataLabels = l ++ ls, predefLabels = ps ++ p } 
                             
+      ls           = dataLabels     s
+      ps           = predefLabels   s
+
+-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+-- Updates the state with the print labels and functions
+stateAddPrint s name
+  = if not $ containsLabel (name ++ ":") ps
+      then 
+        case name of 
+          "p_print_int"       -> stateAddPrint' intPrintPredef  
+          "p_print_bool"      -> stateAddPrint' boolPrintPredef 
+          "p_print_string"    -> stateAddPrint' strPrintPredef  
+          "p_print_reference" -> stateAddPrint' refPrintPredef  
+          "p_print_ln"        -> stateAddPrint' printlnPredef   
+      else s 
+
+    where
+      stateAddPrint' function = let (l, p) = function ls 
+                                in  s { dataLabels = l ++ ls, predefLabels = ps ++ p }
+
       ls           = dataLabels     s
       ps           = predefLabels   s
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
--- Adds the null pointer checker and its needed data labels to the state
+-- Updates the state with the predefined functions that perform checks, and might
+-- throw runtime errors. 
 stateAddCheckNullPtr s
   = stateAddError s "p_check_null_pointer:" nullPtrCheckPredef 
 
--- Adds the overflow error data and predef labels as needed for all integers
 stateAddIntOverflowError s 
   = stateAddError s "p_throw_overflow_error:" ovfErrPredef 
         
--- Adds the divide by zero check as needed by DIV and MOD      
 stateAddDivZeroError s
   = stateAddError s "p_check_divide_by_zero:" divZeroCheckPredef
       
--- Adds the check array bounds predef and data labels
 stateAddArrayBounds s
   = stateAddError s "p_check_array_bounds:" arrBoundsCheckPredef 
 
@@ -487,7 +492,6 @@ stateAddFreeArr s
 stateAddFreePair s
   = stateAddError s "p_free_pair:" freePairPredef
 
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- Helper function to add string print and runtime error
 stateAddError s name function
   = s { dataLabels = ls', predefLabels = ps' }
@@ -496,7 +500,7 @@ stateAddError s name function
         = if not $ containsLabel name ps
             then 
                 let (l, p)   = if not $ containsLabel "p_print_string:" ps 
-                                 then let (l,  p) = strPrintPredef ls in ([l], p)
+                                 then strPrintPredef ls
                                  else ([], [])          
                 in
                 let (l', p') = function (l ++ ls)  

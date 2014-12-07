@@ -82,73 +82,36 @@ transStat s (ReturnStat e it) = (s', returnI)
 transStat s (PrintStat e it) 
   = ( s'', instrs')
     where
+        -- First gets the instructions for the expr, then adds the print
+        instrs'      = instrs ++ [ MOV'Reg R0 dst ] ++ [ BL $ JumpLabel label ]
+        (s', instrs) = transExpr s (e, it)  
         (dst:_)      = freeRegs s
 
         -- The new state just updates the data labels
-        s''          = s' { dataLabels = ls', predefLabels = ps' }
-
-
-        -- First gets the instructions for the expr, then adds the print
-        instrs'      = instrs ++ [ MOV'Reg R0 dst ] ++ label
-
-        (s', instrs) = transExpr s (e, it)  
+        s''          = stateAddPrint s' label 
 
         -- The print label/function called depends on the type
         label        = case typeOf e it of
-                          IntType    -> [ BL $ JumpLabel "p_print_int"    ]
-                          BoolType   -> [ BL $ JumpLabel "p_print_bool"   ]
-                          CharType   -> [ BL $ JumpLabel "putchar"        ]
-                          StringType -> [ BL $ JumpLabel "p_print_string" ]  
-                          _          -> [ BL $ JumpLabel "p_print_reference" ] 
-
-
-        ls  = dataLabels   s'
-        ps  = predefLabels s'
-        -- Updates the data and predef labels with the strings/instructions
-        (ls', ps') = case typeOf e it of
-                       IntType    -> if not $ containsLabel "p_print_int:"    ps
-                                         then  
-                                              let (l, p)   = intPrintPredef  ls  in
-                                              (l:ls, ps ++ p)
-                                         else (ls, ps)
-                       BoolType   -> if not $ containsLabel "p_print_bool:"   ps
-                                         then
-                                              let (ls', p) = boolPrintPredef ls  in
-                                              (ls' ++ ls, ps ++ p)
-                                         else (ls, ps)
-                       StringType -> if not $ containsLabel "p_print_string:" ps
-                                         then
-                                              let (l, p)   = strPrintPredef  ls  in 
-                                              (l:ls, ps ++ p)
-                                         else (ls, ps)
-                       _          -> if not $ containsLabel "p_print_reference:" ps
-                                         then 
-                                              let (l, p)   = refPrintPredef  ls  in
-                                              (l:ls, ps ++ p)
-                                        else  (ls, ps)        
+                          IntType    -> "p_print_int"    
+                          BoolType   -> "p_print_bool"   
+                          CharType   -> "putchar"        
+                          StringType -> "p_print_string"   
+                          _          -> "p_print_reference" 
 
 
 --
 transStat s (PrintlnStat e it)
   = (s'', instrs')
     where
+      -- The println instruction will be added to the set of print instrs
+      instrs'      = instrs ++ [ BL ( JumpLabel label ) ]
       -- Println is a print, so do print first
       (s', instrs) = transStat s (PrintStat e it) 
-      ---- Get its labels from the updated state
-      ls     = dataLabels s'
-      ps     = predefLabels s'
-      -- Get the println specific labels
-      (ls', ps')
-         = if not $ containsLabel "p_print_ln:" ps
-             then let (l, p) = printlnPredef ls
-                  in  (l:ls, ps ++ p)
-             else     (ls, ps)
 
-      -- The println instruction will be added to the set of print instrs
-      instrs' = instrs ++ [ BL ( JumpLabel "p_print_ln" ) ]
       -- The new state will get the print and println labels
-      s''     = s' { dataLabels = ls' } -- predefLabels = ps' } ******
+      s''     = stateAddPrint s' "p_print_ln" 
 
+      label   = "p_print_ln"
  
 -- 
 transStat s (ScopedStat stat) = transScoped s stat
