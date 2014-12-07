@@ -141,8 +141,10 @@ makePretty (s, instrs)
       where
         putDataLabel ( DataLabel l str ) 
           =  "\t" ++ l ++ ":"
-          ++ "\n\t\t.word " ++ show ( length str - 1 )
+          ++ "\n\t\t.word "    ++ show length' 
           ++ "\n\t\t.ascii \"" ++ str  ++ "\"\n"
+            where
+                length' = length str - ((length . filter (\x -> x == '\\')) str)
 
         putPredefLabel ( PredefLabel l instrs )
           = ( concat $ intersperse "\n\t" $ map show instrs ) ++ "\n"
@@ -507,7 +509,7 @@ stateAddRead s name
   = s { dataLabels = ls', predefLabels = ps' }
     where
       (ls', ps')
-        = if not $ containsLabel name ls 
+        = if not $ containsLabel (name ++ ":") ls 
             then 
               case name of
                   "p_read_int"  -> let (l, p) = intReadPredef  ls 
