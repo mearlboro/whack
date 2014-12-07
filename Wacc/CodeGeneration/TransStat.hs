@@ -30,7 +30,7 @@ transStat s SkipStat = (s, [])
 transStat s (FreeStat e it) = (s', freeI)
   where 
     dst         = head (freeRegs s)
-    (s', exprI) = transExpr s e
+    (s', exprI) = transExpr s (e, it)
     freeI       = exprI ++ [ MOV'Reg R0 dst, BL (JumpLabel freeL) ]
     freeL       = case typeOf e it of 
                     ArrayType {} -> "p_free_array"
@@ -38,12 +38,12 @@ transStat s (FreeStat e it) = (s', freeI)
 
 -- To exit we load the value of the expression into the first available reg
 -- and then move its value into register 0. then call BL exit  
-transStat s (ExitStat e _) = (s', exitI)
+transStat s (ExitStat e it) = (s', exitI)
   where
     -- Obtain the register that the expression value will be saved into
     (dst:_) = freeRegs s
     -- Translate the expression to exit
-    (s', exprI) = transExpr s e
+    (s', exprI) = transExpr s (e, it)
     -- Instructions for the exit statement
     exitI         
       =  exprI 
@@ -51,12 +51,12 @@ transStat s (ExitStat e _) = (s', exitI)
       ++ [ BL (JumpLabel "exit") ] -- TODO: Comment
 
 -- 
-transStat s (ReturnStat e _) = (s', returnI)
+transStat s (ReturnStat e it) = (s', returnI)
   where
     -- Obtain the register that the expression value will be saved into
     (dst:_)  =  freeRegs s
     -- Translate the expression to return
-    (s', exprI) = transExpr s e 
+    (s', exprI) = transExpr s (e, it) 
     -- Move result of expression from dst into return register R0
     returnI = exprI ++ [ MOV'Reg R0 dst ] 
 
@@ -70,7 +70,7 @@ transStat s (PrintStat e it)
 
         -- First gets the instructions for the expr, then adds the print
         instrs'      = instrs ++ [ MOV'Reg R0 dst ] ++ label
-        (s', instrs) = transExpr s e  
+        (s', instrs) = transExpr s (e, it)  
         (dst:_)      = freeRegs s'
         -- The print label/function called depends on the type
         label        = case typeOf e it of
@@ -152,14 +152,14 @@ transStat s (ReadStat (LhsArrayElem arrayE) it) = (s', readI)
                 CharType -> "p_read_char"
   
     dst          = head (freeRegs s)
-    (s', arrayI) = transExpr s (ArrayElemExpr arrayE)
+    (s', arrayI) = transExpr s (ArrayElemExpr arrayE, it)
     readI       =  
       arrayI ++ 
       [ MOV'Reg R0 dst 
       , BL (JumpLabel readL) ]
 
 -- 
-transStat s (WhileStat cond body _) = (s''', whileI)
+transStat s (WhileStat cond body it) = (s''', whileI)
     where
       -- Obtain the next free label
       currL = numJumpLabels s
@@ -172,7 +172,7 @@ transStat s (WhileStat cond body _) = (s''', whileI)
       -- We have used up 2 labels so we need to update the state
       s' = s { numJumpLabels = currL + 2 }
       -- Now let's translate the loop condition expression with the new state
-      (s'', condI) = transExpr s' cond 
+      (s'', condI) = transExpr s' (cond, it) 
       -- Now for the body statements, which are scoped           
       (s''', bodyI) = transScoped s'' body
       -- Now concatenate everything together
@@ -212,7 +212,7 @@ transStat s (DeclareStat vtype vname rhs it) = (s''', declareI)
 transStat s (AssignStat (LhsIdent id) rhs it) = (s', assignI)
   where
     -- TODO
-    magic4 = 4
+    size = sizeOf (IdentExpr id) it 
     -- Obtain the register that the rhs value will be saved into
     dst = head (freeRegs s)
     -- Generate instructions for the right hand side
@@ -220,7 +220,7 @@ transStat s (AssignStat (LhsIdent id) rhs it) = (s', assignI)
     -- Figure out where the variable is in memory
     (src, off) = lookupLoc s' id  -- TODO check s == s' 
     -- TODO comment
-    assignI = rhsI ++ [ strVar dst src magic4 off ]
+    assignI = rhsI ++ [ strVar dst src size off ]
 
 -- We are assigning the first or second element of a pair to a new value
 transStat s (AssignStat (LhsPairElem pelem) rhs it) = (s', pelemInstr)
@@ -254,7 +254,18 @@ transStat s (AssignStat (LhsPairElem pelem) rhs it) = (s', pelemInstr)
     getIdent                           _      =  Nothing
 
 
-transStat s (AssignStat (LhsArrayElem (id, exprs)) rhs it) = error "TODO"
+transStat s (AssignStat (LhsArrayElem (id, exprs)) rhs it) = (s'', assignI)
+  where
+    (dst:nxt:rs) = freeRegs s 
+    (s', rhsI)   = transRhs s (rhs, it)
+    --(src, off)  = lookupLoc s id 
+    size         = sizeOf rhs it 
+    --arrelemI     = [ ADD dst src off ] ++ 
+    (s'', elemI) = transExpr s' { freeRegs=nxt:rs } (ArrayElemExpr (id, exprs), it)
+--    (s'', elemI) = transExpr s' {freeRegs = nxt:rs }  (ArrayElemExpr (id, exprs))
+  
+    -- We use init to remove the last load from transAraryElem
+    assignI      = rhsI ++ (init elemI) ++ [ strVar dst nxt size 0 ]
 
 
 -- 
@@ -271,11 +282,11 @@ transStat s (IfStat cond thens elses it) = (s'''', ifI)
     -- We have used up 2 labels so we need to update the arm state
     s' = s { numJumpLabels = currL + 2 }
     -- Now let's translate the if condition expression
-    (s'', condI) = transExpr s' cond
+    (s'', condI) = transExpr s' (cond, it)
     -- Now for the then end else branch, in its own scope
     (s''', thenI) = transScoped s'' thens 
     -- Now for the else branch, also in its own scope
-    (s'''', elseI) = transScoped s'''' elses 
+    (s'''', elseI) = transScoped s''' elses 
     -- Now concatenate everything together
     ifI =  
       condI ++                          
@@ -304,7 +315,7 @@ transPairElem s (pairE, it)  =
     transPairElemExpr e off  =  (s', pelemI)
       where
         dst = head (freeRegs s)
-        (s', exprI) = transExpr s e
+        (s', exprI) = transExpr s (e, it)
         size = sizeOf pairE it 
         pelemI = 
           exprI ++
@@ -316,7 +327,7 @@ transPairElem s (pairE, it)  =
 transRhs :: Assembler (AssignRhs, It)
 
 --
-transRhs s (RhsExpr e, it) = transExpr s e  
+transRhs s (RhsExpr e, it) = transExpr s (e, it)  
 
 --
 transRhs s (RhsPairElem pairE, it) = (s', rhsI)
@@ -376,7 +387,7 @@ transRhs s (RhsCall fname params, it) = (s', callInstrs)
     --transFuncts :: -> ParamList -> (ArmState, [[Instr]])
     (dst:_) = freeRegs s
     -- Expression instructtion
-    (s', instrs) = mapAccumR transExpr s (reverse params)
+    (s', instrs) = mapAccumR (\s p -> transExpr s (p, it)) s (reverse params)
     -- Generate instructions to push params on the stack
 
     pushArg e = let s = sizeOf e it in [[ strArg dst SP s (-s) ]]

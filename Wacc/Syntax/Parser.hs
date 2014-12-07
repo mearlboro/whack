@@ -97,7 +97,7 @@ pStat = pStat' >>= \stat ->
     --   finds one then it will go on and parse a second statement with `pStat`
     --   and place it inside a `SeqStat` together with `stat`.
     --   If it can't parse a `waccSemicolon` it will fail and return `stat`.
-    option stat $ waccSemicolon >> liftM ( SeqStat stat ) pStat
+    option stat $ waccSemicolon >> ( SeqStat stat ) `liftM` pStat 
 
     where
 
@@ -165,7 +165,7 @@ pStat = pStat' >>= \stat ->
             waccReserved "begin"
             stat <- pStat
             waccReserved "end"
-            return $ ScopedStat stat
+            return $ ScopedStat stat 
 
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --

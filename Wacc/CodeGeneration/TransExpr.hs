@@ -18,22 +18,22 @@ import Wacc.Data.DataTypes
 -- ************************************************************************** --
 
 -- |
-transExpr :: Assembler Expr
+transExpr :: Assembler (Expr, It)
 
 -- |
-transExpr s (IntLiterExpr i)
+transExpr s (IntLiterExpr i, _)
   = (s, [ LDR dst i ])
     where 
       (dst:_) = freeRegs s
 
 -- | Put the value of boolean @b@ into the first avaialble register @dst@
-transExpr s (BoolLiterExpr b)
+transExpr s (BoolLiterExpr b, _)
   = (s, [ MOV dst (Op2'ImmVal $ if b then 1 else 0) ])
     where
         (dst:_) = freeRegs s
 
 -- | Put the string into a dataLabel and the label into the first register @dst@
-transExpr s (StrLiterExpr str)
+transExpr s (StrLiterExpr str, _)
   = (s', [ LDR'Lbl dst l ])
     where
       (dst:_) = freeRegs s
@@ -43,46 +43,73 @@ transExpr s (StrLiterExpr str)
 
 
 -- | Put the char @c@ into the destination reg @dst@
-transExpr s (CharLiterExpr c)
+transExpr s (CharLiterExpr c, _)
   = (s, [ MOV dst (Op2'ImmChr c) ])
     where
       (dst:_) = freeRegs s
 
 -- |
-transExpr s PairLiterExpr 
-  = (s, [ LDR R0 8] ++ [ BL $ JumpLabel "malloc" ])
+transExpr s (PairLiterExpr, _) = (s, [ LDR dst 0 ])
+  where
+    (dst:_) = freeRegs s -- ++ [ BL $ JumpLabel "malloc" ])
 
 
 -- | TODO make ArrayElem a type synonym PLSSSSSSS
-transExpr s (ArrayElemExpr (id, exprs))
-  =    (s, addI
-          ++ concat ( map (transExpr') exprs )
-          ++ [ LDR'Reg dst dst ] )
-          -- ++ [ STR'Reg dst SP ] )
-    
-      where 
-
-        (src, off) = lookupLoc s id  
-        addI =  [ ADD dst src $ Op2'ImmVal off ] 
-
-        (dst:nxt:regs) = freeRegs s
-
-        s' = s { freeRegs = nxt:regs }
-
-        transExpr' e = snd ( transExpr s' e )
-                      ++ [ LDR'Reg dst dst ]
-                      ++ [ MOV'Reg R0 nxt ]
-                      ++ [ MOV'Reg R1 dst ]
-                      ++ [ BL $ JumpLabel "p_check_array_bounds" ]
-                      ++ [ ADD dst dst $ Op2'ImmVal 4 ]
-                      ++ [ ADD dst dst $ Op2'LSL'Sh nxt 2 ]
+--transExpr s (ArrayElemExpr (id, exprs)), _)
+--  =    (s', addI ++ concat ( map (transExpr') exprs )
+--         ++ [ LDR'Reg dst dst ] )
+--          -- ++ [ STR'Reg dst SP ] )
+--    where 
+--      (dst:nxt:regs) = freeRegs s
+--      (src, off) = lookupLoc s id  
+--      addI =  [ ADD dst src $ Op2'ImmVal off ] 
 
 
+--      s' = s { freeRegs = nxt:regs }
+---- (acc -> x -> (acc, y)) -> acc -> [x] -> (acc, [y])
+--      (s'', elemIs) = mapAccumL (trasExpr') s' exprs 
+
+--      transExpr' arm expr = (arm', 
+--        where
+--          (arm', exprI) = transExpr arm expr 
+--                        ++ [ LDR'Reg dst dst ]
+--                        ++ [ MOV'Reg R0 nxt ]
+--                        ++ [ MOV'Reg R1 dst ]
+--                        ++ [ BL $ JumpLabel "p_check_array_bounds" ]
+--                        ++ [ ADD dst dst $ Op2'ImmVal 4 ]
+--                        ++ [ ADD dst dst $ Op2'LSL'Sh nxt 2 ]
+
+transExpr s (ArrayElemExpr (id, exprs), it) = (s', addI ++ elemsI ++ [ ldrVar dst dst size 0 ])
+  where
+    (dst:nxt:regs) = freeRegs s
+    (src, off)     = lookupLoc s id 
+    addI =  [ ADD dst src $ Op2'ImmVal off ] 
+
+    size = sizeOf (id, exprs) it 
+    (s', elemsI) = transDims s exprs 
+
+    transDims s []     = (s,           [])
+    transDims s (e:es) = (s'', eI' ++ esI)
+      where
+
+        finalAddI  =  ADD dst dst (if size == 1 then Op2'Reg nxt else Op2'LSL'Sh nxt 2)  
+
+        isLast     = null es 
+        (s',  eI)  = transExpr s { freeRegs = nxt:regs }  (e, it) 
+        (s'', esI) = transDims s' es 
+        eI'        = 
+          eI ++ 
+          [ LDR'Reg dst dst 
+          , MOV'Reg R0 nxt -- Args for p_check_array_bounds
+          , MOV'Reg R1 dst 
+          , BL (JumpLabel "p_check_array_bounds") 
+          , ADD dst dst $ Op2'ImmVal 4 ] ++
+          if isLast then [ finalAddI ] else [ ADD dst dst $ Op2'LSL'Sh nxt 2 ]
 
 
 -- TODO! TEST!
 -- | Lookup what register variable @id@ is in, and copy its content in @dst@
-transExpr s (IdentExpr id) 
+transExpr s (IdentExpr id, _) 
   = (s, pushDst) -- TODO LOL
     where
       (dst:_) = freeRegs s
@@ -90,28 +117,28 @@ transExpr s (IdentExpr id)
       pushDst = [ LDR'Off dst src off ] -- [sp, #<off>] where 
 
 -- |
-transExpr s (ParenthesisedExpr e) 
-  = transExpr s e 
+transExpr s (ParenthesisedExpr e, it) 
+  = transExpr s (e, it) 
 
 -- 
-transExpr s (UnaryOperExpr NegUnOp (IntLiterExpr i)) 
-  = transExpr s (IntLiterExpr (-i))
+transExpr s (UnaryOperExpr NegUnOp (IntLiterExpr i), it) 
+  = transExpr s (IntLiterExpr (-i), it)
 
 -- | Evaluates the expression and places it in the destination regster @dst@,
 --   will perform  the unary operation on that reg 
-transExpr s (UnaryOperExpr op e)
+transExpr s (UnaryOperExpr op e, it)
   = (s'', exprInstr ++ unopInstr)
     where
-      (s' , exprInstr) = transExpr s  e  
+      (s' , exprInstr) = transExpr s  (e, it)  
       (s'', unopInstr) = transUnOp s' op 
 
 
 -- |
-transExpr s (BinaryOperExpr op e e')
+transExpr s (BinaryOperExpr op e e', it)
   = (s''', chikiInstr ++ chakaInstr ++ binopInstr)
     where
-      (s'  , chikiInstr) = transExpr  s   e  
-      (_   , chakaInstr) = transExpr  s'' e' 
+      (s'  , chikiInstr) = transExpr  s   (e,  it) 
+      (_   , chakaInstr) = transExpr  s'' (e', it) 
       (s''', binopInstr) = transBinOp s'  op 
       s''    = s' { freeRegs = rs }
       (r:rs) = freeRegs s'
@@ -318,7 +345,7 @@ transPairElemExpr :: Assembler (Expr, It, WhichOfTheTwo)
 transPairElemExpr s (expr, it, wott) = (s' { freeRegs = rs }, instr)
   where 
     rs@(dst:nxt:regs) = freeRegs s 
-    (s', exprInstr) = transExpr s { freeRegs = nxt:regs } expr 
+    (s', exprInstr) = transExpr s { freeRegs = nxt:regs } (expr, it) 
     size = sizeOf expr it
     instr 
       =  exprInstr 
@@ -344,12 +371,12 @@ transArrayLitExpr arm (es, it) =
 --Translates an array elem 
 transArrayElem :: Assembler (Expr, It, Int) 
 transArrayElem arm (e, it, index) = 
-  (arm' { freeRegs= r } , exprInstr ++ storeInstr)
+  (arm' { freeRegs = r } , exprInstr ++ storeInstr)
     where
       r@(dst:nxt:regs) = freeRegs arm 
 
       -- Translate the expression 
-      (arm', exprInstr) = transExpr arm{freeRegs = nxt:regs} e
+      (arm', exprInstr) = transExpr arm{freeRegs = nxt:regs} (e, it)
       -- At what index in the heap the elem is
       -- +4 Beause the first 4 bytes are taken up by the length
       offset = (index * (sizeOf e it)) + 4 -- MAGIC NUMBER NOOO 

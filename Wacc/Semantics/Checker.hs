@@ -32,13 +32,14 @@ import Data.Maybe                 ( isNothing , fromMaybe , fromJust , isJust )
 -- :: Program Semantics ::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 -- :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: --
 
--- |Check for semantic errors in a program. Check for duplicate functions, and
---  for each function check for duplicate parameter names and parameter-function
---  name clashes. If there are errors we stop here. Reason being that agumenting
---  the program when there are duplicate identifiers will overwrite existing
---  identifiers in the tables resulting in inaccurate semantic error messages.
---  If there are no errors we proceed and augment the program and check each
---  function body and the main body for semantic errors.
+-- Check for semantic errors in a program. 
+-- Errors include duplicate function names, and duplicate parameter names.
+
+-- name clashes. If there are errors we stop here. Reason being that agumenting
+-- the program when there are duplicate identifiers will overwrite existing
+-- identifiers in the tables resulting in inaccurate semantic error messages.
+-- If there are no errors we proceed and augment the program and check each
+-- function body and the main body for semantic errors.
 checkProgram                           :: Program -> (Program, [ SemanticErr ])
 checkProgram prog@( Program funcs _ )  =
     (aug, if null duplicateErrs then statementErrs else duplicateErrs)
@@ -301,7 +302,7 @@ checkAssignRhs ( RhsArrayLiter exprs ) it ctxs types  =
   where
     arrElemType = case head types of
                       ArrayType t -> t
-                      _           -> error "Weird"
+                      _           -> error "Weird" -- TODO
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- Once again, since AssignRhs only occurs in AssignStat and DeclareStat we are
@@ -322,7 +323,7 @@ checkAssignRhs ( RhsNewPair efst esnd ) it ctxs types  =
 -- Note: this could use some improvements. There is a repeted call to findIndet.
 -- So first we check that the identifier is in scope and that is is a function.
 -- Once we are sure it is a Function we pattern match to expose the Func object.
-checkAssignRhs rhs@( RhsCall fname args ) it@( ST encl _ ) ctxs types  =
+checkAssignRhs rhs@( RhsCall fname args ) it@( ST encl _ _ ) ctxs types  =
   -- I look for fname in current table
   case findIdent' fname it of
     -- Not found!
