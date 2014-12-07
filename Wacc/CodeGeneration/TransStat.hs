@@ -150,12 +150,16 @@ transStat s (PrintlnStat e it)
       ls     = dataLabels s'
       ps     = predefLabels s'
       -- Get the println specific labels
-      (l, p) = printlnPredef ls
+      (ls', ps')
+         = if not $ containsLabel "p_print_ln" ps
+             then let (l, p) = printlnPredef ls
+                  in  (l:ls, ps ++ p)
+             else     (ls, ps)
 
       -- The println instruction will be added to the set of print instrs
       instrs' = instrs ++ [ BL ( JumpLabel "p_print_ln" ) ]
       -- The new state will get the print and println labels
-      s''     = s' { dataLabels = l:ls, predefLabels = ps ++ p }
+      s''     = s' { dataLabels = ls', predefLabels = ps' }
 
  
 -- 
@@ -234,7 +238,7 @@ transStat s (WhileStat cond body _) = (s''', whileI)
         [ B (JumpLabel condL)      -- TODO: Comment        
         , DEFINE (JumpLabel $ bodyL ++ ":") -- TODO: Comment       
         ] ++ bodyI ++              
-        [ DEFINE (JumpLabel condL ++ ":") -- TODO: Comment       
+        [ DEFINE (JumpLabel $ condL ++ ":") -- TODO: Comment       
         ] ++ condI ++            
         [ CMP dst $ Op2'ImmVal 0   
         , BEQ (JumpLabel bodyL) ]  -- TODO: Comment  
