@@ -141,7 +141,7 @@ makePretty (s, instrs)
       where
         putDataLabel ( DataLabel l str ) 
           =  "\t" ++ l ++ ":"
-          ++ "\n\t\t.word " ++ show ( length str )
+          ++ "\n\t\t.word " ++ show ( length str - 1 )
           ++ "\n\t\t.ascii \"" ++ str  ++ "\"\n"
 
         putPredefLabel ( PredefLabel l instrs )
@@ -163,7 +163,7 @@ makePretty (s, instrs)
 intPrintPredef ls 
   = (intLbl, [ PredefLabel name instrs ])
     where
-      intLbl = newDataLabel "%d\0" ls
+      intLbl = newDataLabel "%d\\0" ls
 
       name   =  "p_print_int:"                         
       instrs =  ( [ DEFINE $ JumpLabel name ] 
@@ -180,8 +180,8 @@ intPrintPredef ls
 boolPrintPredef ls 
   = (falseLbl:[trueLbl], [ PredefLabel name instrs ])
     where
-      falseLbl = newDataLabel "false\0" ls
-      trueLbl  = newDataLabel "true\0"  (falseLbl:ls)
+      falseLbl = newDataLabel "false\\0" ls
+      trueLbl  = newDataLabel "true\\0"  (falseLbl:ls)
 
       name   =  "p_print_bool:"                         
       instrs =  ( [ DEFINE $ JumpLabel name ]
@@ -199,7 +199,7 @@ boolPrintPredef ls
 strPrintPredef ls
   = (strLbl, [ PredefLabel name instrs ])
     where
-      strLbl = newDataLabel "%.*s\0" ls
+      strLbl = newDataLabel "%.*s\\0" ls
 
       name   = "p_print_string:"
       instrs =  ( [ DEFINE $ JumpLabel name ]
@@ -216,7 +216,7 @@ strPrintPredef ls
 refPrintPredef ls
   = (refLbl, [ PredefLabel name instrs ])
     where
-        refLbl = newDataLabel "%p\0" ls
+        refLbl = newDataLabel "%p\\0" ls
         
         name   = "p_print_reference:"
         instrs =  ( [ DEFINE $ JumpLabel name ]
@@ -233,7 +233,7 @@ refPrintPredef ls
 printlnPredef ls
   = (printlnLbl, [ PredefLabel name instrs ])
     where
-      printlnLbl = newDataLabel "\0" ls 
+      printlnLbl = newDataLabel "\\0" ls 
  
       name   = "p_print_ln:"
       instrs =  ( [ DEFINE $ JumpLabel name ]
@@ -251,7 +251,7 @@ printlnPredef ls
 intReadPredef ls
   = (intLbl, [ PredefLabel name instrs ])
     where 
-      intLbl = newDataLabel "%d\0" ls
+      intLbl = newDataLabel "%d\\0" ls
     
       name   = "p_read_int:"
       instrs =  ( [ DEFINE $ JumpLabel name ]
@@ -266,7 +266,7 @@ intReadPredef ls
 charReadPredef ls
   = (charLbl, [ PredefLabel name instrs ])
     where 
-      charLbl = newDataLabel "%c\0" ls
+      charLbl = newDataLabel "%c\\0" ls
 
       name   = "p_read_char:"
       instrs =  ( [ DEFINE $ JumpLabel name ]
@@ -286,7 +286,7 @@ freeArrPredef ls
   = (freeLbl, [ PredefLabel name instrs ])
     where
       freeLbl = newDataLabel (  "NullReferenceError: dereference a null " 
-                             ++ "reference.\0\n"                            )
+                             ++ "reference.\\0\n"                            )
                              ls
       name    = "p_free_array:"
       instrs  =  ( [ DEFINE $ JumpLabel name ]
@@ -302,7 +302,7 @@ freePairPredef ls
   = (freeLbl, [ PredefLabel name instrs ])
     where
       freeLbl = newDataLabel (  "NullReferenceError: dereference a null "
-                             ++ "reference.\n"                          )
+                             ++ "reference.\\n"                          )
                              ls
       name    = "p_free_pair:"
       instrs  =  ( [ DEFINE $ JumpLabel name ]
@@ -331,7 +331,7 @@ ovfErrPredef ls
     where
       -- Creates a data label for printing an overflow error -- TODO \n \0 label issue
       ovfLbl =  newDataLabel (  "OverflowError: the result is too small/large "
-                             ++ "to store in a 4-byte signed-integer."        )
+                             ++ "to store in a 4-byte signed-integer.\\n\\0"  )
                              ls
       name   =  "p_throw_overflow_error:"
       -- The set of instructions calls runtime error which exits the program
@@ -345,7 +345,7 @@ divZeroCheckPredef ls
   = (divLbl, [ PredefLabel name instrs ])
     where
       -- Creates a data label for printing an overflow error -- TODO \n \0 label issue
-      divLbl =  newDataLabel "DivideByZeroError: divide or modulo by zero."
+      divLbl =  newDataLabel "DivideByZeroError: divide or modulo by zero.\\n\\0"
                              ls
       name   = "p_check_divide_by_zero:"
       -- The set of instructions calls runtime error which exits the program
@@ -362,9 +362,9 @@ arrBoundsCheckPredef ls
   = (outIndLbl:[negIndLbl], [ PredefLabel name instrs ])
     where
       -- Creates a data label for printing an overflow error -- TODO \n \0 label issue
-      negIndLbl =  newDataLabel "ArrayIndexOutOfBoundsError: negative index\n"
+      negIndLbl =  newDataLabel "ArrayIndexOutOfBoundsError: negative index\\n\\0"
                                 ls
-      outIndLbl =  newDataLabel "ArrayIndexOutOfBoundsError: index too large\n"
+      outIndLbl =  newDataLabel "ArrayIndexOutOfBoundsError: index too large\\n\\0"
                                 (negIndLbl:ls)
 
       name   = "p_check_array_bounds:"
@@ -384,7 +384,7 @@ nullPtrCheckPredef ls
   = (nullLbl, [ PredefLabel name instrs ]) 
     where
       nullLbl = newDataLabel (  "NullReferenceError: dereference a null "
-                             ++ "reference.\n"                            )
+                             ++ "reference.\\n\\0"                      )
                              ls
       name    = "p_check_null_pointer:"
       instrs  =  ( [ DEFINE $ JumpLabel name ] 
