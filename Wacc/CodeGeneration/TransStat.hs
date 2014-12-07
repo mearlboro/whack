@@ -404,26 +404,48 @@ transRhs s (RhsNewPair fstExpr sndExpr, it)
         -- TODO magic pair
 
 -- 
-transRhs s (RhsCall fname params, it) = (s', callInstrs)
+transRhs s (RhsCall fname params, it) = (s'', callInstrs)
   where
     -- mapAccumR :: (acc -> x -> (acc, y)) -> acc -> [x] -> (acc, [y])
     -- x = Expr 
     --transFuncts :: -> ParamList -> (ArmState, [[Instr]])
-    (dst:_) = freeRegs s
-    -- Expression instructtion
-    (s', instrs) = mapAccumR (\s p -> transExpr s (p, it)) s (reverse params)
-    -- Generate instructions to push params on the stack
 
-    pushArg e = let s = sizeOf e it in [[ strArg dst SP s (-s) ]]
+    (dst:_) = freeRegs  s 
+    oldMap  = memoryMap s 
 
-    pushArgs = map pushArg params 
 
-    paramInstrs = (concat . concat) (zipWith (:) instrs pushArgs)
+
+    transParam           :: ArmState -> [ Expr ] -> (ArmState, [ Instr ])
+    transParam s    []   =  (s, [])
+    transParam s (p:ps)  =  (s''', pI ++ strI ++ psI)
+      where
+        (s', pI) = transExpr s (p, it)
+        pSize    = sizeOf p it 
+        strI     = [ strArg dst SP pSize (-pSize) ]
+        s''      = s' { memoryMap =  updateOff (memoryMap s') }
+        (s''', psI) = transParam s'' ps  
+
+        updateOff = Map.map (\(r, off) -> (r, off+pSize))  
+
+    --(dst:_) = freeRegs s
+    ---- Expression instructtion
+    --(s', instrs) = mapAccumR (\s p -> transExpr s (p, it)) s (reverse params)
+    ---- Generate instructions to push params on the stack
+
+    --pushArg e = let s = sizeOf e it in [[ strArg dst SP s (-s) ]]
+
+    --pushArgs = map pushArg params 
+
+    --paramInstrs = (concat . concat) (zipWith (:) instrs pushArgs)
+
+    --s'' = s' { stackOffset = (stackOffset s') + }
 
     totSize = sum (map (flip sizeOf it) params)
-  
+
+    (s', paramI) = (transParam s params) 
+    s'' = s' { memoryMap = oldMap }
     callInstrs 
-      = paramInstrs 
+      =  paramI
       ++ [ BL (JumpLabel ("f_" ++ fname)) ]
       ++ (if totSize == 0 then [] else [ ADD SP SP $ Op2'ImmVal totSize ]) 
       ++ [ MOV'Reg dst R0 ] -- TODO

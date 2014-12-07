@@ -152,7 +152,7 @@ transUnOp s (NotUnOp, _)
     where
 
       unopInstrs =  [ EOR     dst dst $ Op2'ImmVal 1 ]
-                 ++ [ MOV'Reg R0  dst ]
+                  -- ++ [ MOV'Reg R0  dst ]
       (dst:_)    =  freeRegs s
     
 transUnOp s (LenUnOp, e)
