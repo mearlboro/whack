@@ -149,6 +149,7 @@ data Instr
   -- Branching (jump)
   | B       Label  -- Branch                       | B        <label> | PC := label. label is this instruction ±32MB (T2: ±16MB, T: –252 - +256B)
   | BL      Label  -- Branch with link             | BL       <label> | LR := address of next instruction, PC := label. label is this instruction ±32MB (T2: ±16MB).
+  | BB      Label  -- TODO: comment 
   | BLLT    Label  -- TODO: Comment
   | BLCS    Label  -- TODO: Comment
   | BLVS    Label  -- Branch if overflow TODO: Comment
@@ -237,8 +238,8 @@ instance Show Register where
   show R11 = "r11"
   show R12 = "r12"
   show SP  = "sp"   -- R13 | Stack Pointer
-  show LR  = "{lr}" -- R14 | Link Register (which holds return addresses)
-  show PC  = "{pc}" -- R15 | Program Counter
+  show LR  = "lr"   -- R14 | Link Register (which holds return addresses)
+  show PC  = "pc"   -- R15 | Program Counter
 
 instance Show Directive where
   show Text       = ".text"
@@ -312,6 +313,7 @@ instance Show Instr where
 
     show (B      l            ) = "\tB "     ++ show l
     show (BL     l            ) = "\tBL "    ++ show l
+    show (BB     l            ) = "\tBB "    ++ show l
     show (BEQ    l            ) = "\tBEQ "   ++ show l
     show (BLEQ   l            ) = "\tBLEQ "  ++ show l
     show (BLNE   l            ) = "\tBLNE "  ++ show l
@@ -323,8 +325,8 @@ instance Show Instr where
     show (BLVS   l            ) = "\tBLVS "  ++ show l
     show (DEFINE l            ) = "\t"       ++ show l 
 
-    show (PUSH   regs         ) = "\tPUSH "  ++ intercalate ", " (map show regs) 
-    show (POP    regs         ) = "\tPOP "   ++ intercalate ", " (map show regs)
+    show (PUSH   regs         ) = "\tPUSH {" ++ intercalate ", " (map show regs) ++ "}"
+    show (POP    regs         ) = "\tPOP {"  ++ intercalate ", " (map show regs) ++ "}"
 
     -- LDR STR constant
     show (LDR       rd n      ) = "\tLDR "   ++ show rd ++ ", =" ++ show n
