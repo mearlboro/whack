@@ -69,7 +69,7 @@ transFunc s (Func ftype fname params body it)  =  (s'', funcI)
   where 
     -- Save the current memory map
     oldMap = memoryMap s 
-
+ 
     -- Produce a label for this function
     funcL = JumpLabel ("f_" ++ fname ++ ":")
 
