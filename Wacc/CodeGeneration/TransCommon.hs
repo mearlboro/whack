@@ -226,7 +226,7 @@ refPrintPredef ls
                ++ [ LDR'Lbl R0 refLbl ]  
                ++ [ ADD R0 R0 $ Op2'ImmVal 4 ]
                ++ [ BL $ JumpLabel "printf" ]
-               ++ [ MOV'Reg R0 R0 ]
+               ++ [ MOV R0 $ Op2'ImmVal 0 ]
                ++ [ BL $ JumpLabel "fflush" ]
                ++ [ POP [ PC ] ] )
 
