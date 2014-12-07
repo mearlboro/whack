@@ -72,17 +72,20 @@ transFunc s (Func ftype fname params body it)  =  (s'', funcI)
     -- Produce a label for this function
     funcL = JumpLabel ("f_" ++ fname ++ ":")
 
+    bytesNeeded = getBytesNeeded body 
+
     -- Insert into the memory map m the function parameter variables ps
     -- The location of each parameter on the stack is calculated as the size of 
     -- the type of the parameter plus the previous parameters' summed offsets
     putParams []     _   m = m 
     putParams (p:ps) off m = putParams ps off' m'
       where
-        off' = off + sizeOf (ptypeOf p) it 
+        isFirst = off == bytesNeeded + 4  
+        off' = if isFirst then off else off + sizeOf (ptypeOf p) it 
         m'   = Map.insert (pnameOf p) (SP, off') m
 
     -- Add the function parameters to the memory map
-    newMap = putParams params 0 oldMap 
+    newMap = putParams params (bytesNeeded+4) oldMap 
 
     -- Translate the function body in its own scope using the new map
     (s', bodyI) = transScoped s { memoryMap = newMap } body
