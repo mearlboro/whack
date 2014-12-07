@@ -271,7 +271,7 @@ showOp2 op mne op'  =  show op ++ ", " ++ mne ++ show op'
 
 instance Show Instr where
     show (ADD    rd rn  op2   ) = "\tADD "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                  
-    show (ADDS   rd rn  rs    ) = "\tADD "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rs                     
+    show (ADDS   rd rn  rs    ) = "\tADDS "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rs                     
     show (SUB    rd rn  op2   ) = "\tSUB "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
     show (SUBS   rd rn  rs    ) = "\tSUB "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rs                  
     show (MUL    rd rm  rs    ) = "\tMUL "   ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    
@@ -323,7 +323,7 @@ instance Show Instr where
     show (CBNZ   rn l         ) = "\tCBNZ "  ++ show rn ++ ", " ++ show l
     show (RSBS rd rn op2      ) = "\tRSBS "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2        
     show (BLVS   l            ) = "\tBLVS "  ++ show l
-    show (DEFINE l            ) = "\t"       ++ show l 
+    show (DEFINE l            ) = ""         ++ show l 
 
     show (PUSH   regs         ) = "\tPUSH {" ++ intercalate ", " (map show regs) ++ "}"
     show (POP    regs         ) = "\tPOP {"  ++ intercalate ", " (map show regs) ++ "}"

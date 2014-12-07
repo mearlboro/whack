@@ -77,7 +77,7 @@ transExpr s (PairLiterExpr, _) = (s, [ LDR dst 0 ])
 --                        ++ [ ADD dst dst $ Op2'ImmVal 4 ]
 --                        ++ [ ADD dst dst $ Op2'LSL'Sh nxt 2 ]
 
-transExpr s (ArrayElemExpr (id, exprs), it) = (s', addI ++ elemsI ++ [ ldrVar dst dst size 0 ])
+transExpr s (ArrayElemExpr (id, exprs), it) = (s'', addI ++ elemsI ++ [ ldrVar dst dst size 0 ])
   where
     (dst:nxt:regs) = freeRegs s
     (src, off)     = lookupLoc s id 
@@ -85,6 +85,8 @@ transExpr s (ArrayElemExpr (id, exprs), it) = (s', addI ++ elemsI ++ [ ldrVar ds
 
     size = sizeOf (id, exprs) it 
     (s', elemsI) = transDims s exprs 
+
+    s'' = stateAddArrayBounds s'
 
     transDims s []     = (s,           [])
     transDims s (e:es) = (s'', eI' ++ esI)
@@ -127,8 +129,8 @@ transExpr s (UnaryOperExpr NegUnOp (IntLiterExpr i), it)
 transExpr s (UnaryOperExpr op e, it)
   = (s'', exprInstr ++ unopInstr)
     where
-      (s' , exprInstr) = transExpr s  (e, it)  
-      (s'', unopInstr) = transUnOp s' op 
+      (s' , exprInstr) = transExpr s  (e,  it)  
+      (s'', unopInstr) = transUnOp s' (op, e) 
 
 
 -- |
@@ -144,19 +146,23 @@ transExpr s (BinaryOperExpr op e e', it)
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- | Generate instructions for a unary operator
-transUnOp :: Assembler UnaryOper 
-transUnOp s NotUnOp 
+transUnOp :: Assembler (UnaryOper, Expr) 
+transUnOp s (NotUnOp, _)
   = (s, unopInstrs)
     where
+
       unopInstrs =  [ EOR     dst dst $ Op2'ImmVal 1 ]
                  ++ [ MOV'Reg R0  dst ]
       (dst:_)    =  freeRegs s
     
-transUnOp s LenUnOp
-  = (s, unopInstrs)
+transUnOp s (LenUnOp, e)
+  = (s, [ LDR'Reg dst dst ])
     where 
+       -- = case typeOf  of 
+            --StringType   -> 
+            --ArrayType {} -> 
       unopInstrs =  [ LDR'Lbl dst l ]   -- stores in dst the adrress of a string
-                 ++ [ LDR'Reg dst dst ] -- puts into dst the length of the addr,
+                 -- ++ [ LDR'Reg dst dst ] -- puts into dst the length of the addr,
                                         -- meaning the legth of the string
                   -- REDO comment
       (l:_)      =  dataLabels s
@@ -164,11 +170,11 @@ transUnOp s LenUnOp
 
 -- | Ints and chars are treated the same by ARM, so there is not need to do
 -- anything out of the ordinary regarding Ord and Chr  
-transUnOp s OrdUnOp = (s, [])
+transUnOp s (OrdUnOp, _) = (s, [])
 
-transUnOp s ChrUnOp = (s, []) 
+transUnOp s (ChrUnOp, _) = (s, []) 
 
-transUnOp s NegUnOp 
+transUnOp s (NegUnOp, _) 
   = (s', negUnOpInstrs)
     where 
       s'            =  stateAddIntOverflowError s
