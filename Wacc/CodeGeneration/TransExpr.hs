@@ -254,42 +254,48 @@ transBinOp s OrrBinOp
 transBinOp s LsBinOp  -- less than <
   = ( s, instrs )
     where
-      instrs   = ( [ MOVLT r $ Op2'ImmVal 1 ]
+      instrs   = ( [ CMP   r $ Op2'Reg r'   ]
+      	       ++  [ MOVLT r $ Op2'ImmVal 1 ]
                ++  [ MOVGE r $ Op2'ImmVal 0 ] )
       (r:r':_) = freeRegs s
 
 transBinOp s GtBinOp  -- greater than >
   = ( s, instrs )
     where
-      instrs   = ( [ MOVGT r $ Op2'ImmVal 1 ]
+      instrs   = ( [ CMP   r $ Op2'Reg r'   ]
+      	       ++  [ MOVGT r $ Op2'ImmVal 1 ]
                ++  [ MOVLE r $ Op2'ImmVal 0 ] )
       (r:r':_) = freeRegs s
 
 transBinOp s LEBinOp -- less equal <=
   = ( s, instrs )
     where
-      instrs   = ( [ MOVLE r $ Op2'ImmVal 1 ]
+      instrs   = ( [ CMP   r $ Op2'Reg r'   ]
+      	       ++  [ MOVLE r $ Op2'ImmVal 1 ]
                ++  [ MOVGT r $ Op2'ImmVal 0 ] )
       (r:r':_) = freeRegs s
 
 transBinOp s GEBinOp -- greater equal >=
   = ( s, instrs )
     where
-      instrs   = ( [ MOVGE r $ Op2'ImmVal 1 ]
+      instrs   = ( [ CMP   r $ Op2'Reg r'   ]
+      	        ++ [ MOVGE r $ Op2'ImmVal 1 ]
                ++  [ MOVLT r $ Op2'ImmVal 0 ] )
       (r:r':_) = freeRegs s
 
 transBinOp s EqBinOp -- equal ==
   = ( s, instrs )
     where
-      instrs   = ( [ MOVEQ r $ Op2'ImmVal 1 ]
+      instrs   = ( [ CMP   r $ Op2'Reg r'   ]
+      	       ++  [ MOVEQ r $ Op2'ImmVal 1 ]
                ++  [ MOVNE r $ Op2'ImmVal 0 ] )
       (r:r':_) = freeRegs s
 
 transBinOp s NEBinOp -- not equal !=
   = ( s, instrs )
     where
-      instrs   = ( [ MOVNE r $ Op2'ImmVal 1 ]
+      instrs   = ( [ CMP   r $ Op2'Reg r'   ]
+      	       ++  [ MOVNE r $ Op2'ImmVal 1 ]
                ++  [ MOVEQ r $ Op2'ImmVal 0 ] )
       (r:r':_) = freeRegs s
 
