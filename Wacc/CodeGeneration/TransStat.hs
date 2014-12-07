@@ -90,7 +90,7 @@ transStat s (PrintStat e it)
         -- The new state just updates the data labels
         s''          = stateAddPrint s' label 
 
-        -- The print label/function called depends on the type
+        -- The print label depends on the type
         label        = case typeOf e it of
                           IntType    -> "p_print_int"    
                           BoolType   -> "p_print_bool"   
@@ -109,8 +109,9 @@ transStat s (PrintlnStat e it)
       (s', instrs) = transStat s (PrintStat e it) 
 
       -- The new state will get the print and println labels
-      s''     = stateAddPrint s' "p_print_ln" 
+      s''     = stateAddPrint s' label
 
+      -- The print label
       label   = "p_print_ln"
  
 -- 

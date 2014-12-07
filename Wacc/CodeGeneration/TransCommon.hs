@@ -180,7 +180,7 @@ intPrintPredef ls
 
 
 boolPrintPredef ls 
-  = ([ falseLbl, trueLbl ], [ PredefLabel name instrs ])
+  = ([ trueLbl, falseLbl ], [ PredefLabel name instrs ])
     where
       falseLbl = newDataLabel "false\\0" ls
       trueLbl  = newDataLabel "true\\0"  (falseLbl:ls)
@@ -461,6 +461,7 @@ stateAddPrint s name
           "p_print_string"    -> stateAddPrint' strPrintPredef  
           "p_print_reference" -> stateAddPrint' refPrintPredef  
           "p_print_ln"        -> stateAddPrint' printlnPredef   
+          _                   -> s
       else s 
 
     where
