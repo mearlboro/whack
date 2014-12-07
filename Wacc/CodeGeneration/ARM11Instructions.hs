@@ -337,7 +337,7 @@ instance Show Instr where
     show (LDR'Lbl      rd l   ) = "\tLDR "   ++ show rd ++ ", =" ++ show l
     show (LDREQ'Lbl    rd l   ) = "\tLDREQ " ++ show rd ++ ", =" ++ show l
     show (LDRNE'Lbl    rd l   ) = "\tLDRNE " ++ show rd ++ ", =" ++ show l
-    show (LDRNQ'Lbl    rd l   ) = "\tLDRNQ " ++ show rd ++ ", =" ++ show l
+    show (LDRNQ'Lbl    rd l   ) = "\tLDRNE " ++ show rd ++ ", =" ++ show l
     show (LDRLT'Lbl    rd l   ) = "\tLDRLT " ++ show rd ++ ", =" ++ show l
     show (LDRCS'Lbl    rd l   ) = "\tLDRCS " ++ show rd ++ ", =" ++ show l
     show (STR'Lbl      rd l   ) = "\tSTR "   ++ show rd ++ ", =" ++ show l  
