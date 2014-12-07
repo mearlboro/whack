@@ -83,8 +83,8 @@ check program path = do
     else do
         let assembled = makePretty (evaluateProgram program')
         -- Write the assembly file
-        putStrLn assembled 
-        --saveAssembled path assembled
+        --putStrLn assembled 
+        saveAssembled path assembled
         -- putStrLn assemble
         exitWith   ExitSuccess
 
