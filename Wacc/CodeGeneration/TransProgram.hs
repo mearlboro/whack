@@ -93,7 +93,7 @@ transFunc s (Func ftype fname params body it)  =  (s'', funcI)
     -- 
     offsets = (scanl (+) (4)) (map (flip sizeOf it . ptypeOf) (init params))
 
-    newMap = foldl putParam oldMap (zip params (trace (show offsets) offsets))
+    newMap = foldl putParam oldMap (zip params (offsets))
 
     --newMap = putParams params (bytesNeeded+4) oldMap True
 
