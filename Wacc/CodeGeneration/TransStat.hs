@@ -442,7 +442,7 @@ transRhs s (RhsCall fname params, it) = (s'', callInstrs)
 
     totSize = sum (map (flip sizeOf it) params)
 
-    (s', paramI) = (transParam s params) 
+    (s', paramI) = (transParam s (reverse params)) 
     s'' = s' { memoryMap = oldMap }
     callInstrs 
       =  paramI
