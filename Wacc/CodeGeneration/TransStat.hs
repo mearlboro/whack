@@ -103,6 +103,7 @@ transStat s (PrintStat e it)
                           BoolType   -> "p_print_bool"   
                           CharType   -> "putchar"        
                           StringType -> "p_print_string"   
+                          ArrayType CharType -> "p_print_string"
                           _          -> "p_print_reference" 
 
 
