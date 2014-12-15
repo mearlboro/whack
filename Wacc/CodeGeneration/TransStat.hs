@@ -224,7 +224,7 @@ transStat s (DeclareStat vtype vname rhs it) = (s''', declareI)
 
     oldMemoryUsed = memoryUsed s'
     -- Update the stack offset for the next declaration
-    s'' = s' { stackOffset = offset, memoryUsed = oldMemoryUsed + size }
+    s'' = s' { stackOffset = offset }
     -- Now remember the location of vname in memory
     s''' = insertLoc s'' vname (SP, offset)  -- TODO: check s == s'' here
     -- We now need to push the value in dst reg onto the stack
@@ -487,7 +487,10 @@ transScoped arm stat = (armV, scopedI)
         -- Comment later
         --allah = getBytesNeeded' stat 
         -- Update variables in map, change the map
-        arm'' = arm' { memoryMap = Map.map (\(r, o) -> (r, o+bytesNeeded)) oldMap }
+        arm'' = arm' { 
+          memoryMap = Map.map (\(r, o) -> (r, o+bytesNeeded)) oldMap,
+          memoryUsed = oldMemoryUsed + bytesNeeded 
+        }
         -- Translate the statemente after reserving space on the stack
         (arm''', statInstr) = transStat arm'' stat 
         -- Restore stack offset
