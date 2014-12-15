@@ -325,7 +325,7 @@ freePairPredef ls
               ++ [ PUSH [ R0 ] ]
               ++ [ LDR'Reg R0 R0 ]
               ++ [ BL  $ JumpLabel "free" ]
-              ++ [ LDR'Reg R0 R0 ]
+              ++ [ LDR'Reg R0 SP ]
               ++ [ ldrVar R0 R0 4 4]
               ++ [ BL  $ JumpLabel "free" ]
               ++ [ POP [ R0 ] ] 
