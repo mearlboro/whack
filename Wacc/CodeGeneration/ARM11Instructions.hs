@@ -48,7 +48,7 @@ data ArmState
   , memoryUsed :: Int 
 
   , hasReturned :: Bool 
-  
+
   } deriving (Eq)
 
 -- Insert variable v into memory map of s at location m 
@@ -279,7 +279,7 @@ instance Show Instr where
     show (ADD    rd rn  op2   ) = "\tADD "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                  
     show (ADDS   rd rn  rs    ) = "\tADDS "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rs                     
     show (SUB    rd rn  op2   ) = "\tSUB "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show op2                   
-    show (SUBS   rd rn  rs    ) = "\tSUB "   ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rs                  
+    show (SUBS   rd rn  rs    ) = "\tSUBS "  ++ show rd ++ ", " ++ show rn  ++ ", " ++ show rs                  
     show (MUL    rd rm  rs    ) = "\tMUL "   ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs                    
     show (MLA    rd rm  rs rn ) = "\tMLA "   ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs ++ ", " ++ show rn 
     show (SMULL  rd rm  rs rn ) = "\tSMULL " ++ show rd ++ ", " ++ show rm  ++ ", " ++ show rs ++ ", " ++ show rn 
