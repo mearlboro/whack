@@ -9,6 +9,8 @@ import Wacc.CodeGeneration.TransCommon
 
 import Wacc.Data.DataTypes
 
+import Data.Char (ord)
+
 -- ************************************************************************** --
 -- ***********************                            *********************** --
 -- ***********************   Expression Translation   *********************** --
@@ -42,7 +44,7 @@ transExpr s (StrLiterExpr str, _)
 
 -- | Put the char @c@ into the destination reg @dst@
 transExpr s (CharLiterExpr c, _)
-  = (s, [ MOV dst (Op2'ImmChr c) ])
+  = (s, [ MOV dst $ Op2'ImmVal (ord c) ]) --(s, [ MOV dst (Op2'ImmChr c) ]) 
     where
       (dst:_) = freeRegs s
 

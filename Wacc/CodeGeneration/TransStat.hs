@@ -353,7 +353,7 @@ transPairElem s (pairE, it)  =
           exprI ++
           [ MOV'Reg R0 dst 
           , BL (JumpLabel "p_check_null_pointer") 
-          , ldrVar dst dst size off ] 
+          , ldrVar dst dst 4 off ] 
 
 --
 transRhs :: Assembler (AssignRhs, It)
