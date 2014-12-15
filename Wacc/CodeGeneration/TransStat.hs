@@ -205,9 +205,13 @@ transStat s (WhileStat cond body it) = (s''', whileI)
 
 
 -- mapAccumL for the win
-transStat s (SeqStat x y) = (s', concat iss)
+transStat s (SeqStat stat0 stat1) = (s'', stat0I ++ stat1I)
   where 
-    (s', iss) = mapAccumL transStat s [x, y] 
+    availRegs     = freeRegs s
+    (s', stat0I)  = transStat s                           stat0
+    (s'', stat1I) = transStat s' { freeRegs = availRegs } stat1 
+
+    --(s', iss) = mapAccumL transStat s [x, y] 
 
 
 --

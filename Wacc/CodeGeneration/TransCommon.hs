@@ -126,10 +126,11 @@ getBytesNeeded (DeclareStat vtype _ _ _)  =  sizeOf vtype undefined
 getBytesNeeded _                          =  0 
 
 
-fixQuotes           :: String -> String
-fixQuotes      ""   =  ""
-fixQuotes ('"':cs)  =  "\\\"" ++ fixQuotes cs
-fixQuotes   (c:cs)  =  c:(fixQuotes cs) 
+fixQuotes            :: String -> String
+fixQuotes      ""    =  ""
+fixQuotes  ('"':cs)  =  "\\\"" ++ fixQuotes cs
+fixQuotes ('\'':cs)  =  "\\\'" ++ fixQuotes cs
+fixQuotes    (c:cs)  =  c:(fixQuotes cs) 
 
 
 
