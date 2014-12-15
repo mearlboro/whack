@@ -44,6 +44,11 @@ data ArmState
   , dataLabels    :: [ Label ]
   -- TODO: Comment
   , predefLabels  :: [ Label ]
+
+  , memoryUsed :: Int 
+
+  , hasReturned :: Bool 
+  
   } deriving (Eq)
 
 -- Insert variable v into memory map of s at location m 
