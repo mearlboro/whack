@@ -32,6 +32,12 @@ strArg rd rn size off
   | otherwise = STR'Arg rd rn off 
 
 
+addVar :: Rn -> Rd -> Int -> [ Instr ]
+addVar rd rn off 
+  | off == 0  = []  
+  | otherwise = [ ADD rd rn $ Op2'ImmVal off ]
+
+
 -- ************************************************************************** --
 -- **************************                         *********************** --
 -- **************************       Common Utils      *********************** --

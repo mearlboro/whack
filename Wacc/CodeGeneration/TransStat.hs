@@ -13,7 +13,7 @@ import qualified Data.Map   as Map (Map, insert, lookup, map)
 import           Data.Maybe        (fromJust)
 import           Data.List         (mapAccumL, mapAccumR) 
 import           Data.Tuple        (swap)
-
+import           Debug.Trace
 
 -- ************************************************************************** --
 -- ***********************                            *********************** --
@@ -69,15 +69,22 @@ transStat s (ExitStat e it)
 
 -- 
 -- 
-transStat s (ReturnStat e it) = (s', returnI)
+transStat s (ReturnStat e it) = (s'', returnI)
   where
     -- Obtain the register that the expression value will be saved into
     (dst:_)  =  freeRegs s
     -- Translate the expression to return
     (s', exprI) = transExpr s (e, it) 
     -- Move result of expression from dst into return register R0
-    returnI = exprI ++ [ MOV'Reg R0 dst ] 
+    returnI = exprI ++ [ MOV'Reg R0 dst ] ++ addI
+    -- Add to stack pointer as many bytes as have been allocated so far 
+    addI =  (addVar SP SP $ memoryUsed s') 
+         ++ [ POP [ PC ] ] 
 
+    s'' = s' { hasReturned = True }
+         -- ++ addVar SP SP $ stackOffset s'
+
+-- dont need to add in scoped statement that have a return
 
 transStat s (PrintStat e it) 
   = ( s'', instrs')
@@ -214,8 +221,10 @@ transStat s (DeclareStat vtype vname rhs it) = (s''', declareI)
     size = sizeOf vtype it 
     -- Work out the stack offset for this variable
     offset = stackOffset s' - size -- TODO: check s == s' here
+
+    oldMemoryUsed = memoryUsed s'
     -- Update the stack offset for the next declaration
-    s'' = s' { stackOffset = offset }
+    s'' = s' { stackOffset = offset, memoryUsed = oldMemoryUsed + size }
     -- Now remember the location of vname in memory
     s''' = insertLoc s'' vname (SP, offset)  -- TODO: check s == s'' here
     -- We now need to push the value in dst reg onto the stack
@@ -459,7 +468,7 @@ transRhs s (RhsCall fname params, it) = (s'', callInstrs)
 
 -- | 
 transScoped          :: Assembler Stat
-transScoped arm stat = (arm'''', editStack SUB ++ statInstr ++ editStack ADD)
+transScoped arm stat = (armV, scopedI)
       where
         -- Make room on the stack or free the stack
         editStack :: (Rd -> Rn -> Operand2 -> Instr) -> [ Instr ]
@@ -469,6 +478,8 @@ transScoped arm stat = (arm'''', editStack SUB ++ statInstr ++ editStack ADD)
 
         -- This is the old map
         oldMap = memoryMap arm
+
+        oldMemoryUsed = memoryUsed arm
 
         oldOffset = stackOffset arm 
         -- Update stack offset
@@ -480,11 +491,19 @@ transScoped arm stat = (arm'''', editStack SUB ++ statInstr ++ editStack ADD)
         -- Translate the statemente after reserving space on the stack
         (arm''', statInstr) = transStat arm'' stat 
         -- Restore stack offset
-        arm'''' = arm''' { memoryMap = oldMap }
+        arm'''' = arm''' { memoryMap = oldMap, memoryUsed = oldMemoryUsed }
+
+        armV = arm'''' { hasReturned = False }
 
         -- Work out how many variables are declared in the scope of this 
         -- statement.
         bytesNeeded  =  getBytesNeeded stat 
         -- Can only add and sub from sp in chunks of 1024
         (chunks, left) = divMod bytesNeeded 1024 
+
+        t = trace (show $ hasReturned arm'''') (hasReturned arm'''')
+
+        scopedI = editStack SUB 
+                ++ statInstr 
+                ++ if hasReturned arm'''' then [] else editStack ADD  
 
