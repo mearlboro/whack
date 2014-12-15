@@ -279,7 +279,7 @@ intReadPredef ls
 charReadPredef ls
   = ([ charLbl ], [ PredefLabel name instrs ])
     where 
-      charLbl = newDataLabel "%c\\0" ls
+      charLbl = newDataLabel " %c\\0" ls
 
       name   = "p_read_char:"
       instrs =  ( [ DEFINE $ JumpLabel name ]
