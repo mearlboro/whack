@@ -17,6 +17,7 @@ import Data.Char (ord)
 -- ***********************                            *********************** -- 
 -- ************************************************************************** --
 
+
 -- |
 transExpr :: Assembler (Expr, It)
 
@@ -24,6 +25,7 @@ transExpr :: Assembler (Expr, It)
 transExpr s (IntLiterExpr i, _)
   = (s, [ LDR dst i ])
     where 
+      -- if freeRgs == 2 then PUSH { R10 }
       (dst:_) = freeRegs s
 
 -- | Put the value of boolean @b@ into the first avaialble register @dst@

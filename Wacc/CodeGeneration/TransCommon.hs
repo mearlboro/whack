@@ -117,6 +117,14 @@ instance HasType ArrayElem where
       elemT (ArrayType t) = t
       elemT            t  = t 
 
+
+extractId                               :: PairElem -> IdentName 
+extractId (Fst (IdentExpr      id    )) = id 
+extractId (Fst (ArrayElemExpr (id, _))) = id 
+extractId (Snd (IdentExpr      id    )) = id 
+extractId (Snd (ArrayElemExpr (id, _))) = id 
+extractId                          _    = error "Semantic Check Failed"
+
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
 -- | Does the statement introduce variables in its scope?
