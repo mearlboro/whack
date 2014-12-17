@@ -42,7 +42,7 @@ import Data.Maybe                 ( isNothing , fromMaybe , fromJust , isJust )
 -- function body and the main body for semantic errors.
 checkProgram                           :: Program -> (Program, [ SemanticErr ])
 checkProgram prog@( Program funcs _ )  =
-    (aug, if null duplicateErrs then statementErrs else duplicateErrs)
+    (simplify aug, if null duplicateErrs then statementErrs else duplicateErrs)
   where
     aug@(Program funcs' main)  =  augmentProgram prog
     statementErrs        =  concatMap checkStat ( map bodyOf funcs' ) ++

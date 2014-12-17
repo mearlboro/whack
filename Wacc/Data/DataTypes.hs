@@ -1,7 +1,8 @@
 module Wacc.Data.DataTypes where
 
-import qualified Data.Map as Map (Map)
-
+import qualified Data.Map  as Map (Map)
+import           Data.Char        (ord) 
+import           Control.Monad.Fix (fix)
 -- qualified remove objLoc
 
 -- ************************************************************************** --
@@ -151,6 +152,74 @@ type CharLiter  = Character                      -- <char-liter> ::= ''' <charac
 type StrLiter   = [ Character ]                  -- <str-liter> ::= '"' <character>* '"'
 
 type Character  = Char                           -- <character> ::= any-ASCII-character-except-'\'-'''-'"' | '\' <escaped-char>
+
+
+class CanSimplify a where
+  simplify :: a -> a 
+
+instance CanSimplify Program where
+  simplify (Program fs main) = Program (map simplify fs) (simplify main)
+
+instance CanSimplify Func where
+  simplify f = f { bodyOf = simplify (bodyOf f) }
+
+instance CanSimplify Stat where 
+  simplify  SkipStat                 = SkipStat
+  simplify (FreeStat    e        it) = FreeStat    (simplify e) it 
+  simplify (ReturnStat  e        it) = ReturnStat  (simplify e) it 
+  simplify (ExitStat    e        it) = ExitStat    (simplify e) it
+  simplify (PrintStat   e        it) = PrintStat   (simplify e) it
+  simplify (PrintlnStat e        it) = PrintlnStat (simplify e) it
+  simplify (ScopedStat  s          ) = ScopedStat  (simplify s) 
+  simplify (ReadStat    lhs      it) = ReadStat    (simplify lhs) it 
+  simplify (WhileStat   e s      it) = WhileStat   (simplify e)   (simplify s) it
+  simplify (SeqStat     s s'       ) = SeqStat     (simplify s)   (simplify s')
+  simplify (AssignStat  lhs rhs  it) = AssignStat  (simplify lhs) (simplify rhs) it
+  simplify (IfStat      e s s'   it) = IfStat      (simplify e)   (simplify s)   (simplify s') it 
+  simplify (DeclareStat t n rhs  it) = DeclareStat t n (simplify rhs) it
+
+instance CanSimplify AssignLhs where
+  simplify (LhsPairElem  (Fst e))  = LhsPairElem  (Fst (simplify e))
+  simplify (LhsPairElem  (Snd e))  = LhsPairElem  (Snd (simplify e))
+  simplify (LhsArrayElem (id, es)) = LhsArrayElem (id, map simplify es)
+  simplify                   lhs   = lhs  
+
+instance CanSimplify AssignRhs where
+  simplify (RhsExpr       e      ) = RhsExpr          (simplify e)         
+  simplify (RhsPairElem   (Fst e)) = RhsPairElem (Fst (simplify e))              
+  simplify (RhsPairElem   (Snd e)) = RhsPairElem (Snd (simplify e))
+  simplify (RhsArrayLiter es     ) = RhsArrayLiter    (map simplify es)            
+  simplify (RhsNewPair    e e'   ) = RhsNewPair       (simplify e) (simplify e')            
+  simplify (RhsCall       id es  ) = RhsCall id       (map simplify es)
+
+instance CanSimplify Expr where
+  simplify (BinaryOperExpr op (IntLiterExpr  i) (IntLiterExpr  j))  =  simplifyInt op i j
+  simplify (BinaryOperExpr op (BoolLiterExpr p) (BoolLiterExpr q))  =  simplifyBool op p q
+  simplify (BinaryOperExpr op (CharLiterExpr a) (CharLiterExpr b))  =  simplifyInt op (ord a) (ord b) 
+  simplify (BinaryOperExpr op                e                 e')  =  simplify (BinaryOperExpr op (simplify e) (simplify e'))
+  simplify (UnaryOperExpr  op                e                   )  =  UnaryOperExpr op (simplify e)      
+  simplify (ParenthesisedExpr e)                                    =  (simplify e)  
+  simplify (ArrayElemExpr     (id, es))                             =  ArrayElemExpr (id, map simplify es)            
+  simplify                                                     e    =  e   
+
+
+
+simplifyInt AddBinOp i j = IntLiterExpr  (i   +   j) 
+simplifyInt SubBinOp i j = IntLiterExpr  (i   -   j)
+simplifyInt MulBinOp i j = IntLiterExpr  (i   *   j)
+simplifyInt DivBinOp i j = IntLiterExpr  (i `div` j)
+simplifyInt ModBinOp i j = IntLiterExpr  (i `mod` j)
+simplifyInt LsBinOp  i j = BoolLiterExpr (i   <   j)
+simplifyInt GtBinOp  i j = BoolLiterExpr (i   >   j)
+simplifyInt LEBinOp  i j = BoolLiterExpr (i   <=  j)
+simplifyInt GEBinOp  i j = BoolLiterExpr (i   >=  j)
+simplifyInt EqBinOp  i j = BoolLiterExpr (i   ==  j)
+simplifyInt NEBinOp  i j = BoolLiterExpr (i   /=  j)
+
+simplifyBool AndBinOp p q = BoolLiterExpr (p && q)   
+simplifyBool OrrBinOp p q = BoolLiterExpr (p || q)  
+simplifyBool EqBinOp  p q = BoolLiterExpr (p == q)  
+simplifyBool NEBinOp  p q = BoolLiterExpr (p /= q) 
 
 
 
