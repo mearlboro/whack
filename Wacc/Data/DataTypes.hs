@@ -18,8 +18,10 @@ import qualified Data.Map as Map (Map)
 --   The lateral comments describe the Backus-Naur form syntax of WACC. -- -- --
 
 data Program                                     -- <program> ::=
-  = Program [ Func ] Stat                        -- 'begin' <func>* <stat> 'end'
-  deriving ( Eq , Ord )
+  = Program 
+  { pFuncs :: [ Func ]
+  , pMain  ::   Stat                              -- 'begin' <func>* <stat> 'end'
+  } deriving ( Eq , Ord )
 
 -- TODO rename into fType fName etc
 data Func                                         -- <func> ::=
@@ -235,7 +237,16 @@ data IdentObj
   = IdentObj
   { objType :: Type 
   , objCtx  :: Context
+  , objExpr :: Expr
   } deriving (Eq, Ord)
+
+--data IdentVal
+--  = Unknown
+--  | IntVal  Int 
+--  | BoolVal Bool 
+--  | CharVal Char 
+--  | StringVal String
+--  deriving (Eq, Ord)
 
 -- | Type synonym
 type It = IdentTable

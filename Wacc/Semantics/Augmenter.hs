@@ -78,7 +78,7 @@ augmentStat stat prevIt  =
     PrintStat   expr    _ -> (,) prevIt   $ PrintStat   expr    prevIt
     PrintlnStat expr    _ -> (,) prevIt   $ PrintlnStat expr    prevIt
     ReadStat    lhs     _ -> (,) prevIt   $ ReadStat    lhs     prevIt
-    AssignStat  lhs rhs _ -> (,) prevIt   $ AssignStat  lhs rhs prevIt
+    AssignStat  _ _ _     -> augmentAssign  stat 
     DeclareStat _ _ _   _ -> augmentDeclare stat
     ScopedStat  _         -> augmentScoped  stat
     WhileStat   _ _     _ -> augmentWhile   stat
@@ -87,12 +87,26 @@ augmentStat stat prevIt  =
 
   where
 
+    extractRhsExpr :: AssignRhs -> IdentName -> Expr 
+    extractRhsExpr (RhsExpr       e      ) _   = e 
+    extractRhsExpr  _                      id  = IdentExpr id 
+
+    augmentAssign                                        :: Stat -> ( It , Stat )
+    augmentAssign ( AssignStat ( LhsIdent id ) rhs it )  = 
+      let nextIt  =  if   isDefined id it -- If not defined semantics will complain
+                     then setExpr id (extractRhsExpr rhs id) $ encloseIn prevIt False
+                     else prevIt
+      in  ( nextIt , AssignStat ( LhsIdent id ) rhs nextIt )          
+
+    augmentAssign ( AssignStat lhs rhs _ )  =  
+      ( prevIt , AssignStat lhs rhs prevIt )
+
     -- |We have the previous table and we need to return the table for the next
     --  statement. This is the only case where the table is updated, since we
     --  just introduced a new variable that can be used by subsequent statements
     augmentDeclare                                   :: Stat -> ( It , Stat )
     augmentDeclare ( DeclareStat itype name rhs _ )  =
-      let nextIt  =  addVariable name itype $ encloseIn prevIt False
+      let nextIt  =  addVariable name itype (extractRhsExpr rhs name) $ encloseIn prevIt False
       in  ( nextIt , DeclareStat itype name rhs nextIt )
 
 
@@ -100,7 +114,7 @@ augmentStat stat prevIt  =
     augmentScoped ( ScopedStat body )  =
       -- Need to tell that the first statement in body is inside a new scope
       let ( _ , body' )  =  augmentStat body (encloseIn prevIt True) -- Begins a new scope
-      in  ( prevIt  , ScopedStat body' )
+      in  ( prevIt , ScopedStat body' )
 
 
     augmentWhile                            :: Stat -> ( It , Stat )

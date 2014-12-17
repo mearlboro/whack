@@ -20,6 +20,8 @@ module Wacc.Data.SymbolTable
 , findEnclFunc
 , findIdent
 , findIdent'
+, findExpr
+, setExpr
 , nonFunction
 ) where
 
@@ -66,7 +68,7 @@ addParams params it  =  foldr addParam it params
 
 -- | Add a single paramter to the table
 addParam                       :: Param -> It -> It
-addParam ( Param ptype name )  =  addObject name ptype Parameter
+addParam ( Param ptype name )  =  addObject name ptype Parameter undefined
 
 -- | Add a list of functions to the table
 addFuncs           :: [ Func ] -> It ->  It
@@ -74,20 +76,20 @@ addFuncs funcs it  =  foldr addFunc it funcs
 
 -- | Add a single function to the table
 addFunc                              :: Func -> It -> It
-addFunc f@( Func ftype name _ _ _ )  =  addObject name ftype ( Function f )
+addFunc f@( Func ftype name _ _ _ )  =  addObject name ftype ( Function f ) undefined
 
 -- | Add a variable to the table
-addVariable             :: IdentName -> Type -> It -> It
-addVariable name vtype  =  addObject name vtype Variable
+addVariable                  :: IdentName -> Type -> Expr -> It -> It
+addVariable name vtype expr  =  addObject name vtype Variable expr
 
 -- | Add an object to the table
-addObject                       :: IdentName -> Type -> Context -> It -> It
-addObject name otype ctx table  =
+addObject                            :: IdentName -> Type -> Context -> Expr -> It -> It
+addObject name otype ctx expr table  =
   case table of
     -- Empty             -> ST Empty (insertIn empty TODO -- 
-    ST encl dict bs   -> ST encl  (insertIn dict) bs
+    ST encl dict bs   -> ST encl (insertIn dict) bs
   where
-    insertIn = insertWith onClash name $ IdentObj otype ctx -- (undefined, -1) 
+    insertIn = insertWith onClash name $ IdentObj otype ctx expr -- (undefined, -1) 
 
 -- | Handle case of re-declaration of a variable in the same scope
 onClash          :: ( IdentObj -> IdentObj -> IdentObj )
@@ -169,6 +171,15 @@ findContext name it  =  objCtx <$> findIdent name it
 findContext'          :: IdentName -> It -> Maybe Context
 findContext' name it  =  objCtx <$> findIdent' name it
 
+-- After semantic check
+findExpr         :: IdentName -> It -> Expr 
+findExpr name it =  fromJust (objExpr <$> findIdent' name it)
+
+
+setExpr               :: IdentName -> Expr -> It -> It 
+setExpr name expr it  =  addObject name itype ctx expr it
+  where
+    IdentObj itype ctx _ = fromJust (findIdent' name it)
 
 ---- | Recursively finds the context of an identifier in the table provided
 --findLocation          :: IdentName -> It -> (Reg, Int)
