@@ -78,18 +78,18 @@ main = do
   asd <- translateAll ( pwd ++ "valid" )
   checkProgs False False asd  
   
-  --asd' <- translateAll ( pwd ++ "invalid/syntaxErr" )
-  --checkProgs True  False asd'
+  asd' <- translateAll ( pwd ++ "invalid/syntaxErr" )
+  checkProgs True  False asd'
 
-  --asd'' <- translateAll ( pwd ++ "invalid/semanticErr" )  
-  --checkProgs False True  asd''
+  asd'' <- translateAll ( pwd ++ "invalid/semanticErr" )  
+  checkProgs False True  asd''
 
 
 checkProgs :: Bool -> Bool -> (Int, [(FilePath, Bool, [ SemanticErr ], [ Instr ])]) -> IO ()
 checkProgs haveSynErr haveSemErr (tot, res) = do 
 
   let passed (_, syn, sem, _) = (haveSynErr == not syn) && (haveSemErr == not (null sem))
-  mapM_ dumpOutput res
+  --mapM_ dumpOutput res
   let oks = length $ filter passed res
 
   putStrLn $ show oks ++ "/" ++ show tot ++ ": " ++ show (tot - oks) ++ " behaved badly"

@@ -78,7 +78,7 @@ augmentStat stat prevIt  =
     PrintStat   expr    _ -> (,) prevIt   $ PrintStat   expr    prevIt
     PrintlnStat expr    _ -> (,) prevIt   $ PrintlnStat expr    prevIt
     ReadStat    lhs     _ -> (,) prevIt   $ ReadStat    lhs     prevIt
-    AssignStat  lhs rhs _ -> (,) prevIt   $ AssignStat  lhs rhs prevIt
+    AssignStat  lhs rhs _ -> augmentAssign  stat -- (,) prevIt   $ AssignStat  lhs rhs prevIt
     DeclareStat _ _ _   _ -> augmentDeclare stat
     ScopedStat  _         -> augmentScoped  stat
     WhileStat   _ _     _ -> augmentWhile   stat
@@ -87,12 +87,34 @@ augmentStat stat prevIt  =
 
   where
 
+    extractRhsExpr                   :: AssignRhs -> IdentName -> Expr 
+    extractRhsExpr ( RhsExpr e ) _   =  e 
+    extractRhsExpr           _   id  =  IdentExpr id 
+
+
+
+    augmentAssign                                           :: Stat -> ( It , Stat )
+    augmentAssign ( AssignStat lhs@( LhsIdent id ) rhs _ )  =  
+      let expr    =  extractRhsExpr rhs id
+          -- Check that lhs identifer has already been defined. If not then 
+          -- the semantic checker will complain, and all will be good
+          nextIt  =  case findInCurrScope id prevIt of 
+             Nothing                           -> prevIt 
+             Just ( IdentObj itype ctx _expr ) -> addObject id itype ctx expr $ encloseIn prevIt False
+
+      in  ( nextIt , AssignStat lhs rhs nextIt )
+
+
+    augmentAssign ( AssignStat lhs rhs _ )  =  
+      ( prevIt , AssignStat lhs rhs prevIt )
+
     -- |We have the previous table and we need to return the table for the next
     --  statement. This is the only case where the table is updated, since we
     --  just introduced a new variable that can be used by subsequent statements
     augmentDeclare                                   :: Stat -> ( It , Stat )
     augmentDeclare ( DeclareStat itype name rhs _ )  =
-      let nextIt  =  addVariable name itype $ encloseIn prevIt False
+      let expr    =  extractRhsExpr rhs name 
+          nextIt  =  addVariable name itype expr $ encloseIn prevIt False
       in  ( nextIt , DeclareStat itype name rhs nextIt )
 
 

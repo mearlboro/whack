@@ -37,16 +37,18 @@ The idea is to associate each Identifier (i, j, p, q, a, b, r) with its
 right-hand-side Expr and map each Identifier to such Expr.
 So the SymbolTable has been modified so that now IdentObj also has a field for 
 the expression it contains, in addition to type and context.
+So i would have: IntLiterExpr 10
+   j would have: BinaryOperExpr AddBinOP (IdentExpr i) (IntLiterExpr 5)
 
-The problem now is that we need to add Expr information not only 
-in DeclareStat but also in AssignStat. 
-The best (only) place to add the Expr info to the identifiers is in the 
-Agumenter, so that the identifier tables don't get messed up.
+The problem now is that we need to add Expr information whenever we encounter
+a DeclareStat but also an AssignStat. 
+The best (only) place to do so is in the Agumenter, so that the identifier 
+tables remain intact.
 
-Assuming that works, then CanReplace should work fine and what's left to do 
-is **instance CanSimplify Expr where** 
-(atm it gets stuck in a black hole. The answer might be the almighty fix function)
-
+Assuming that works (hardly), then CanReplace should work fine (hopefully) 
+and what's left to do is **instance CanSimplify Expr where** 
+(atm it gets stuck in a black hole. 
+The answer might be the almighty fix function)
 
 -}
 
@@ -125,7 +127,7 @@ instance CanSimplify Stat where
 instance CanSimplify AssignLhs where
   simplify (LhsPairElem  (Fst e))  = LhsPairElem  (Fst (simplify e))
   simplify (LhsPairElem  (Snd e))  = LhsPairElem  (Snd (simplify e))
-  simplify (LhsArrayElem (id, es)) = LhsArrayElem (id, simplify es)
+  simplify (LhsArrayElem (id, es)) = LhsArrayElem (id,  simplify es)
   simplify                   lhs   = lhs  
 
 instance CanSimplify AssignRhs where
@@ -135,6 +137,7 @@ instance CanSimplify AssignRhs where
   simplify (RhsArrayLiter es     ) = RhsArrayLiter    (simplify es)            
   simplify (RhsNewPair    e e'   ) = RhsNewPair       (simplify e) (simplify e')            
   simplify (RhsCall       id es  ) = RhsCall id       (simplify es)
+
 
 instance CanSimplify Expr where
   simplify (BinaryOperExpr op (IntLiterExpr  i) (IntLiterExpr  j))  =  simplifyInt op i j
@@ -238,4 +241,16 @@ simplifyBool NEBinOp  p q = BoolLiterExpr (p /= q)
 --extractLhsIdent (LhsPairElem  (Snd (ArrayElemExpr (id, _))) = id  
 --extractLhsIdent (LhsPairElem  (Snd (ParensExpr     e      ) = extractLhsIdent (LhsPairElem (Snd e)) 
 --extractLhsIdent (LhsArrayElem                     (id, _) ) = id 
+--format      :: [ Char ] -> [ Char ]
+--format txt  = 
+--  where 
+--    cols  :: [[[ Char ]]]
+--    cols  =  (transpose . transpose . map words . lines) txt  
+
+--    align       :: [[ Char ]] -> [[ Char ]] -- Add spaces
+--    align cols  =  map (++ spaces) cols 
+--      where 
+--        spaces col  =  replicate (length col - mcol + 1) ' '
+--        mcol        =  max        cols  
+
 

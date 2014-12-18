@@ -254,7 +254,7 @@ getArrayElemType ( ident , exprs ) it  =
     if isValidArray then arrElemType else Nothing
   where
     arrayObj                  =  findIdent' ident it
-    IdentObj arrayType arrayCtx    =  fromJust arrayObj
+    IdentObj arrayType arrayCtx _   =  fromJust arrayObj
     isValidArray              =  isJust arrayObj            &&
                                  arrayType ~== ArrayType {} &&
                                  arrayCtx ~/= Function {}
@@ -390,7 +390,7 @@ checkExpr ( IdentExpr ident ) it ctxs types  =
   where
     identObj       =  findIdent' ident it
     notFoundErr    =  checkFound ident identObj
-    IdentObj itype ctx =  fromJust identObj
+    IdentObj itype ctx _ =  fromJust identObj
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- Let checkArrayElem do the job

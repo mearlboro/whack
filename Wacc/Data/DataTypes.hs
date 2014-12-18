@@ -235,6 +235,7 @@ data IdentObj
   = IdentObj
   { objType :: Type 
   , objCtx  :: Context
+  , objExpr :: Expr 
   } deriving (Eq, Ord)
 
 -- | Type synonym
