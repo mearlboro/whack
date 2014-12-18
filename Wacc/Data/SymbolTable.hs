@@ -9,12 +9,14 @@ module Wacc.Data.SymbolTable
 , isDefined
 , isRedefined
 , findInCurrScope
+, isConstant
 , findType
 , findType'
 , findContext
 , findContext'
 , isFunc
 , isFunc'
+, getExpr
 , isVariable
 , isVariable'
 , isParam
@@ -79,11 +81,11 @@ addFunc                              :: Func -> It -> It
 addFunc f@( Func ftype name _ _ _ )  =  addObject name ftype ( Function f ) undefined
 
 -- | Add a variable to the table
-addVariable                  :: IdentName -> Type -> Expr -> It -> It
+addVariable                  :: IdentName -> Type -> Maybe Expr -> It -> It
 addVariable name vtype expr  =  addObject name vtype Variable expr 
 
 -- | Add an object to the table
-addObject                            :: IdentName -> Type -> Context -> Expr -> It -> It
+addObject                            :: IdentName -> Type -> Context -> Maybe Expr -> It -> It
 addObject name otype ctx expr table  =
   case table of
     -- Empty             -> ST Empty (insertIn empty TODO -- 
@@ -122,6 +124,9 @@ findInCurrScope name it  =  findInCurrScope' it
                                               Nothing -> findInCurrScope' (getEncl it)
                                               obj     -> obj 
 
+getExpr :: IdentName -> It -> Maybe Expr 
+getExpr name it = objExpr (fromJust $ findIdent' name it)
+
 getEncl                  :: It -> It 
 getEncl   Empty          =  Empty
 getEncl ( ST encl _ _ )  =  encl
@@ -130,6 +135,8 @@ getDict                  :: It -> Dictionary
 getDict   Empty          =  error "NOOOOO"
 getDict ( ST _ dict _ )  =  dict 
 
+
+isConstant name it = False
 
 -- | Returns True iif the identifer is found in the table
 isDefined          :: IdentName -> It -> Bool

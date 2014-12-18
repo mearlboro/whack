@@ -2,9 +2,13 @@ module Wacc.Optimization.Optimizer where
 
 import Wacc.Data.DataTypes
 import Wacc.CodeGeneration.ARM11Instructions
+import Wacc.Semantics.Checker
+import Wacc.Syntax.Parser
 
 import qualified Data.Map as Map 
-import qualified Wacc.Semantics.SymbolTable as St
+import qualified Wacc.Data.SymbolTable as St
+
+import Data.Char (ord)
 
 {-
 
@@ -61,7 +65,7 @@ instance (CanReplace a) => CanReplace [ a ] where
   replace xs it = map (`replace` it) xs 
 
 instance CanReplace Program where
-  replace (Program funcs body) _ = Progam (replace funcs _it) (replace body _it)
+  replace (Program funcs body) _ = Program (replace funcs _it) (replace body _it)
 
 instance CanReplace Func where
   replace f _ = let body = bodyOf f in f { bodyOf = replace body _it }
@@ -74,12 +78,12 @@ instance CanReplace Stat where
   replace (PrintStat   e       it) _ = PrintStat   (replace e it) it 
   replace (PrintlnStat e       it) _ = PrintlnStat (replace e it) it 
   replace (ScopedStat  s         ) _ = ScopedStat  (replace s _it) 
-  replace (ReadStat    e       it) _ = ReadStat    (replace e it) it  
+  replace (ReadStat    lhs     it) _ = ReadStat    lhs            it  
   replace (WhileStat   e s     it) _ = WhileStat   (replace e it) (replace s _it) it 
   replace (IfStat      e s s'  it) _ = IfStat      (replace e it) (replace s _it) (replace s' _it) it 
   replace (AssignStat  lhs rhs it) _ = AssignStat  lhs (replace rhs it) it
   replace (DeclareStat t n rhs it) _ = DeclareStat t n (replace rhs it) it  
-  replace (SeqStat     s s'      ) _ = SeqStat     (replace s _it) (replace s _it) 
+  replace (SeqStat     s s'      ) _ = SeqStat     (replace s _it) (replace s' _it) 
 
 instance CanReplace AssignRhs where
   replace (RhsExpr       e      ) it = RhsExpr (replace e it)           
@@ -90,9 +94,14 @@ instance CanReplace AssignRhs where
   replace (RhsCall       id es  ) it = RhsCall id (replace es it)     
 
 instance CanReplace Expr where
-  replace (IdentExpr      id      ) it = St.getExpr id it -- * Magic happens right here *--
+  replace (IdentExpr id) it = 
+    case St.getExpr id it of 
+      -- * Magic happens right here *--
+      Nothing   -> IdentExpr id
+      Just expr -> expr 
+
   replace (UnaryOperExpr  op e    ) it = UnaryOperExpr op (replace e it) 
-  replace (ParensExpr     e       ) it = ParensExpr (replace e it)
+  replace (ParenthesisedExpr     e       ) it = ParenthesisedExpr (replace e it)
   replace (ArrayElemExpr  (id, es)) it = ArrayElemExpr (id, replace es it)
   replace (BinaryOperExpr op e e' ) it = BinaryOperExpr op (replace e it) (replace e' it) 
   replace                 e         _  = e
@@ -100,7 +109,7 @@ instance CanReplace Expr where
 class CanSimplify a where
   simplify :: a -> a 
 
-instance (CanSimplify a) => [ a ] where
+instance (CanSimplify a) => CanSimplify [ a ] where
   simplify = map simplify
 
 instance CanSimplify Program where
@@ -140,13 +149,13 @@ instance CanSimplify AssignRhs where
 
 
 instance CanSimplify Expr where
-  simplify (BinaryOperExpr op (IntLiterExpr  i) (IntLiterExpr  j))  =  simplifyInt op i j
-  simplify (BinaryOperExpr op (BoolLiterExpr p) (BoolLiterExpr q))  =  simplifyBool op p q
-  simplify (BinaryOperExpr op (CharLiterExpr a) (CharLiterExpr b))  =  simplifyInt op (ord a) (ord b) 
-  simplify (BinaryOperExpr op                e                 e')  =  simplify (BinaryOperExpr op (simplify e) (simplify e'))
-  simplify (UnaryOperExpr  op                e                   )  =  UnaryOperExpr op (simplify e)      
-  simplify (ParenthesisedExpr e)                                    =  (simplify e)  
-  simplify (ArrayElemExpr     (id, es))                             =  ArrayElemExpr (id, simplify es)            
+  --simplify (BinaryOperExpr op (IntLiterExpr  i) (IntLiterExpr  j))  =  simplifyInt op i j
+  --simplify (BinaryOperExpr op (BoolLiterExpr p) (BoolLiterExpr q))  =  simplifyBool op p q
+  --simplify (BinaryOperExpr op (CharLiterExpr a) (CharLiterExpr b))  =  simplifyInt op (ord a) (ord b) 
+  --simplify (BinaryOperExpr op                e                 e')  =  (BinaryOperExpr op (simplify e) (simplify e'))
+  --simplify (UnaryOperExpr  op                e                   )  =  UnaryOperExpr op (simplify e)      
+  --simplify (ParenthesisedExpr e)                                    =  (simplify e)  
+  --simplify (ArrayElemExpr     (id, es))                             =  ArrayElemExpr (id, simplify es)            
   simplify                                                     e    =  e   
 
 
@@ -169,6 +178,16 @@ simplifyBool EqBinOp  p q = BoolLiterExpr (p == q)
 simplifyBool NEBinOp  p q = BoolLiterExpr (p /= q) 
 
 
+test :: String -> IO () 
+test file = do 
+  source <- readFile ("/Users/Zeme/Desktop/wacc_24/WaccTesting/wacc_examples/valid/" ++ file)
+  let Right prog       = parseWithEof pProgram source
+      (prog', semErrs) = checkProgram prog
+
+  putStrLn $ "BeforeOptimizing: " 
+  putStrLn $ show prog
+  putStrLn $ "AfterOptimizing: " 
+  putStrLn $ show (replace prog' _it)
 
 ----------------------------------------------------------------------------------
 --extractIt                        :: Stat -> Maybe It 

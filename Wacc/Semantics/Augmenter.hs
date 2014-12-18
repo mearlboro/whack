@@ -91,18 +91,20 @@ augmentStat stat prevIt  =
     extractRhsExpr ( RhsExpr e ) _   =  e 
     extractRhsExpr           _   id  =  IdentExpr id 
 
-
+-- Probe
 
     augmentAssign                                           :: Stat -> ( It , Stat )
-    augmentAssign ( AssignStat lhs@( LhsIdent id ) rhs _ )  =  
-      let expr    =  extractRhsExpr rhs id
-          -- Check that lhs identifer has already been defined. If not then 
-          -- the semantic checker will complain, and all will be good
-          nextIt  =  case findInCurrScope id prevIt of 
-             Nothing                           -> prevIt 
-             Just ( IdentObj itype ctx _expr ) -> addObject id itype ctx expr $ encloseIn prevIt False
+    --augmentAssign ( AssignStat lhs@( LhsIdent id ) rhs _ )  =  
+    --  let expr    =  IdentExpr id  -- extractRhsExpr rhs id
+    --      -- Check that lhs identifer has already been defined. If not then 
+    --      -- the semantic checker will complain, and all will be good
+    --      -- If is has been defined then we are reassigninig it and therefore it 
+    --      -- is no longer constant
+    --      nextIt  =  case findInCurrScope id prevIt of 
+    --         Nothing                           -> prevIt 
+    --         Just ( IdentObj itype ctx _expr ) -> addObject id itype ctx Nothing prevIt -- $ encloseIn prevIt False
 
-      in  ( nextIt , AssignStat lhs rhs nextIt )
+    --  in  ( nextIt , AssignStat lhs rhs nextIt )
 
 
     augmentAssign ( AssignStat lhs rhs _ )  =  
@@ -114,7 +116,7 @@ augmentStat stat prevIt  =
     augmentDeclare                                   :: Stat -> ( It , Stat )
     augmentDeclare ( DeclareStat itype name rhs _ )  =
       let expr    =  extractRhsExpr rhs name 
-          nextIt  =  addVariable name itype expr $ encloseIn prevIt False
+          nextIt  =  addVariable name itype (Just expr) $ encloseIn prevIt False
       in  ( nextIt , DeclareStat itype name rhs nextIt )
 
 

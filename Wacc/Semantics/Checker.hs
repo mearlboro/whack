@@ -390,7 +390,7 @@ checkExpr ( IdentExpr ident ) it ctxs types  =
   where
     identObj       =  findIdent' ident it
     notFoundErr    =  checkFound ident identObj
-    IdentObj itype ctx _ =  fromJust identObj
+    IdentObj itype ctx _  =  fromJust identObj
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 -- Let checkArrayElem do the job
