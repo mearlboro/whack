@@ -163,7 +163,7 @@ simplify' (BinaryOperExpr op (IntLiterExpr  i) (IntLiterExpr  j))  =  simplifyIn
 simplify' (BinaryOperExpr op (BoolLiterExpr p) (BoolLiterExpr q))  =  simplifyBool op p q
 simplify' (BinaryOperExpr op (CharLiterExpr a) (CharLiterExpr b))  =  simplifyInt op (ord a) (ord b) 
 simplify' (UnaryOperExpr  op                e                   )  =  UnaryOperExpr op (simplify e)      
-simplify' (ParenthesisedExpr e)                                    =  (simplify e)  
+simplify' (ParenthesisedExpr e)                                    =  (simplify e)
 simplify' (ArrayElemExpr     (id, es))                             =  ArrayElemExpr (id, simplify es)            
 simplify'                                                     e    =  e   
 
@@ -171,6 +171,7 @@ simplify'                                                     e    =  e
 simplifyInt AddBinOp i j = IntLiterExpr  (i   +   j) 
 simplifyInt SubBinOp i j = IntLiterExpr  (i   -   j)
 simplifyInt MulBinOp i j = IntLiterExpr  (i   *   j)
+simplifyInt DivBinOp i 0 = BinaryOperExpr DivBinOp (IntLiterExpr i)(IntLiterExpr 0)
 simplifyInt DivBinOp i j = IntLiterExpr  (i `div` j)
 simplifyInt ModBinOp i j = IntLiterExpr  (i `mod` j)
 simplifyInt LsBinOp  i j = BoolLiterExpr (i   <   j)
