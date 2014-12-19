@@ -10,6 +10,7 @@ import Wacc.Syntax.Parser
 import Wacc.Semantics.Checker
 import Wacc.CodeGeneration.TransProgram
 import Wacc.CodeGeneration.TransCommon (makePretty)
+import Wacc.Optimization.Optimizer
 
 -------------------------------------------------------------------------------
 
@@ -81,7 +82,7 @@ check program path = do
         putStrLn $ unlines errs
         exitWith $ ExitFailure 200
     else do
-        let assembled = makePretty (evaluateProgram program')
+        let assembled = makePretty (evaluateProgram (simplify program') )
         -- Write the assembly file
         putStrLn assembled 
         saveAssembled path assembled
