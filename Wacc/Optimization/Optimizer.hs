@@ -8,7 +8,7 @@ import Wacc.Syntax.Parser
 import qualified Data.Map as Map 
 import qualified Wacc.Data.SymbolTable as St
 
-import Data.Char (ord)
+import Data.Char (ord, chr)
 
 {-
 
@@ -153,7 +153,7 @@ instance CanSimplify Expr where
   simplify (BinaryOperExpr op (BoolLiterExpr p) (BoolLiterExpr q))  =  simplifyBool op p q
   simplify (BinaryOperExpr op (CharLiterExpr a) (CharLiterExpr b))  =  simplifyInt op (ord a) (ord b) 
   simplify (BinaryOperExpr op                e                 e')  =  simplify' (BinaryOperExpr op (simplify e) (simplify e'))
-  simplify (UnaryOperExpr  op                e                   )  =  UnaryOperExpr op (simplify e)      
+  simplify (UnaryOperExpr  op                e                   )  =  simplifyUnary (UnaryOperExpr op (simplify e))      
   simplify (ParenthesisedExpr e)                                    =  (simplify e)  
   simplify (ArrayElemExpr     (id, es))                             =  ArrayElemExpr (id, simplify es)            
   simplify                                                     e    =  e   
@@ -166,6 +166,14 @@ simplify' (UnaryOperExpr  op                e                   )  =  UnaryOperE
 simplify' (ParenthesisedExpr e)                                    =  (simplify e)
 simplify' (ArrayElemExpr     (id, es))                             =  ArrayElemExpr (id, simplify es)            
 simplify'                                                     e    =  e   
+
+
+simplifyUnary (UnaryOperExpr NotUnOp (BoolLiterExpr b)) = BoolLiterExpr ( not b )
+simplifyUnary (UnaryOperExpr OrdUnOp (CharLiterExpr c)) = IntLiterExpr  ( ord c )
+simplifyUnary (UnaryOperExpr ChrUnOp (IntLiterExpr  i)) = CharLiterExpr ( chr i)
+simplifyUnary (UnaryOperExpr NegUnOp (IntLiterExpr  i)) = IntLiterExpr  ( -i )
+simplifyUnary                                     e     = e 
+
 
 
 simplifyInt AddBinOp i j = IntLiterExpr  (i   +   j) 
