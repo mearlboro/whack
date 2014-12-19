@@ -149,15 +149,23 @@ instance CanSimplify AssignRhs where
 
 
 instance CanSimplify Expr where
-  --simplify (BinaryOperExpr op (IntLiterExpr  i) (IntLiterExpr  j))  =  simplifyInt op i j
-  --simplify (BinaryOperExpr op (BoolLiterExpr p) (BoolLiterExpr q))  =  simplifyBool op p q
-  --simplify (BinaryOperExpr op (CharLiterExpr a) (CharLiterExpr b))  =  simplifyInt op (ord a) (ord b) 
-  --simplify (BinaryOperExpr op                e                 e')  =  (BinaryOperExpr op (simplify e) (simplify e'))
-  --simplify (UnaryOperExpr  op                e                   )  =  UnaryOperExpr op (simplify e)      
-  --simplify (ParenthesisedExpr e)                                    =  (simplify e)  
-  --simplify (ArrayElemExpr     (id, es))                             =  ArrayElemExpr (id, simplify es)            
+  simplify (BinaryOperExpr op (IntLiterExpr  i) (IntLiterExpr  j))  =  simplifyInt op i j
+  simplify (BinaryOperExpr op (BoolLiterExpr p) (BoolLiterExpr q))  =  simplifyBool op p q
+  simplify (BinaryOperExpr op (CharLiterExpr a) (CharLiterExpr b))  =  simplifyInt op (ord a) (ord b) 
+  simplify (BinaryOperExpr op                e                 e')  =  simplify' (BinaryOperExpr op (simplify e) (simplify e'))
+  simplify (UnaryOperExpr  op                e                   )  =  UnaryOperExpr op (simplify e)      
+  simplify (ParenthesisedExpr e)                                    =  (simplify e)  
+  simplify (ArrayElemExpr     (id, es))                             =  ArrayElemExpr (id, simplify es)            
   simplify                                                     e    =  e   
 
+
+simplify' (BinaryOperExpr op (IntLiterExpr  i) (IntLiterExpr  j))  =  simplifyInt op i j
+simplify' (BinaryOperExpr op (BoolLiterExpr p) (BoolLiterExpr q))  =  simplifyBool op p q
+simplify' (BinaryOperExpr op (CharLiterExpr a) (CharLiterExpr b))  =  simplifyInt op (ord a) (ord b) 
+simplify' (UnaryOperExpr  op                e                   )  =  UnaryOperExpr op (simplify e)      
+simplify' (ParenthesisedExpr e)                                    =  (simplify e)  
+simplify' (ArrayElemExpr     (id, es))                             =  ArrayElemExpr (id, simplify es)            
+simplify'                                                     e    =  e   
 
 
 simplifyInt AddBinOp i j = IntLiterExpr  (i   +   j) 
